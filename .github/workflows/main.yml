@@ -16,21 +16,11 @@ jobs:
         os: [ubuntu-latest]
     name: On ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 15
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Free up disk space
-      run: |
-        df -h
-        for d in /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-                 /opt/hostedtoolcache/CodeQL; do
-          { sudo rm -rf "$d" || true; } &
-        done
-        wait
-        df -h
 
     - name: Set up Docker
       uses: docker/setup-docker-action@v4
