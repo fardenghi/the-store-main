@@ -1,47 +1,62 @@
 # Pre-entrega TPE — Tema 9: Asistente Inteligente de Compras con GenAI
 
 **Redes de Información — ITBA — 2C 2026**
-**Grupo [N]** — [Integrante 1], [Integrante 2], [Integrante 3]
+
+**Grupo [3]** — [Ardenghi, Filipo - 64306], [Bassi, Santiago - 64643], [Testoni, Ezequiel 64709]
 
 ---
 
 ## 1. Problemática y contexto
 
-**The Store** es un e-commerce de microservicios desplegado en Kubernetes: `ui` (Java 21 / Spring Boot, WebFlux + Thymeleaf), `catalog` (Go / Gin), `cart` y `orders` (Java / Spring Boot) y `checkout` (NestJS). El descubrimiento de productos tiene hoy dos limitaciones concretas:
+**The Store** es un e-commerce de microservicios desplegado en Kubernetes con los siguientes servicios:
 
-- **Búsqueda sólo léxica.** `GET /catalog/products` filtra únicamente por `tags` exactos, con orden por precio y paginación. No hay búsqueda semántica ni tolerancia a sinónimos o errores de tipeo: una consulta que no comparte palabras literales con un producto no lo encuentra.
-- **Chat sin conocimiento de la tienda.** La UI ya expone un chat (`POST /chat/submit`, streaming SSE, Spring AI 1.0.0), pero es sólo un *system prompt* de personaje: no conoce el catálogo, no recuerda turnos anteriores y no puede actuar sobre otros servicios.
 
-**Objetivo:** convertir ese chat en un **asistente de compras con GenAI** que busque semánticamente, responda con datos reales del catálogo, razone sobre comparaciones y actúe sobre los microservicios (agregar al carrito). El modelo se ejecuta **de forma local, dentro del propio cluster** (Llama sobre Ollama, sólo CPU), sin depender de APIs cloud.
+
+* UI - Java + Spring Boot, WebFlux + Thymeleaf
+* Catalog - Go / Gin
+* Cart - Java + Spring Boot
+* Orders - Java + Spring Boot
+* Checkout - Nest JS
+
+El descubrimiento de productos tiene hoy dos limitaciones concretas:
+
+
+
+* **Búsqueda sólo léxica.** `GET /catalog/products` filtra únicamente por tags exactos, con orden por precio y paginación. No hay búsqueda semántica ni tolerancia a sinónimos o errores de tipeo: una consulta que no comparte palabras literales con un producto no lo encuentra.
+* **Chat sin conocimiento de la tienda.** La UI ya expone un chat (`POST /chat/submit`, streaming SSE), pero es sólo un system prompt ficticio: no conoce el catálogo, no recuerda sesiones anteriores y no puede actuar sobre otros servicios.
+
+El objetivo es convertir ese chat en un asistente de compras con GenAI que busque semánticamente, responda con datos reales del catálogo, razone sobre comparaciones y actúe sobre los microservicios (agregar al carrito). El modelo se ejecuta de forma local.
+
 
 ## 2. Diseño de la solución
 
-- **Componente `assistant` (nuevo microservicio).** Java 21 + Spring Boot + Spring AI, desplegado en el namespace `the-store` como un servicio más (puerto 8080, `Service` ClusterIP), al mismo nivel que `catalog`, `cart` y `orders`. Concentra toda la lógica GenAI y es el único servicio que habla con Ollama y con Qdrant: indexación de productos, retrieval, armado de prompts (incluida la persona «A.G.E.N.T.», que hoy vive en la configuración de la UI), memoria por sesión y *tools* contra los microservicios. Cambiar de modelo o de vector store impacta sólo a este servicio. La UI sigue siendo sólo presentación y las fallas o la carga del LLM quedan aisladas en su propio servicio.
-- **Runtime del modelo: Ollama en un pod, sólo CPU.** Ollama corre como un `Deployment` propio en el namespace `the-store`, publicado por un `Service` ClusterIP `ollama` (puerto 11434) que el `assistant` resuelve por DNS (`ollama.the-store.svc.cluster.local`) como a cualquier otro servicio. No depende de una GPU ni de software instalado en el host, por lo que el despliegue es reproducible con `kind` + `kubectl apply` en cualquier máquina. En el primer arranque el pod descarga los modelos (`ollama pull`) a un PVC de la StorageClass `standard` montado en `/root/.ollama`, de modo que los reinicios posteriores no repiten la descarga, y un `readinessProbe` lo marca disponible recién cuando ambos modelos están presentes. Modelos: **Llama 3.2 3B Instruct (cuantización Q4)** para generación, razonamiento y *tool calling* (~2 GB de RAM), y **nomic-embed-text** (768 dimensiones) para embeddings, ambos servidos por la misma instancia.
-- **Vector store: Qdrant.** Desplegado en el cluster (`Deployment` + `Service` + PVC de la StorageClass `standard`). Una colección de productos (768 dimensiones, distancia coseno) con payload `{id, name, price, tags}`, que habilita filtros híbridos (rango de precio, tags). El `assistant` lo consulta con el starter oficial de Spring AI (REST 6333 / gRPC 6334).
-- **Indexación de productos.** Cuando el `assistant` se levanta, lee el catálogo real por API (`GET /catalog/size` y luego `GET /catalog/products?size=<total>`, dado que el endpoint pagina de a 10 por defecto), extrae `tags[].name`, calcula el embedding de `name + description + tags` con `nomic-embed-text` (el mismo modelo con el que embebe las consultas) y hace *upsert* en Qdrant. Al leer de la API, el índice vectorial refleja exactamente lo que sirve el catálogo, y `catalog` no se acopla a Ollama ni a Qdrant.
-- **Contrato UI ↔ `assistant`.** Nuevo *provider* de chat en la UI, `assistant` (`AssistantChatConfig` + `AssistantChatModel`, mismo patrón que los providers existentes `openai`, `bedrock` y `mock`; se activa con `retail.ui.chat.provider=assistant`). `ChatController` obtiene la sesión con `SessionIDUtil.getSessionId(request)` y la transmite en un `ChatOptions` propio; el provider la envía como header `X-Session-ID` en `POST /chat` (body `{"message": "..."}`, respuesta `text/event-stream`). El `assistant` expone además `GET /products/{id}/similar?k=` (vecinos más cercanos en Qdrant) para la ficha de producto. El front (`chat.js`) no cambia: `SessionIDWebFilter` ya traduce la cookie `SESSIONID` al header `X-Session-ID`.
-- **Identidad y memoria.** El `X-Session-ID` es el mismo identificador que la aplicación ya usa como `customerId` contra `cart`. El `assistant` lo usa como clave de la memoria conversacional (ventana de turnos, en memoria) y como `customerId` en la tool de carrito, de modo que lo que el asistente agrega aparece en el carrito que muestra la UI.
-- **Tools (function calling).** Tres herramientas expuestas al modelo: búsqueda con filtros estructurados (tags y orden de `GET /catalog/products`, más rango de precio como filtro de payload en Qdrant), detalle y precio en vivo (`GET /catalog/products/{id}`) y agregar al carrito (`POST /carts/{customerId}/items`).
+
+
+* **Componente `assistant`, nuevo microservicio.** Desarrollado en Java 21 con Spring Boot y Spring AI, desplegado en el namespace `the-store` como un servicio más en el puerto 8080 con Service ClusterIP, al mismo nivel que `catalog`, `cart` y `orders`. Concentra toda la lógica GenAI y es el único servicio que se comunica con `ollama` y con `qdrant`: indexación de productos, retrieval, armado de prompts, incluida la persona A.G.E.N.T. que hoy reside en la configuración de la UI, memoria por sesión y tools contra los microservicios. Cambiar de modelo o de vector store impacta únicamente a este servicio. La `ui` continúa siendo sólo presentación, por lo que las fallas o la carga del LLM quedan aisladas en su propio servicio.
+* **Runtime del modelo: `Ollama` en un pod.** `ollama` corre como un Deployment propio en el namespace `the-store`. Se va a experimentar con diferentes modelos para generación, razonamiento y tool calling, para luego determinar qué modelo queda en producción.
+* **Vector store: `Qdrant`.** Se define una colección de productos de 768 dimensiones con distancia coseno y payload con atributos id, name, price y tags, lo que habilita filtros híbridos como rango de precio y tags. Es consultado por el servicio `assistant`.
+* **Indexación de productos.** Al iniciar el servicio, `assistant` consulta el catálogo real. Luego extrae el nombre de los tags, calcula el embedding de la concatenación de nombre, descripción y tags con un modelo como, por ejemplo, modelo `nomic-embed-text`.
+* **Contrato UI con `assistant`.** Se incorpora un nuevo provider de chat en la `ui` denominado `assistant`.
+* **Herramientas de Function Calling.** Se exponen tres herramientas al modelo de lenguaje: búsqueda con filtros estructurados que combina tags y ordenamiento de `GET /catalog/products` junto con filtros de rango de precio sobre el payload en `qdrant`, consulta de detalle y precio en tiempo real mediante `GET /catalog/products/{id}`, e incorporación de productos al carrito mediante `POST /carts/{customerId}/items`.
+
 
 ## 3. Scope del POC y casos de uso
 
-Implementamos los bloques **1 a 4** de capacidades del asistente (embeddings → LLM chico con RAG → LLM mediano con razonamiento → function calling). Catálogo, UI y persona del chat están en inglés, por lo que los ejemplos de consulta también.
+Se implementarán las siguientes capacidades del asistente, abarcando desde embeddings, modelo compacto con RAG, modelo intermedio con razonamiento y function calling.
 
-| Bloque | Caso de uso | Criterio de aceptación en la demo |
-|---|---|---|
-| **1. Embeddings** | Búsqueda semántica | *"something to escape a chase without being seen"* devuelve ≥3 productos reales del catálogo, sin coincidencia léxica exacta |
-| **1. Embeddings** | Productos similares | La ficha de producto muestra los k vecinos más cercanos, coherentes con el producto |
-| **1. Embeddings** | Tolerancia a typos y sinónimos | *"umbrela with a grapling hok"* encuentra el mismo producto que la grafía correcta |
-| **2. LLM chico (RAG)** | Respuesta con productos reales | La respuesta menciona sólo productos existentes, con su precio real y enlace a su ficha |
-| **2. LLM chico (RAG)** | Query rewriting previo al retrieval | El retrieval mejora de forma observable respecto de buscar la consulta cruda |
-| **3. LLM mediano** | Comparación justificada | Compara dos productos con criterios explícitos (precio, atributos), no sólo «elegí el A» |
-| **3. LLM mediano** | Conversación multi-turno | Ante *"cheaper"* o *"not a vehicle"*, mantiene el contexto del turno anterior usando `X-Session-ID` |
-| **4. Function calling** | Agregar al carrito desde el chat | Llama a `POST /carts/{customerId}/items` y el carrito de la UI lo refleja |
-| **4. Function calling** | Precio y detalle en vivo | Consulta `GET /catalog/products/{id}` en lugar de leer el dato del vector store |
-| **4. Function calling** | Filtros estructurados | Traduce categoría y presupuesto del lenguaje natural a filtros reales (tags y orden de la API, rango de precio en Qdrant) |
 
-**Transversales dentro del scope:** streaming de tokens de punta a punta (navegador ↔ `ui` ↔ `assistant` ↔ Ollama, todo SSE) y citado de fuentes (cada producto mencionado linkea a su ficha `/catalog/{id}`, lo que permite verificar que no hay alucinaciones).
+| Caso de uso | Criterio de aceptación en la demo |
+|---|---|
+| Búsqueda semántica | "*something to escape a chase without being seen*" devuelve al menos 3 productos reales del catálogo, sin coincidencia léxica exacta |
+| Productos similares | La ficha de producto muestra los k vecinos más cercanos y coherentes con el producto |
+| Tolerancia a errores de tipeo y sinónimos | "*umbrela with a grapling hok*" encuentra el mismo producto que la grafía correcta |
+| Reescritura de consulta previa al retrieval | La recuperación de información mejora de forma observable respecto de buscar la consulta cruda |
+| Comparación justificada | Compara dos productos con criterios explícitos de precio y atributos, evitando respuestas simplistas |
+| Conversación multi-turno | Ante expresiones como "*cheaper*" o "*not a vehicle*", mantiene el contexto del turno anterior utilizando |
+| Agregar al carrito desde el chat | Invoca `POST /carts/{customerId}/items` y el carrito de la interfaz refleja los cambios |
+| Precio y detalle en tiempo real | Consulta `GET /catalog/products/{id}` en lugar de tomar el valor estático del vector store |
+| Filtros estructurados | Traduce la categoría y el presupuesto expresados en lenguaje natural a filtros reales de tags y orden en la API y rango de precio en `Qdrant` |
+
 
 ## 4. Diagrama de arquitectura
 
@@ -87,22 +102,15 @@ flowchart TB
 
 ## 5. Alternativas consideradas
 
+
 | Decisión | Alternativa descartada | Por qué se descarta |
 |---|---|---|
-| Dónde vive el asistente | Extender el `ChatController` de la UI | Mezcla presentación con inteligencia, sin contrato de API explícito entre componentes ni aislamiento de fallas; carga de LLM/RAG en un servicio que ya sirve páginas |
-| Dónde vive el asistente | Servicio nuevo en Python (FastAPI + LangChain/LlamaIndex) | Suma un cuarto lenguaje al repo (ya hay Java, Go y Node) y se aleja de Spring AI, que es la tecnología nombrada por el tema |
-| Runtime del modelo | Ollama nativo en el host, con GPU | Aprovecha la RTX 3050 Ti sin passthrough, pero exige instalar Ollama en el host y exponerlo (`OLLAMA_HOST=0.0.0.0`, firewall), fijar a mano la IP del bridge (`172.19.0.1`) en un `Service` sin selector + `EndpointSlice` y contar con una GPU NVIDIA: el despliegue deja de ser reproducible con sólo `kind` + `kubectl apply` |
-| Runtime del modelo | Ollama en un pod con GPU passthrough | Requiere passthrough anidado (host → Docker → containerd del nodo `kind` → pod), `nvidia-container-toolkit`, `extraMounts` y device plugin, y sólo funciona en máquinas con GPU NVIDIA: contradice el objetivo de portabilidad |
-| Runtime del modelo | Ollama como sidecar (o dentro del mismo contenedor) del `assistant` | Reiniciar o escalar el `assistant` recargaría o duplicaría el modelo en RAM, y se pierde el aislamiento de memoria entre el LLM y la lógica de negocio |
-| Runtime del modelo | llama.cpp directo, sin Ollama | Más control de bajo nivel, pero Ollama aporta gestión de modelos y API HTTP lista, lo que reduce el riesgo operativo |
-| Modelo | Modelos de 7–8B como base | Sin GPU, la generación en CPU sería demasiado lenta para una demo interactiva y ocuparían varios GB más de RAM en el nodo |
-| Vector store | pgvector | Ningún servicio de The Store usa PostgreSQL: habría que desplegar una base relacional completa sólo para la extensión |
-| Vector store | Qdrant + pgvector con comparativa | Duplica la indexación y los puntos de falla en la demo, sin justificar el contenido extra |
-| Indexación | Que `catalog` calcule los embeddings y escriba en Qdrant al arrancar | Duplica en Go la lógica de embeddings y el esquema del vector store, y acopla `catalog` a Ollama y a Qdrant: cambiar de modelo o de vector store obligaría a modificar dos servicios en dos lenguajes. El `assistant` es el único dueño de ambas dependencias |
-| Contrato UI ↔ assistant | API compatible OpenAI (`base-url`) | Igualmente exige modificar `ChatController` para propagar la sesión, y depende de que la librería externa permita pasar `X-Session-ID` |
-| Contrato UI ↔ assistant | Proxy intermedio | Una capa más sin nada que desacoplar: ambos extremos son componentes propios |
-| IA | API cloud gestionada (OpenAI, Bedrock) | Ya soportada por la UI, pero con costo variable y contraria al espíritu del tema (modelos locales) |
-| Recuperación | Catálogo completo en el prompt, sin vector store | Es el bloque 6 (fuera de scope); no escala con el tamaño del catálogo y no demuestra embeddings |
-| Búsqueda | Mejorar con SQL `LIKE` / Elasticsearch, sin GenAI | Resuelve parte del descubrimiento pero no cumple la consigna del tema |
+| Dónde vive el asistente | Servicio nuevo en Python con FastAPI y LangChain | Incorpora un cuarto lenguaje al repositorio que ya contiene Java, Go y Node, alejándose además de Spring AI que es la tecnología designada para el trabajo. |
+| Runtime del modelo | Ollama como sidecar dentro del pod de `assistant` | Reiniciar o escalar horizontalmente el servicio assistant duplicaría o recargaría innecesariamente el modelo en memoria RAM, perdiendo aislamiento de recursos. |
+| Runtime del modelo | Uso de llama.cpp directo sin Ollama | Brinda mayor control de bajo nivel pero carece de la gestión integral de modelos y de la API HTTP lista que aporta Ollama, incrementando el riesgo operativo. |
+| Vector store | pgvector sobre PostgreSQL | Ningún servicio de The Store utiliza PostgreSQL, por lo que requeriría desplegar y mantener una base de datos relacional completa únicamente para esta funcionalidad. |
+| Proceso de indexación | Indexación directa desde `catalog` hacia Ollama y Qdrant | Acopla el microservicio de catálogo a la infraestructura de inteligencia artificial y duplica en Go la lógica de embeddings y el esquema que Spring AI gestiona nativamente. |
+| Contrato UI con `assistant` | API compatible con OpenAI mediante `base-url` | Exige modificar de igual forma el ChatController para propagar la sesión y depende de que la librería externa admita cabeceras personalizadas como `X-Session-ID`. |
+| Mecanismo de búsqueda | Búsqueda tradicional por SQL LIKE o Elasticsearch sin GenAI | Resuelve únicamente búsquedas sintácticas pero no aporta comprensión semántica ni tolerancia a intenciones complejas del usuario. |
 
-**Riesgos y mitigaciones.** *Latencia del modelo local (sólo CPU):* streaming de tokens, modelo 3B cuantizado, contexto de retrieval acotado (pocos productos por consulta) y precarga del modelo antes de la demo; si una prueba de banco de tokens/segundo o de *tool calling* no alcanza, se evaluará un modelo más chico (p. ej. Llama 3.2 1B). *Memoria del nodo:* el `Deployment` de Ollama fija un límite de memoria propio, para que el modelo no compita con los servicios Java del nodo. *Alucinaciones del modelo chico:* RAG con datos reales y citado de fuentes. *Memoria efímera:* el historial vive en memoria del `assistant` y se pierde si el pod se reinicia, el mismo criterio que hoy tiene el carrito.
+
