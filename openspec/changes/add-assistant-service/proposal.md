@@ -9,10 +9,10 @@ La pre-entrega aprobada define un microservicio nuevo, `assistant`, que concentr
 - Nuevo servicio `src/assistant`: Java 21, Spring Boot y Spring AI. Imagen sobre Amazon Linux 2023 + Corretto 21, igual que `ui` y `cart`. Expone el endpoint de health.
 - Despliegue en el namespace `the-store`: `ServiceAccount`, `ConfigMap`, `Service` ClusterIP en el puerto 8080 y `Deployment`, con el mismo patrón que el resto de los servicios en `dist/kubernetes.yaml`.
 - Qdrant como `Deployment`/`StatefulSet` propio con su imagen oficial, REST :6333 y gRPC :6334, y un PVC sobre la StorageClass `standard`.
-- `Secret` con `NVIDIA_API_KEY`, montado como variable de entorno en `assistant`. La clave no se versiona: se crea desde `local.sh` o a mano.
-- Configuración del cliente hacia `https://integrate.api.nvidia.com`: URL base, modelos y `max-tokens` explícito, que NVIDIA exige.
+- `Secret` con `NVIDIA_API_KEY` (chat) y `GOOGLE_API_KEY` (embeddings), montados como variables de entorno en `assistant`. Las claves no se versionan: se crean desde `local.sh` o a mano.
+- Configuración del cliente de chat hacia `https://integrate.api.nvidia.com` (URL base, modelos y `max-tokens` explícito, que NVIDIA exige) y del cliente de embeddings hacia la Gemini API.
 - `local.sh`: `assistant` se suma a `SERVICES` (build y `kind load`) y se agrega la creación del Secret.
-- **Desvío respecto de la pre-entrega:** se elimina el pod de Ollama y su PVC. La cátedra autorizó usar modelos de proveedores en la nube, así que todo el tráfico de inferencia sale del cluster por HTTPS 443 hacia NVIDIA (pod → SNAT del nodo kind → NAT de Docker → internet; DNS externo vía forward de kube-dns). Hay que actualizar la fila "Tráfico hacia afuera del cluster" y el diagrama.
+- **Desvío respecto de la pre-entrega:** se elimina el pod de Ollama y su PVC. La cátedra autorizó usar modelos de proveedores en la nube, así que todo el tráfico de inferencia sale del cluster por HTTPS 443 hacia dos destinos: `integrate.api.nvidia.com` (chat) y `generativelanguage.googleapis.com` (embeddings). El camino es pod → SNAT del nodo kind → NAT de Docker → internet, con DNS externo vía forward de kube-dns. Hay que actualizar la fila "Tráfico hacia afuera del cluster" y el diagrama.
 
 ## Capabilities
 
@@ -27,5 +27,5 @@ La pre-entrega aprobada define un microservicio nuevo, `assistant`, que concentr
 - Nuevo: `src/assistant/` (proyecto Maven y Dockerfile).
 - `dist/kubernetes.yaml`: recursos nuevos de `assistant` y `qdrant`, más el `Secret`.
 - `local.sh`: lista `SERVICES` y creación del Secret.
-- Dependencia externa nueva: API de NVIDIA (tier gratuito, 40 RPM). Sin internet el asistente no funciona; el resto de la tienda no se ve afectado.
+- Dependencias externas nuevas: API de NVIDIA (tier gratuito, 40 RPM) y Gemini API (tier gratuito, 100 RPM y 1.000 requests por día). Sin internet el asistente no funciona; el resto de la tienda no se ve afectado.
 - Desbloquea `add-product-indexing`, `add-assistant-chat`, `add-assistant-tools` e `integrate-ui-assistant`.

@@ -62,8 +62,9 @@ integrate-ui-assistant                <- add-product-indexing, add-assistant-cha
   - Reescritura de consulta: `nvidia/nemotron-3.5-lightning-30b-a3b` con thinking desactivado.
   - Modelo principal (razonamiento + tools): `nvidia/nemotron-3-super-120b-a12b`.
   - Planes B: `deepseek-ai/deepseek-v4.1-flash` (principal) y `google/gemma-3-12b-it` (reescritura).
-- **Embeddings:** `nvidia/nemotron-3-embed-1b`, **2048 dimensiones**, con un `EmbeddingModel` propio porque NVIDIA exige `input_type` (`passage` al indexar, `query` al buscar).
-- **Vector store:** Qdrant, coseno. El filtro por tags es OR (`match any`), igual que el `IN` de `GET /catalog/products`.
-- **Rate limit de NVIDIA:** 40 RPM. Embeber en lotes, calcular similares desde Qdrant sin llamar a NVIDIA, y manejar 429.
+- **Embeddings:** `gemini-embedding-001` de Google (tier gratuito), con el starter nativo `spring-ai-starter-model-google-genai-embedding`, `task-type` `RETRIEVAL_DOCUMENT` al indexar y `RETRIEVAL_QUERY` al buscar, y **768 dimensiones**.
+- **Vector store:** Qdrant, 768d, coseno. El filtro por tags es OR (`match any`), igual que el `IN` de `GET /catalog/products`.
+- **Cuotas:** NVIDIA (chat) 40 RPM; Gemini (embeddings) 100 RPM y 1.000 requests por día, independientes entre sí. Embeber en lotes, calcular similares desde Qdrant sin llamar al proveedor, y manejar 429.
+- **Secrets:** `NVIDIA_API_KEY` y `GOOGLE_API_KEY`, nunca versionados.
 - **Catálogo:** ~80 productos de hogar y muebles del dataset Amazon Berkeley Objects (CC BY 4.0), con varios tags por producto. Se mantiene el envoltorio spy de la UI y de la persona A.G.E.N.T.
 - **Sesión:** el `X-Session-ID` (cookie `SESSIONID`) identifica tanto la memoria del chat como el carrito (`customerId`). El servicio de carrito se llama `carts`.

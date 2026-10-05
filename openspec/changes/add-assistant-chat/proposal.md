@@ -27,6 +27,6 @@ El chat actual de la UI es solo un system prompt sobre un modelo genérico: no c
 
 - `src/assistant`: endpoint SSE, dos `ChatClient` sobre la misma API de NVIDIA (con distinto modelo y `extraBody`), memoria de chat y prompts.
 - Hay que verificar que la versión de Spring AI elegida soporte `extraBody` en `OpenAiChatOptions`, porque la `ui` usa la 1.0.0.
-- Cuota: cada turno consume entre 3 y 6 requests sobre un límite de 40 RPM.
+- Cuota: cada turno consume entre 2 y 5 requests de NVIDIA, sobre un límite de 40 RPM. El embedding de la consulta va por la cuota de Gemini.
 - Casos de uso de la pre-entrega que cubre: reescritura de consulta, comparación justificada y conversación multi-turno.
 - Depende de `add-product-indexing`. Desbloquea `add-assistant-tools` e `integrate-ui-assistant`.
