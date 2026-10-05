@@ -15,17 +15,19 @@ Todo cambio funcional se planifica y se ejecuta como un change de OpenSpec en `o
 
 ```bash
 npm install -g @fission-ai/openspec@latest
-openspec init --tools claude   # genera los comandos /opsx y los skills en .claude/ (está en .gitignore)
+openspec init   # genera los comandos /opsx y los skills
 ```
 
 ### Ciclo de un change
 
-| Paso | Comando | Qué hace |
-|---|---|---|
-| Explorar | `/opsx:explore <tema>` | Pensar, investigar el código y comparar opciones. No implementa nada |
-| Planificar | `/opsx:propose <change>` | Completa specs, design y tasks a partir del `proposal.md` |
-| Implementar | `/opsx:apply <change>` | Ejecuta las tasks de `tasks.md` y las va marcando |
-| Cerrar | `/opsx:archive <change>` | Archiva el change e incorpora sus specs a `openspec/specs/` |
+
+| Paso        | Comando                  | Qué hace                                                             |
+| ----------- | ------------------------ | -------------------------------------------------------------------- |
+| Explorar    | `/opsx:explore <tema>`   | Pensar, investigar el código y comparar opciones. No implementa nada |
+| Planificar  | `/opsx:propose <change>` | Completa specs, design y tasks a partir del `proposal.md`            |
+| Implementar | `/opsx:apply <change>`   | Ejecuta las tasks de `tasks.md` y las va marcando                    |
+| Cerrar      | `/opsx:archive <change>` | Archiva el change e incorpora sus specs a `openspec/specs/`          |
+
 
 ### Reglas
 
@@ -66,5 +68,6 @@ integrate-ui-assistant                <- add-product-indexing, add-assistant-cha
 - **Vector store:** Qdrant, 768d, coseno. El filtro por tags es OR (`match any`), igual que el `IN` de `GET /catalog/products`.
 - **Cuotas:** NVIDIA (chat) 40 RPM; Gemini (embeddings) 100 RPM y 1.000 requests por día, independientes entre sí. Embeber en lotes, calcular similares desde Qdrant sin llamar al proveedor, y manejar 429.
 - **Secrets:** `NVIDIA_API_KEY` y `GOOGLE_API_KEY`, nunca versionados.
-- **Catálogo:** ~80 productos de hogar y muebles del dataset Amazon Berkeley Objects (CC BY 4.0), con varios tags por producto. Se mantiene el envoltorio spy de la UI y de la persona A.G.E.N.T.
+- **Catálogo:** \~80 productos de hogar y muebles del dataset Amazon Berkeley Objects (CC BY 4.0), con varios tags por producto. Se mantiene el envoltorio spy de la UI y de la persona A.G.E.N.T.
 - **Sesión:** el `X-Session-ID` (cookie `SESSIONID`) identifica tanto la memoria del chat como el carrito (`customerId`). El servicio de carrito se llama `carts`.
+
