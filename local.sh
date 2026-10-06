@@ -3,7 +3,9 @@ set -e
 
 # Global configuration
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-SERVICES="catalog cart checkout orders ui"
+SERVICES="catalog cart checkout orders ui assistant"
+ASSISTANT_SECRET="assistant-api-keys"
+KEY_PLACEHOLDER="not-configured"
 
 print_status() {
     local BLUE='\033[0;34m'
@@ -164,6 +166,8 @@ deploy_services() {
         print_success "Namespace '$NAMESPACE' is ready"
     fi
 
+    create_assistant_secret
+
     print_status "Applying Kubernetes manifests to namespace '$NAMESPACE'..."
     kubectl apply -f $DIR/dist/kubernetes.yaml -n $NAMESPACE
 
@@ -174,6 +178,38 @@ deploy_services() {
     print_status "Waiting for all pods to be ready and running..."
     kubectl wait --namespace $NAMESPACE --for=condition=ready pods --timeout=300s --all
     print_success "All pods are ready and running"
+}
+
+# Crea (o actualiza) el Secret con las claves de los proveedores del assistant.
+# Las toma del .env de la raíz del repo, si existe, o del entorno. Si falta
+# alguna usa un placeholder: el assistant arranca igual pero no responde.
+create_assistant_secret() {
+    if [ -f "$DIR/.env" ]; then
+        print_status "Loading API keys from $DIR/.env"
+        set -a
+        . "$DIR/.env"
+        set +a
+    fi
+
+    local nvidia_key="${NVIDIA_API_KEY:-}"
+    local google_key="${GOOGLE_API_KEY:-}"
+
+    if [ -z "$nvidia_key" ]; then
+        print_warning "NVIDIA_API_KEY is not set: the assistant will start but chat will not work"
+        nvidia_key="$KEY_PLACEHOLDER"
+    fi
+    if [ -z "$google_key" ]; then
+        print_warning "GOOGLE_API_KEY is not set: the assistant will start but embeddings will not work"
+        google_key="$KEY_PLACEHOLDER"
+    fi
+
+    print_status "Applying secret '$ASSISTANT_SECRET' to namespace '$NAMESPACE'..."
+    # Las claves van por un descriptor de archivo y no como argumentos, para
+    # que no queden visibles en la lista de procesos.
+    kubectl create secret generic $ASSISTANT_SECRET -n $NAMESPACE \
+        --from-env-file=<(printf 'NVIDIA_API_KEY=%s\nGOOGLE_API_KEY=%s\n' "$nvidia_key" "$google_key") \
+        --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
+    print_success "Secret '$ASSISTANT_SECRET' is ready"
 }
 
 show_status() {
@@ -244,6 +280,8 @@ show_help() {
     echo "  reload-images   Build and load Docker images"
     echo "  e2e-test        Run end-to-end tests"
     echo "  load-test       Run load generator tests"
+    echo "  update-secrets  Re-apply the assistant API keys (from .env or the environment)"
+    echo "                  and restart the assistant"
     echo ""
     echo "OPTIONS:"
     echo "  -c, --cluster NAME   Cluster name (default: the-store)"
@@ -276,6 +314,27 @@ cmd_reload_images() {
     build_images
     load_images
     print_success "Images built and loaded successfully"
+}
+
+cmd_update_secrets() {
+    check_prerequisites
+
+    if ! kind get clusters | grep -q "^$CLUSTER_NAME$"; then
+        print_error "Cluster '$CLUSTER_NAME' does not exist. Please create it first with 'create-cluster' command."
+        exit 1
+    fi
+
+    if ! kubectl get namespace $NAMESPACE &> /dev/null; then
+        print_error "Namespace '$NAMESPACE' does not exist. Please deploy services first with 'create-cluster' command."
+        exit 1
+    fi
+
+    create_assistant_secret
+
+    print_status "Restarting the assistant to pick up the new keys..."
+    kubectl rollout restart deployment/assistant -n $NAMESPACE
+    kubectl rollout status deployment/assistant -n $NAMESPACE --timeout=300s
+    print_success "Assistant restarted with the updated keys"
 }
 
 cmd_status() {
@@ -341,7 +400,7 @@ main() {
 
     while [[ $# -gt 0 ]]; do
         case $1 in
-            help|create-cluster|delete-cluster|rebuild-cluster|status|reload-images|e2e-test|load-test) COMMAND="$1"; shift ;;
+            help|create-cluster|delete-cluster|rebuild-cluster|status|reload-images|e2e-test|load-test|update-secrets) COMMAND="$1"; shift ;;
             -c|--cluster) CLUSTER_NAME="$2"; shift 2 ;;
             -n|--namespace) NAMESPACE="$2"; shift 2 ;;
             --skip-tests) SKIP_TESTS=true; shift ;;
@@ -359,6 +418,7 @@ main() {
         reload-images) cmd_reload_images;;
         e2e-test) cmd_e2e_tests;;
         load-test) cmd_load_generator;;
+        update-secrets) cmd_update_secrets;;
         help) show_help; exit 0;;
         *) print_error "Unknown command: $COMMAND"; show_help; exit 1;;
     esac

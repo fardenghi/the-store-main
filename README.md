@@ -22,6 +22,10 @@ The Store is built with a microservices architecture that uses different technol
 | [Cart](./src/cart/) | Java (Spring Boot) | Shopping cart management with Redis/DynamoDB |
 | [Orders](./src/orders/) | Java (Spring Boot) | Order processing and management |
 | [Checkout](./src/checkout/) | Node.js (NestJS) | Checkout orchestration and payment processing |
+| [Assistant](./src/assistant/) | Java (Spring Boot + Spring AI) | GenAI shopping assistant: the only service that talks to the LLM (NVIDIA) and to the embeddings model (Gemini) |
+| Qdrant | Official image (`qdrant/qdrant`) | Vector store for the assistant, with a persistent volume. Internal only |
+
+The updated architecture diagram and network table are in [docs/arquitectura.md](./docs/arquitectura.md).
 
 
 ## 🛠️ Development
@@ -50,9 +54,45 @@ Use the `local.sh` script to manage your local Kubernetes cluster:
 
 # Build and load Docker images only
 ./local.sh reload-images
+
+# Re-apply the assistant API keys and restart it
+./local.sh update-secrets
 ```
 
 After running `./local.sh create-cluster`, access The Store at: **http://localhost**.
+
+### Assistant API keys
+
+The assistant needs two API keys, which are never committed:
+
+| Variable | Provider | Used for |
+|----------|----------|----------|
+| `NVIDIA_API_KEY` | [NVIDIA API Catalog](https://build.nvidia.com/) | Chat (`integrate.api.nvidia.com`) |
+| `GOOGLE_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) | Embeddings (`gemini-embedding-001`) |
+
+Define them either as environment variables or in a `.env` file at the repo root (it is git-ignored, and it takes precedence over the environment):
+
+```bash
+# Option 1: environment variables
+export NVIDIA_API_KEY=...
+export GOOGLE_API_KEY=...
+
+# Option 2: .env file at the repo root
+cat > .env <<'ENV'
+NVIDIA_API_KEY=...
+GOOGLE_API_KEY=...
+ENV
+```
+
+`./local.sh create-cluster` (and `rebuild-cluster`) stores them in the `assistant-api-keys` Secret. To change them on a running cluster without recreating it, edit `.env` (or the variables) and run:
+
+```bash
+./local.sh update-secrets
+```
+
+It re-applies the Secret and restarts the `assistant` deployment.
+
+Without keys the cluster still comes up (`local.sh` prints a warning and uses a `not-configured` placeholder): every pod gets Ready and the rest of the store works, but the assistant does not answer.
 
 ### Testing
 

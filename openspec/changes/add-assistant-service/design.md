@@ -110,3 +110,40 @@ La pre-entrega proponía `ollama` en un pod (`llama3.2:3b` + `nomic-embed-text`,
 
 1. Mergear el change: el próximo `./local.sh create-cluster` (o `rebuild-cluster`) despliega `assistant` y `qdrant`. En un cluster existente alcanza con `./local.sh reload-images`, `./local.sh update-secrets` y `kubectl apply -f dist/kubernetes.yaml -n the-store`.
 2. Rollback: revertir el commit y borrar los recursos (`kubectl delete deploy/assistant sts/qdrant svc/assistant svc/qdrant cm/assistant secret/assistant-api-keys pvc -l app.kubernetes.io/name=qdrant`). Ningún otro servicio depende todavía del `assistant`.
+
+## Notas de implementación
+
+Resultados de los spikes y decisiones menores tomadas al implementar. Ninguna cambia las decisiones D1–D8 ni el spec.
+
+### Spikes
+
+- **Proveedores reales (task 2.5):** `./mvnw -Psmoke verify` hizo 3 requests (sin reintentos) y pasó: `nvidia/nemotron-3-super-120b-a12b` y `nvidia/nemotron-3.5-lightning-30b-a3b` responden por `https://integrate.api.nvidia.com` con `max_tokens` explícito y `extraBody` `{chat_template_kwargs: {enable_thinking: false}}` (el `extraBody` por request de `OpenAiChatOptions` 1.1.8 llega al proveedor), y `gemini-embedding-001` devuelve 768 dimensiones. El modelo informado en la respuesta coincide con el pedido. No hizo falta el plan B.
+- **Cliente gRPC de Qdrant 1.13 contra el servidor 1.19.2:** el health check, la conexión y la reconexión después de reiniciar `qdrant-0` funcionan. Como se preveía en Risks, el cliente loguea al arrancar un warning de compatibilidad de versiones (o "Failed to obtain server version" si Qdrant todavía no está listo). No se desactiva en este change, porque la autoconfiguración de Spring AI arma el `QdrantGrpcClient` con el chequeo activado y desactivarlo obliga a redefinir el bean; si `add-product-indexing` encuentra una incompatibilidad real, se aplica lo previsto en Risks.
+- **Qdrant con `readOnlyRootFilesystem`:** arranca y responde `/readyz` y `/livez`. Solo loguea que no puede crear `.qdrant-initialized` (un indicador para herramientas externas), sin efecto en el servicio.
+- **Binding de las variables del ConfigMap:** el formato `SPRING_AI_OPENAI_CHAT_OPTIONS_MAX_TOKENS` (guion bajo en lugar del guion) se mapea bien a `max-tokens`. Lo cubre `ConfigMapBindingTest`, que además simula el cambio al plan B.
+
+### Decisiones menores
+
+- **Defaults de las claves en `application.yml`:** `${NVIDIA_API_KEY:not-configured}` y `${GOOGLE_API_KEY:not-configured}`, para que `./mvnw spring-boot:run` y los tests arranquen sin claves con el mismo comportamiento que en el cluster (D3).
+- **Log de claves (D3):** se emite en `ApplicationReadyEvent`; `INFO` "configurada" o `WARN` "NO configurada (placeholder)". No imprime ni el valor ni el placeholder, y los tests verifican con `OutputCaptureExtension` que la salida no contiene ninguno de los dos.
+- **Health:** `management.endpoint.health.group.readiness.include=readinessState` deja explícito que Qdrant no entra en la readiness, y `show-details: always` muestra el componente `qdrant` en `/actuator/health`. Con Qdrant caído el estado agregado de `/actuator/health` es `DOWN` (HTTP 503), mientras liveness y readiness siguen en `UP` (200). El health check usa un timeout de 3 s.
+- **Probes del `assistant`:** además de la readiness de `carts`, se agregó una `livenessProbe` en `/actuator/health/liveness` (`initialDelaySeconds: 60`), porque D4 y el spec piden liveness.
+- **Labels:** los recursos nuevos usan las mismas `app.kubernetes.io/*` que el resto, sin `helm.sh/chart` ni `managed-by: Helm`, porque no vienen de un chart. Qdrant usa `component: vector-store`.
+- **Recursos de Qdrant:** 512Mi de memoria (request = limit) y 128m de CPU, que no estaban fijados en D5.
+- **Telemetría de Qdrant desactivada** (`QDRANT__TELEMETRY_DISABLED=true`): por defecto Qdrant reporta telemetría a internet, y D8 establece que el único tráfico saliente es el del `assistant`.
+- **Secret en `local.sh`:** en lugar de `--from-literal`, las claves se pasan con `--from-env-file=<(printf ...)` (process substitution de bash), para que no aparezcan en los argumentos de `kubectl` ni en la lista de procesos. El resultado es el mismo Secret y sigue siendo idempotente (`--dry-run=client -o yaml | kubectl apply -f -`). Si existe `.env`, sus valores tienen precedencia sobre las variables del entorno. `.env` ya estaba en el `.gitignore` de la raíz.
+- **Smoke test:** `ProvidersSmokeIT` (tag `smoke`) corre con `maven-failsafe-plugin` solo en el perfil `smoke`, se saltea si faltan las claves y fija `spring.ai.retry.max-attempts=1` para no multiplicar requests ante un 429.
+- **`ATTRIBUTION.md`:** lista las dependencias directas (Spring Boot, Spring AI, cliente de Qdrant y SDK de Google GenAI, todas Apache 2.0). Los archivos Java nuevos no llevan el encabezado de copyright de Amazon de los servicios originales, porque son del grupo.
+- **Endpoints por defecto:** `retail.assistant.endpoints.catalog` y `carts` apuntan a `http://localhost:8081` y `:8082` para correr fuera del cluster; en el cluster los define el ConfigMap (`http://catalog`, `http://carts`).
+- **Documentación:** la sección nueva del `README.md` está en inglés, como el resto del archivo; `docs/arquitectura.md` y el README del servicio, en español.
+
+### Verificación en el cluster
+
+Con kind v0.33.0 (Kubernetes v1.37.0) en macOS con Docker Desktop:
+
+- **8.1:** `./local.sh rebuild-cluster --skip-tests` con claves: los 7 pods quedan Ready (`assistant-*` y `qdrant-0` incluidos) y el PVC `qdrant-storage-qdrant-0` (1Gi, `standard`) queda `Bound`. Desde la `ui`, `curl http://assistant/actuator/health` muestra `qdrant: UP` con la versión 1.19.2. `http://localhost/actuator/health` responde la `ui` (sin el componente `qdrant`). `kubectl apply --dry-run=server` y `kubectl diff` no muestran cambios.
+- **8.2:** desde el pod, NVIDIA `/v1/models` responde `200` y la raíz de `generativelanguage.googleapis.com` responde `404` (DNS, TCP y TLS OK). El camino quedó en `docs/arquitectura.md`. En esta máquina la red `kind` es `172.23.0.0/16` y no `172.19.0.0/16` como en el host Ubuntu de la pre-entrega; el camino es el mismo.
+- **8.3:** una colección de prueba con un punto sobrevive al borrado de `qdrant-0`; después se eliminó.
+- **6.2:** con un valor de prueba en `.env`, `./local.sh update-secrets` reinicia el `assistant` y `printenv NVIDIA_API_KEY` en el pod muestra el valor nuevo. Después se restauró el `.env` original (mismo SHA) y se volvió a aplicar.
+- **8.4:** con `assistant` en 0 réplicas, `./local.sh e2e-test` pasa (13/13). Después se volvió a escalar a 1.
+- **8.5 (parte local):** en una copia del repo con solo los archivos versionables (sin `.env`) y sin `NVIDIA_API_KEY` ni `GOOGLE_API_KEY` en el entorno, `./local.sh rebuild-cluster` (con e2e) muestra los dos warnings, crea el Secret con el placeholder, deja los 7 pods Ready, el `assistant` loguea "NO configurada (placeholder)" para ambas claves y los e2e pasan (13/13). **Pendiente:** confirmarlo en el workflow de GitHub Actions, que corre al pushear a `main`; el push queda a cargo del grupo.

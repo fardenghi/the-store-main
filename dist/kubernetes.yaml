@@ -505,6 +505,261 @@ spec:
             medium: Memory
 
 ---
+# Source: the-store/assistant/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: assistant
+  labels:
+    app.kubernetes.io/name: assistant
+    app.kubernetes.io/instance: assistant
+    app.kubernetes.io/component: service
+    app.kubernetes.io/owner: retail-store-sample
+---
+# Source: the-store/assistant/configmap.yaml
+# Las claves (NVIDIA_API_KEY, GOOGLE_API_KEY) NO van acá: vienen del Secret
+# assistant-api-keys, que crea local.sh y no se versiona.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assistant
+data:
+  RETAIL_ASSISTANT_ENDPOINTS_CATALOG: http://catalog
+  RETAIL_ASSISTANT_ENDPOINTS_CARTS: http://carts
+  SPRING_AI_VECTORSTORE_QDRANT_HOST: qdrant
+  SPRING_AI_VECTORSTORE_QDRANT_PORT: "6334"
+  SPRING_AI_OPENAI_BASE_URL: https://integrate.api.nvidia.com
+  SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: nvidia/nemotron-3-super-120b-a12b
+  SPRING_AI_OPENAI_CHAT_OPTIONS_MAX_TOKENS: "1024"
+  RETAIL_ASSISTANT_MODELS_REWRITE: nvidia/nemotron-3.5-lightning-30b-a3b
+  SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_MODEL: gemini-embedding-001
+  SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_DIMENSIONS: "768"
+---
+# Source: the-store/assistant/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: assistant
+  labels:
+    app.kubernetes.io/name: assistant
+    app.kubernetes.io/instance: assistant
+    app.kubernetes.io/component: service
+    app.kubernetes.io/owner: retail-store-sample
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: assistant
+    app.kubernetes.io/instance: assistant
+    app.kubernetes.io/component: service
+    app.kubernetes.io/owner: retail-store-sample
+---
+# Source: the-store/assistant/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: assistant
+  labels:
+    app.kubernetes.io/name: assistant
+    app.kubernetes.io/instance: assistant
+    app.kubernetes.io/component: service
+    app.kubernetes.io/owner: retail-store-sample
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assistant
+      app.kubernetes.io/instance: assistant
+      app.kubernetes.io/component: service
+      app.kubernetes.io/owner: retail-store-sample
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assistant
+        app.kubernetes.io/instance: assistant
+        app.kubernetes.io/component: service
+        app.kubernetes.io/owner: retail-store-sample
+    spec:
+      serviceAccountName: assistant
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: assistant
+          env:
+            - name: JAVA_OPTS
+              value: -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/urandom
+          envFrom:
+            - configMapRef:
+                name: assistant
+            - secretRef:
+                name: assistant-api-keys
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+          image: "the-store-assistant:latest"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            limits:
+              memory: 768Mi
+            requests:
+              cpu: 256m
+              memory: 768Mi
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-volume
+      volumes:
+        - name: tmp-volume
+          emptyDir:
+            medium: Memory
+---
+# Source: the-store/qdrant/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  labels:
+    app.kubernetes.io/name: qdrant
+    app.kubernetes.io/instance: qdrant
+    app.kubernetes.io/component: vector-store
+    app.kubernetes.io/owner: retail-store-sample
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6333
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 6334
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+  selector:
+    app.kubernetes.io/name: qdrant
+    app.kubernetes.io/instance: qdrant
+    app.kubernetes.io/component: vector-store
+    app.kubernetes.io/owner: retail-store-sample
+---
+# Source: the-store/qdrant/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qdrant
+  labels:
+    app.kubernetes.io/name: qdrant
+    app.kubernetes.io/instance: qdrant
+    app.kubernetes.io/component: vector-store
+    app.kubernetes.io/owner: retail-store-sample
+spec:
+  serviceName: qdrant
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: qdrant
+      app.kubernetes.io/instance: qdrant
+      app.kubernetes.io/component: vector-store
+      app.kubernetes.io/owner: retail-store-sample
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qdrant
+        app.kubernetes.io/instance: qdrant
+        app.kubernetes.io/component: vector-store
+        app.kubernetes.io/owner: retail-store-sample
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: qdrant
+          env:
+            # Sin telemetría: el único tráfico saliente del cluster es el del assistant.
+            - name: QDRANT__TELEMETRY_DISABLED
+              value: "true"
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+          image: "qdrant/qdrant:v1.19.2-unprivileged"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 6333
+              protocol: TCP
+            - name: grpc
+              containerPort: 6334
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 6333
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 6333
+            initialDelaySeconds: 10
+          resources:
+            limits:
+              memory: 512Mi
+            requests:
+              cpu: 128m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /qdrant/storage
+              name: qdrant-storage
+            - mountPath: /qdrant/snapshots
+              name: snapshots-volume
+            - mountPath: /tmp
+              name: tmp-volume
+      volumes:
+        - name: snapshots-volume
+          emptyDir: {}
+        - name: tmp-volume
+          emptyDir:
+            medium: Memory
+  volumeClaimTemplates:
+    - metadata:
+        name: qdrant-storage
+        labels:
+          app.kubernetes.io/name: qdrant
+          app.kubernetes.io/instance: qdrant
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
+---
 # Source: retail-store-sample-ui-chart/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount

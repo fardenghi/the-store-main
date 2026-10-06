@@ -1,0 +1,68 @@
+server:
+  port: ${port:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: info,health,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      # La readiness depende solo del proceso: Qdrant y los proveedores quedan
+      # fuera para que una caída no saque al assistant del Service (D4).
+      group:
+        readiness:
+          include: readinessState
+
+spring:
+  application:
+    name: assistant
+  ai:
+    # Chat: NVIDIA expone una API compatible con OpenAI. El cliente agrega
+    # /v1/chat/completions a la base URL. NVIDIA exige max-tokens explícito.
+    openai:
+      base-url: https://integrate.api.nvidia.com
+      api-key: ${NVIDIA_API_KEY:not-configured}
+      chat:
+        options:
+          model: nvidia/nemotron-3-super-120b-a12b
+          max-tokens: 1024
+    # Embeddings: gemini-embedding-001 con 768 dimensiones. El task-type por
+    # defecto es el de indexación; las consultas lo sobreescriben por llamada.
+    google:
+      genai:
+        embedding:
+          api-key: ${GOOGLE_API_KEY:not-configured}
+          text:
+            options:
+              model: gemini-embedding-001
+              dimensions: 768
+              task-type: RETRIEVAL_DOCUMENT
+    vectorstore:
+      qdrant:
+        host: localhost
+        port: 6334
+        # La colección la crea add-product-indexing.
+        initialize-schema: false
+
+# Selección de modelos de Spring AI. Van como claves planas porque
+# spring.ai.model.embedding y spring.ai.model.embedding.text no se pueden
+# anidar en YAML. Se apagan las autoconfiguraciones de OpenAI que no se usan
+# para que el único EmbeddingModel sea el de Google GenAI (D2).
+spring.ai.model.embedding: none
+spring.ai.model.embedding.text: google-genai
+spring.ai.model.image: none
+spring.ai.model.audio.speech: none
+spring.ai.model.audio.transcription: none
+spring.ai.model.moderation: none
+
+retail:
+  assistant:
+    models:
+      rewrite: nvidia/nemotron-3.5-lightning-30b-a3b
+    endpoints:
+      catalog: http://localhost:8081
+      carts: http://localhost:8082
