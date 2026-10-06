@@ -36,6 +36,8 @@ class ToolsPropertiesTest {
       assertThat(tools.descriptionMaxChars()).isEqualTo(300);
       assertThat(tools.http().connectTimeout()).isEqualTo(Duration.ofSeconds(2));
       assertThat(tools.http().readTimeout()).isEqualTo(Duration.ofSeconds(5));
+      assertThat(tools.correctiveToolChoice())
+          .isEqualTo(ToolsProperties.CorrectiveToolChoice.PROMPT);
 
       RateLimitProperties rateLimit = context.getBean(RateLimitProperties.class);
       assertThat(rateLimit.requestsPerMinute()).isEqualTo(36);
@@ -43,6 +45,14 @@ class ToolsPropertiesTest {
       assertThat(rateLimit.max429Retries()).isEqualTo(2);
       assertThat(rateLimit.defaultRetryAfter()).isEqualTo(Duration.ofSeconds(5));
     });
+  }
+
+  @Test
+  void correctiveToolChoiceCanBeRequiredForThePlanB() {
+    // Variable del ConfigMap con Nemotron: RETAIL_ASSISTANT_TOOLS_CORRECTIVE_TOOL_CHOICE=required.
+    runner.withPropertyValues("retail.assistant.tools.corrective-tool-choice=required")
+        .run(context -> assertThat(context.getBean(ToolsProperties.class).correctiveToolChoice())
+            .isEqualTo(ToolsProperties.CorrectiveToolChoice.REQUIRED));
   }
 
   @Test

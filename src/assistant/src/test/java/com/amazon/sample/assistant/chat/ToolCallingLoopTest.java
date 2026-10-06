@@ -493,6 +493,110 @@ class ToolCallingLoopTest {
         .endsWith(ToolCallingLoop.NOT_ADDED_TEXT).doesNotContain("adds two lamps");
   }
 
+  // Segundo intento de select-assistant-models: vuelta correctiva sin tool_choice required
+
+  private ChatTurnService promptService() {
+    return ChatTestSupport.service(sessions, rewriter, retriever, chat,
+        ChatTestSupport.loop(chatModel, chat, limiter, tools, ChatTestSupport.TOOLS_PROMPT));
+  }
+
+  @Test
+  void withThePromptModeTheCorrectiveRoundAsksForTheToolCallWithoutToolChoice() {
+    when(carts.getCart("s1")).thenReturn(new CartsClient.Cart("s1",
+        List.of(new CartsClient.Item(LAMP.id(), 2, 45))));
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("Right away, Operative. "),
+            ChatTurnServiceTest.fragment("Two Ceramic Table Lamps have been added to your cart.")),
+        () -> Flux.just(toolCall("addToCart",
+            "{\"productId\":\"" + LAMP.id() + "\",\"quantity\":2}")),
+        () -> Flux.just(ChatTurnServiceTest.fragment(" Done: two lamps added to your cart.")));
+
+    List<ServerSentEvent<?>> events = promptService().open("s1", "add two lamps to my cart")
+        .collectList().block(Duration.ofSeconds(10));
+
+    assertThat(texts(events)).isEqualTo("Right away, Operative. Done: two lamps added to your "
+        + "cart.");
+    verify(carts).addItem("s1", LAMP.id(), 2, 45);
+    assertThat(prompts).hasSize(3);
+    // Ningún request lleva tool_choice: el aviso pide el tool call.
+    assertThat(prompts).allSatisfy(prompt -> assertThat(options(prompt).getToolChoice()).isNull());
+    List<org.springframework.ai.chat.messages.Message> corrective =
+        prompts.get(1).getInstructions();
+    assertThat(corrective.get(corrective.size() - 1).getText())
+        .isEqualTo(ToolCallingLoop.CORRECTION_NOTE + " " + ToolCallingLoop.TOOL_CALL_NOTE);
+    assertThat(turnLine()).contains("tools=addToCart:ok", "claimGuard=dropped:1+retry",
+        "corrections=claim+prompt", "modelCalls=3");
+  }
+
+  @Test
+  void withThePromptModeFalseClaimsAreStillBlocked() {
+    // Un modelo que ignora el aviso y vuelve a afirmar el agregado.
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("*adds two lamps to cart* "),
+        ChatTurnServiceTest.fragment("Consider it done, Operative.")));
+
+    List<ServerSentEvent<?>> events = promptService().open("s1", "add two lamps to my cart")
+        .collectList().block(Duration.ofSeconds(10));
+
+    assertThat(texts(events)).isEqualTo(ToolCallingLoop.NOT_ADDED_TEXT);
+    assertThat(events).filteredOn(event -> isEvent(event, "cart-updated")).isEmpty();
+    verify(carts, never()).addItem(any(), any(), anyInt(), anyInt());
+    assertThat(prompts).hasSize(1 + ToolCallingLoop.MAX_CORRECTIONS);
+    assertThat(prompts).allSatisfy(prompt -> assertThat(options(prompt).getToolChoice()).isNull());
+    assertThat(turnLine()).contains("claimGuard=dropped:3+retry+notice",
+        "corrections=claim+prompt,claim+prompt");
+  }
+
+  @Test
+  void withThePromptModeAnAnnouncementOutsideACartRequestKeepsThePlainNote() {
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("Let me check the price for you.")),
+        () -> Flux.just(ChatTurnServiceTest.fragment("It costs $45.")));
+
+    promptService().open("s1", "how much is the lamp").collectList()
+        .block(Duration.ofSeconds(10));
+
+    assertThat(prompts).hasSize(2);
+    List<org.springframework.ai.chat.messages.Message> corrective =
+        prompts.get(1).getInstructions();
+    assertThat(corrective.get(corrective.size() - 1).getText())
+        .isEqualTo(ToolCallingLoop.ANNOUNCED_NOTE);
+    assertThat(turnLine()).contains("corrections=announce");
+  }
+
+  @Test
+  void firstReasoningFragmentIsLoggedApartFromTheFirstText() {
+    model(() -> Flux.just(
+        new ChatResponse(List.of(new Generation(AssistantMessage.builder().content("")
+            .properties(Map.of("reasoningContent", "The user wants a lamp.")).build()))),
+        ChatTurnServiceTest.fragment("Here is a lamp.")));
+
+    service().open("s1", "hi").blockLast(Duration.ofSeconds(10));
+
+    assertThat(turnLine()).containsPattern("firstReasoningMs=\\d+")
+        .containsPattern("firstFragmentMs=\\d+").contains("reasoningChars=22");
+  }
+
+  @Test
+  void aModelThatIgnoresRequiredIsLoggedAndTheGuardStillHolds() {
+    ListAppender<ILoggingEvent> loopLog = new ListAppender<>();
+    Logger loopLogger = (Logger) LoggerFactory.getLogger(ToolCallingLoop.class);
+    loopLog.start();
+    loopLogger.addAppender(loopLog);
+    try {
+      model(() -> Flux.just(ChatTurnServiceTest.fragment("The lamp has been added to your cart.")),
+          () -> Flux.just(ChatTurnServiceTest.fragment("Hello! How can I help you today?")));
+
+      List<ServerSentEvent<?>> events = service().open("s1", "add the lamp to my cart")
+          .collectList().block(Duration.ofSeconds(10));
+
+      assertThat(options(prompts.get(1)).getToolChoice()).isEqualTo("required");
+      assertThat(texts(events)).doesNotContain("has been added")
+          .endsWith(ToolCallingLoop.NOT_ADDED_TEXT);
+      assertThat(loopLog.list).extracting(ILoggingEvent::getFormattedMessage)
+          .anyMatch(message -> message.contains("ignoró tool_choice required"));
+    } finally {
+      loopLogger.detachAppender(loopLog);
+    }
+  }
+
   @Test
   void claimInTheLastPossibleRoundEndsWithTheNoticeWithoutACorrectiveRound() {
     model(() -> Flux.just(toolCall("getProductDetails", "{\"productId\":\"" + LAMP.id() + "\"}")),

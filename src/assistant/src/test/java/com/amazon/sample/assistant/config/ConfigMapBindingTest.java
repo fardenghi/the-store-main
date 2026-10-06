@@ -33,9 +33,9 @@ class ConfigMapBindingTest {
           new SystemEnvironmentPropertySource("configmap-systemEnvironment", Map.ofEntries(
               Map.entry("NVIDIA_API_KEY", ApiKeysStartupLogger.PLACEHOLDER),
               Map.entry("GOOGLE_API_KEY", ApiKeysStartupLogger.PLACEHOLDER),
-              Map.entry("SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL", "deepseek-ai/deepseek-v4.1-flash"),
+              Map.entry("SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL", "nvidia/nemotron-3-super-120b-a12b"),
               Map.entry("SPRING_AI_OPENAI_CHAT_OPTIONS_MAX_TOKENS", "777"),
-              Map.entry("RETAIL_ASSISTANT_MODELS_REWRITE", "google/gemma-3-12b-it"),
+              Map.entry("RETAIL_ASSISTANT_MODELS_REWRITE", "nvidia/nemotron-3.5-lightning-30b-a3b"),
               Map.entry("SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_DIMENSIONS", "512"),
               Map.entry("SPRING_AI_VECTORSTORE_QDRANT_PORT", "1"),
               Map.entry("RETAIL_ASSISTANT_TOOLS_MAX_MODEL_CALLS", "3"),
@@ -66,9 +66,9 @@ class ConfigMapBindingTest {
   void configMapVariablesOverrideDefaults() {
     OpenAiChatOptions options = (OpenAiChatOptions) chatModel.getDefaultOptions();
 
-    assertThat(options.getModel()).isEqualTo("deepseek-ai/deepseek-v4.1-flash");
+    assertThat(options.getModel()).isEqualTo("nvidia/nemotron-3-super-120b-a12b");
     assertThat(options.getMaxTokens()).isEqualTo(777);
-    assertThat(rewriteModel).isEqualTo("google/gemma-3-12b-it");
+    assertThat(rewriteModel).isEqualTo("nvidia/nemotron-3.5-lightning-30b-a3b");
     assertThat(embeddingModel.defaultOptions.getDimensions()).isEqualTo(512);
   }
 

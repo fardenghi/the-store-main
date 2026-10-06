@@ -15,7 +15,8 @@ import org.springframework.ai.openai.OpenAiChatOptions;
  * <p>Las opciones del request reemplazan a las {@code defaultOptions} del
  * {@code ChatClient} (no se combinan campo a campo), así que se arman como una
  * copia de las opciones base del cliente principal con el {@code extraBody} y
- * el {@code maxTokens} del turno.
+ * el {@code maxTokens} del turno. Un {@code reasoning_effort} del
+ * {@code extra-body} va por la opción nativa de Spring AI ({@link ExtraBody}).
  */
 public class ReasoningPolicy {
 
@@ -43,8 +44,8 @@ public class ReasoningPolicy {
     boolean reasoning = reasoningFor(intent);
     OpenAiChatOptions options = OpenAiChatOptions.fromOptions(baseOptions);
     options.setMaxTokens(reasoning ? properties.maxTokensReasoning() : properties.maxTokens());
-    options.setExtraBody(new java.util.LinkedHashMap<>(reasoning
-        ? properties.reasoning().onExtraBody() : properties.reasoning().offExtraBody()));
+    ExtraBody.apply(options, reasoning
+        ? properties.reasoning().onExtraBody() : properties.reasoning().offExtraBody());
     return new TurnOptions(reasoning, options);
   }
 }

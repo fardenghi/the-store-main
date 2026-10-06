@@ -103,6 +103,7 @@ class TurnLogTest {
         .contains("rewriteMs=42")
         .contains("retrievalMs=7")
         .containsPattern("firstFragmentMs=\\d+")
+        .contains("firstReasoningMs=-")
         .containsPattern("totalMs=\\d+");
   }
 

@@ -24,7 +24,12 @@ import org.springframework.core.io.ClassPathResource;
 final class ChatTestSupport {
 
   static final ToolsProperties TOOLS = new ToolsProperties(4, 6, 10, 5, 10, 300,
-      new ToolsProperties.Http(Duration.ofSeconds(2), Duration.ofSeconds(5)));
+      new ToolsProperties.Http(Duration.ofSeconds(2), Duration.ofSeconds(5)),
+      ToolsProperties.CorrectiveToolChoice.REQUIRED);
+
+  /** Las mismas tools, con la vuelta correctiva que pide el tool call en el aviso. */
+  static final ToolsProperties TOOLS_PROMPT = new ToolsProperties(4, 6, 10, 5, 10, 300,
+      TOOLS.http(), ToolsProperties.CorrectiveToolChoice.PROMPT);
 
   static final RateLimitProperties RATE_LIMIT = new RateLimitProperties(36,
       Duration.ofSeconds(30), 2, Duration.ofSeconds(5));
@@ -68,11 +73,17 @@ final class ChatTestSupport {
   /** Ciclo de tools con las tools dadas registradas en el cliente principal. */
   static ToolCallingLoop loop(ChatModel chatModel, ChatProperties.Chat chat,
       ChatRateLimiter limiter, List<ToolCallback> tools) {
+    return loop(chatModel, chat, limiter, tools, TOOLS);
+  }
+
+  /** Ciclo de tools con otras {@link ToolsProperties} (por ejemplo, {@link #TOOLS_PROMPT}). */
+  static ToolCallingLoop loop(ChatModel chatModel, ChatProperties.Chat chat,
+      ChatRateLimiter limiter, List<ToolCallback> tools, ToolsProperties properties) {
     ChatClient main = ChatClient.builder(chatModel).defaultToolCallbacks(tools).build();
     ToolCallingManager manager = ToolCallingManager.builder()
         .toolCallbackResolver(SafeToolCallback.unknownToolResolver())
         .build();
-    return new ToolCallingLoop(main, manager, tools, limiter, TOOLS, RATE_LIMIT, chat);
+    return new ToolCallingLoop(main, manager, tools, limiter, properties, RATE_LIMIT, chat);
   }
 
   static ChatTurnService service(SessionStore sessions, QueryRewriter rewriter,

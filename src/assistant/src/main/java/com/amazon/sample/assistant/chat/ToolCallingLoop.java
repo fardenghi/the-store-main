@@ -69,8 +69,12 @@ import reactor.core.scheduler.Schedulers;
  *       se agrega una vuelta correctiva con un aviso al modelo (hasta
  *       {@link #MAX_CORRECTIONS} por turno, si queda presupuesto y la vuelta
  *       siguiente no es la última). Si el usuario pidió agregar al carrito y el
- *       modelo no le estaba preguntando nada, esa vuelta va con
- *       {@code tool_choice: required}. Si el turno igual termina con una afirmación
+ *       modelo no le estaba preguntando nada, esa vuelta obliga a pedir una tool:
+ *       con {@code tool_choice: required} o, para los modelos que lo ignoran,
+ *       con {@link #TOOL_CALL_NOTE} en el aviso
+ *       ({@code retail.assistant.tools.corrective-tool-choice}). En los dos casos
+ *       el texto de esa vuelta sigue pasando por el {@link CartClaimFilter}.
+ *       Si el turno igual termina con una afirmación
  *       descartada y sin agregado, se emite {@link #NOT_ADDED_TEXT}.</li>
  *   <li>Si una vuelta no pidió tools pero las escribió como texto
  *       ({@link TextualToolCalls}), se ejecutan como tool calls.</li>
@@ -104,6 +108,14 @@ public class ToolCallingLoop {
       + "any tool, so nothing was done. Call the tool now instead of announcing it. If no tool "
       + "is needed, answer with the information you already have. Do not repeat what you "
       + "already said.";
+
+  /**
+   * Agregado al aviso de la vuelta correctiva de un pedido de carrito cuando no
+   * se manda {@code tool_choice: required} ({@code corrective-tool-choice: prompt}).
+   */
+  static final String TOOL_CALL_NOTE = "The customer asked to add a product to the cart: this "
+      + "reply must be a tool call, not text. Call addToCart with the product id and quantity, "
+      + "or searchProducts or getProductDetails first if you do not know the id.";
 
   /** Vueltas correctivas por turno (afirmación descartada o anuncio sin tool). */
   static final int MAX_CORRECTIONS = 2;
@@ -251,7 +263,8 @@ public class ToolCallingLoop {
 
   /**
    * @param requireTool vuelta correctiva de un pedido de carrito: el modelo ya quiso
-   *     una tool y no la pidió, así que va con {@code tool_choice: required}
+   *     una tool y no la pidió, así que va con {@code tool_choice: required} (si
+   *     {@code corrective-tool-choice} es {@code required}; si no, el aviso ya lo pide)
    */
   private Mono<Void> round(int n, List<Message> messages, Run run, boolean requireTool) {
     boolean last = n >= tools.maxModelCalls();
@@ -260,11 +273,17 @@ public class ToolCallingLoop {
     if (last) {
       // Mismas tools, pero sin poder pedirlas: la última vuelta tiene que ser texto.
       options.setToolChoice("none");
-    } else if (requireTool) {
+    } else if (requireTool && requiredToolChoice()) {
       options.setToolChoice("required");
     }
     return attempt(messages, options, run, rateLimit.max429Retries())
         .flatMap(round -> {
+          if (requireTool && requiredToolChoice() && !last && round.toolCalls.isEmpty()
+              && round.textualCalls.isEmpty()) {
+            log.warn("El modelo ignoró tool_choice required en la vuelta correctiva (sesión {}): "
+                + "con este modelo conviene corrective-tool-choice=prompt",
+                abbreviate(run.turn.sessionId()));
+          }
           if (round.toolCalls.isEmpty() && !round.textualCalls.isEmpty() && !last) {
             log.warn("El modelo escribió {} tool calls como texto (sesión {}): se ejecutan",
                 round.textualCalls.size(), abbreviate(run.turn.sessionId()));
@@ -287,14 +306,18 @@ public class ToolCallingLoop {
               boolean cartRequest = isCartRequest(run.turn.message())
                   && !asksUser(round.text);
               run.corrections.add((falseClaim ? "claim" : "announce")
-                  + (cartRequest ? "+required" : ""));
+                  + (cartRequest ? (requiredToolChoice() ? "+required" : "+prompt") : ""));
               log.warn("{} (sesión {}): se pide una vuelta correctiva{}", falseClaim
                       ? "El modelo afirmó un agregado al carrito sin llamar a addToCart"
                       : "La respuesta terminó anunciando una acción sin llamar a una tool",
-                  abbreviate(run.turn.sessionId()),
-                  cartRequest ? " con tool_choice required" : "");
-              return round(n + 1, corrective(messages, round,
-                  falseClaim ? CORRECTION_NOTE : ANNOUNCED_NOTE), run, cartRequest);
+                  abbreviate(run.turn.sessionId()), !cartRequest ? ""
+                      : requiredToolChoice() ? " con tool_choice required"
+                      : " que pide el tool call en el aviso");
+              String note = falseClaim ? CORRECTION_NOTE : ANNOUNCED_NOTE;
+              if (cartRequest && !requiredToolChoice()) {
+                note = note + " " + TOOL_CALL_NOTE;
+              }
+              return round(n + 1, corrective(messages, round, note), run, cartRequest);
             }
             boolean notAdded = run.falseClaims > 0 && !run.toolTurn.hasAdded();
             if (notAdded) {
@@ -310,6 +333,11 @@ public class ToolCallingLoop {
           }
           return execute(messages, round, run).flatMap(next -> round(n + 1, next, run, false));
         });
+  }
+
+  /** Si la vuelta correctiva de un pedido de carrito va con {@code tool_choice: required}. */
+  private boolean requiredToolChoice() {
+    return tools.correctiveToolChoice() == ToolsProperties.CorrectiveToolChoice.REQUIRED;
   }
 
   /**
@@ -367,18 +395,38 @@ public class ToolCallingLoop {
     });
   }
 
-  /** Stream de una vuelta: reenvía el texto y junta los tool calls. */
+  /**
+   * Stream de una vuelta: reenvía el texto y junta los tool calls.
+   *
+   * <p>El tiempo límite al primer fragmento se cumple con el primer chunk que
+   * trae algo: texto, razonamiento ({@code reasoning_content}) o un tool call.
+   * Un modelo que razona siempre, aun con el esfuerzo mínimo (como
+   * {@code meta/muse-glimmer-30b}), ya está respondiendo mientras razona, y
+   * antes los turnos se cortaban a los 20 s sin texto visible
+   * ({@code select-assistant-models}, segundo intento). Un chunk vacío (solo el
+   * rol o el {@code finish_reason}) no cuenta. Después del primero, el límite es
+   * el del turno.
+   */
   private Mono<Void> stream(List<Message> messages, OpenAiChatOptions options, Run run,
       Round round) {
     run.turn.countProviderRequest();
     run.stats.modelCalls++;
+    Duration firstToken = run.options.reasoning()
+        ? chat.timeouts().firstTokenReasoning() : chat.timeouts().firstToken();
     Flux<String> text = mainChatClient.prompt()
         .messages(messages)
         .options(options)
         .stream()
         .chatResponse()
+        .filter(ToolCallingLoop::hasContent)
+        .timeout(Mono.delay(min(firstToken, remaining(run.deadline))),
+            response -> Mono.delay(remaining(run.deadline)))
         .doOnNext(response -> {
-          run.stats.reasoningChars += reasoningLength(response);
+          long reasoning = reasoningLength(response);
+          if (reasoning > 0 && run.stats.firstReasoningMillis < 0) {
+            run.stats.firstReasoningMillis = run.stats.elapsedMillis();
+          }
+          run.stats.reasoningChars += reasoning;
           List<AssistantMessage.ToolCall> calls = toolCalls(response);
           if (!calls.isEmpty()) {
             round.emitted = true;
@@ -392,11 +440,7 @@ public class ToolCallingLoop {
     }
     TextualToolCalls textual = new TextualToolCalls(toolNames);
     CartClaimFilter guard = new CartClaimFilter(run.toolTurn::hasAdded, textual::extract);
-    Duration firstToken = run.options.reasoning()
-        ? chat.timeouts().firstTokenReasoning() : chat.timeouts().firstToken();
     return text
-        .timeout(Mono.delay(min(firstToken, remaining(run.deadline))),
-            fragment -> Mono.delay(remaining(run.deadline)))
         .doOnNext(fragment -> {
           round.emitted = true;
           round.text.append(fragment);
@@ -501,6 +545,12 @@ public class ToolCallingLoop {
       return List.of();
     }
     return response.getResult().getOutput().getToolCalls();
+  }
+
+  /** Si el chunk trae texto, razonamiento o tool calls (cuenta para el tiempo límite). */
+  static boolean hasContent(ChatResponse response) {
+    return !text(response).isEmpty() || reasoningLength(response) > 0
+        || !toolCalls(response).isEmpty();
   }
 
   static String text(ChatResponse response) {

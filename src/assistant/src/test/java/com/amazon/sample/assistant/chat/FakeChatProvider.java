@@ -26,6 +26,7 @@ public class FakeChatProvider implements AutoCloseable {
 
   private final HttpServer server;
   private final List<JsonNode> requests = new CopyOnWriteArrayList<>();
+  private final List<String> rawRequests = new CopyOnWriteArrayList<>();
   private volatile int errorStatus;
   private volatile String retryAfter;
   private volatile String text = "ok";
@@ -52,8 +53,17 @@ public class FakeChatProvider implements AutoCloseable {
     return requests;
   }
 
+  /**
+   * Los cuerpos tal como llegaron, para ver campos repetidos (al parsearlos,
+   * Jackson se queda con el último y el duplicado no se ve).
+   */
+  public List<String> rawRequests() {
+    return rawRequests;
+  }
+
   public void reset() {
     requests.clear();
+    rawRequests.clear();
     errorStatus = 0;
     retryAfter = null;
     text = "ok";
@@ -86,7 +96,9 @@ public class FakeChatProvider implements AutoCloseable {
   }
 
   private void handle(HttpExchange exchange) throws IOException {
-    JsonNode body = JSON.readTree(exchange.getRequestBody().readAllBytes());
+    byte[] raw = exchange.getRequestBody().readAllBytes();
+    rawRequests.add(new String(raw, StandardCharsets.UTF_8));
+    JsonNode body = JSON.readTree(raw);
     requests.add(body);
     Duration delay = streamDelay;
     if (body.path("stream").asBoolean(false) && !delay.isZero()) {

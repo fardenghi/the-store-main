@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.amazon.sample.assistant.chat.llm.ChatProviderErrors;
 import com.amazon.sample.assistant.chat.llm.ChatProviderException;
+import com.amazon.sample.assistant.chat.llm.ExtraBody;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -284,10 +285,11 @@ class ModelSpikeSmokeIT {
   @Order(4)
   void rewriteReturnsJsonQuickly() {
     BeanOutputConverter<SpikeRewrite> converter = new BeanOutputConverter<>(SpikeRewrite.class);
-    ChatClient client = ChatClient.builder(chatModel)
-        .defaultOptions(OpenAiChatOptions.builder().model(rewriteModel).temperature(0.0)
-            .maxTokens(rewriteMaxTokens).extraBody(rewriteExtra).build())
-        .build();
+    // El extra-body por el mismo camino que el assistant (ExtraBody, segundo intento).
+    OpenAiChatOptions rewriteOptions = OpenAiChatOptions.builder().model(rewriteModel)
+        .temperature(0.0).maxTokens(rewriteMaxTokens).build();
+    ExtraBody.apply(rewriteOptions, rewriteExtra);
+    ChatClient client = ChatClient.builder(chatModel).defaultOptions(rewriteOptions).build();
     List<Long> latencies = new ArrayList<>();
     int invalid = 0;
     for (int i = 0; i < REWRITE_MESSAGES.size(); i++) {
@@ -353,9 +355,10 @@ class ModelSpikeSmokeIT {
     var callbacks = List.of(MethodToolCallbackProvider.builder().toolObjects(tool).build()
         .getToolCallbacks());
     OpenAiChatOptions options = OpenAiChatOptions.builder().model(mainModel).temperature(0.6)
-        .maxTokens(1024).extraBody(mainOff).toolCallbacks(callbacks)
+        .maxTokens(1024).toolCallbacks(callbacks)
         .internalToolExecutionEnabled(false)
         .toolContext(Map.of("sessionId", "spike-session")).build();
+    ExtraBody.apply(options, mainOff);
     String schema = callbacks.get(0).getToolDefinition().inputSchema();
     System.out.printf("spike %s [tools controladas]: schema de la tool %s%n", mainModel, schema);
     assertThat(schema).doesNotContain("sessionId").doesNotContain("context");
@@ -710,7 +713,7 @@ class ModelSpikeSmokeIT {
         .maxTokens(1024).build();
     OpenAiChatOptions perRequest = OpenAiChatOptions.fromOptions(defaults);
     perRequest.setMaxTokens(maxTokens);
-    perRequest.setExtraBody(extraBody);
+    ExtraBody.apply(perRequest, extraBody);
     ChatClient client = ChatClient.builder(chatModel).defaultOptions(defaults).build();
 
     ChatClient.ChatClientRequestSpec request = client.prompt().user(message).options(perRequest);

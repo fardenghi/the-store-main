@@ -15,6 +15,12 @@ class TurnStats {
   volatile boolean reasoning;
   volatile long reasoningChars;
   volatile long firstFragmentMillis = -1;
+  /**
+   * Primer fragmento de razonamiento ({@code reasoning_content}) del modelo
+   * principal, desde el inicio del turno; el usuario no lo ve
+   * ({@code select-assistant-models}, segundo intento: M7 por separado).
+   */
+  volatile long firstReasoningMillis = -1;
   volatile long totalMillis = -1;
   volatile String outcome = "cancelled";
   volatile List<String> rawTopK;

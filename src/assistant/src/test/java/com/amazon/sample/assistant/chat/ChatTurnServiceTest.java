@@ -36,6 +36,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 /** Pipeline de un turno (D2): orden de eventos, streaming, keepalive, cancelación y memoria. */
@@ -387,6 +388,40 @@ class ChatTurnServiceTest {
 
     assertThat(sessions.get("s1").turns()).isEmpty();
     assertThat(sessions.get("s1").isBusy()).isFalse();
+  }
+
+  @Test
+  void reasoningContentCountsAsTheFirstFragment() {
+    // Un modelo que razona siempre (select-assistant-models, segundo intento):
+    // razona a los 5 s y el texto llega a los 30 s, con el límite de 20 s.
+    model(() -> Flux.concat(
+        Mono.delay(Duration.ofSeconds(5)).thenReturn(reasoning("", "The user wants a chair.")),
+        Mono.delay(Duration.ofSeconds(25)).thenReturn(fragment("Here is a chair."))));
+
+    StepVerifier.withVirtualTime(() -> service.open("s1", "a velvet armchair"))
+        .expectNextMatches(ChatTurnServiceTest::isProducts)
+        .thenAwait(Duration.ofSeconds(30))
+        .thenConsumeWhile(ChatTurnServiceTest::isKeepalive)
+        .expectNextMatches(event -> isText(event, "Here is a chair."))
+        .expectNextMatches(event -> "done".equals(event.event()))
+        .verifyComplete();
+
+    assertThat(sessions.get("s1").turns()).singleElement()
+        .satisfies(turn -> assertThat(turn.assistant()).isEqualTo("Here is a chair."));
+  }
+
+  @Test
+  void anEmptyChunkDoesNotCountAsTheFirstFragment() {
+    // El chunk inicial con solo el rol no frena el tiempo límite de 20 s.
+    model(() -> Flux.concat(Flux.just(fragment("")),
+        Mono.delay(Duration.ofSeconds(25)).thenReturn(fragment("too late"))));
+
+    StepVerifier.withVirtualTime(() -> service.open("s1", "a velvet armchair"))
+        .expectNextMatches(ChatTurnServiceTest::isProducts)
+        .thenAwait(Duration.ofSeconds(20))
+        .thenConsumeWhile(ChatTurnServiceTest::isKeepalive)
+        .expectNextMatches(event -> isError(event, "llm-provider-unavailable"))
+        .verifyComplete();
   }
 
   @Test

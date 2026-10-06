@@ -33,7 +33,7 @@ class ChatPropertiesTest {
 
       assertThat(properties.rewrite().timeout()).isEqualTo(Duration.ofSeconds(12));
       assertThat(properties.rewrite().historyTurns()).isEqualTo(3);
-      assertThat(properties.rewrite().maxTokens()).isEqualTo(256);
+      assertThat(properties.rewrite().maxTokens()).isEqualTo(1024);
       ChatProperties.Chat chat = properties.chat();
       assertThat(chat.retrievalK()).isEqualTo(5);
       assertThat(chat.minScore()).isZero();
@@ -57,13 +57,13 @@ class ChatPropertiesTest {
     runner.run(context -> {
       ChatProperties properties = context.getBean(ChatProperties.class);
 
-      // La clave conserva el guion bajo y el valor es booleano, no "false".
-      assertThat(properties.rewrite().extraBody())
-          .isEqualTo(Map.of("chat_template_kwargs", Map.of("enable_thinking", false)));
+      // Defaults de muse-glimmer-30b (select-assistant-models); la clave conserva
+      // el guion bajo.
+      assertThat(properties.rewrite().extraBody()).isEqualTo(Map.of("reasoning_effort", "low"));
       assertThat(properties.chat().reasoning().onExtraBody())
-          .isEqualTo(Map.of("chat_template_kwargs", Map.of("enable_thinking", true)));
+          .isEqualTo(Map.of("reasoning_effort", "high"));
       assertThat(properties.chat().reasoning().offExtraBody())
-          .isEqualTo(Map.of("chat_template_kwargs", Map.of("enable_thinking", false)));
+          .isEqualTo(Map.of("reasoning_effort", "low"));
     });
   }
 

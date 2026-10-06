@@ -21,8 +21,9 @@ import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * Lo que manda cada {@code ChatClient} a NVIDIA (D3, D7): modelo,
- * {@code temperature}, {@code max_tokens} y {@code chat_template_kwargs},
- * capturado por un proveedor falso.
+ * {@code temperature}, {@code max_tokens} y el nivel de razonamiento
+ * ({@code reasoning_effort} de {@code meta/muse-glimmer-30b}, los defaults de
+ * {@code select-assistant-models}), capturado por un proveedor falso.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.NONE, properties = {
     "spring.ai.openai.api-key=test-key",
@@ -71,11 +72,11 @@ class ChatClientsRequestTest {
     rewriteChatClient.prompt().user("hi").call().content();
 
     JsonNode request = PROVIDER.requests().get(0);
-    assertThat(request.path("model").asText()).isEqualTo("nvidia/nemotron-3.5-lightning-30b-a3b");
+    assertThat(request.path("model").asText()).isEqualTo("meta/muse-glimmer-30b");
     assertThat(request.path("temperature").asDouble()).isZero();
-    assertThat(request.path("max_tokens").asInt()).isEqualTo(256);
-    assertThat(request.path("chat_template_kwargs").path("enable_thinking").isBoolean()).isTrue();
-    assertThat(request.path("chat_template_kwargs").path("enable_thinking").asBoolean()).isFalse();
+    assertThat(request.path("max_tokens").asInt()).isEqualTo(1024);
+    assertThat(request.path("reasoning_effort").asText()).isEqualTo("low");
+    assertThat(request.has("chat_template_kwargs")).isFalse();
     assertThat(request.path("stream").asBoolean(false)).isFalse();
     // add-assistant-tools (D2): la reescritura no tiene tools.
     assertThat(request.has("tools")).isFalse();
@@ -96,10 +97,10 @@ class ChatClientsRequestTest {
     stream(Intent.SEARCH);
 
     JsonNode request = PROVIDER.requests().get(0);
-    assertThat(request.path("model").asText()).isEqualTo("nvidia/nemotron-3-super-120b-a12b");
+    assertThat(request.path("model").asText()).isEqualTo("meta/muse-glimmer-30b");
     assertThat(request.path("temperature").asDouble()).isEqualTo(0.6);
     assertThat(request.path("max_tokens").asInt()).isEqualTo(1024);
-    assertThat(request.path("chat_template_kwargs").path("enable_thinking").asBoolean()).isFalse();
+    assertThat(request.path("reasoning_effort").asText()).isEqualTo("low");
     assertThat(request.path("stream").asBoolean()).isTrue();
   }
 
@@ -108,10 +109,10 @@ class ChatClientsRequestTest {
     stream(Intent.COMPARE);
 
     JsonNode request = PROVIDER.requests().get(0);
-    assertThat(request.path("model").asText()).isEqualTo("nvidia/nemotron-3-super-120b-a12b");
+    assertThat(request.path("model").asText()).isEqualTo("meta/muse-glimmer-30b");
     assertThat(request.path("temperature").asDouble()).isEqualTo(0.6);
     assertThat(request.path("max_tokens").asInt()).isEqualTo(4096);
-    assertThat(request.path("chat_template_kwargs").path("enable_thinking").asBoolean()).isTrue();
+    assertThat(request.path("reasoning_effort").asText()).isEqualTo("high");
   }
 
   private void stream(Intent intent) {

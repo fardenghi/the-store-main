@@ -301,7 +301,7 @@ Los dos roles, sus prompts y su configuración siguen separados, así que se pue
 
 Corridas del 2026-10-06 con `scripts/model-bench.sh`, contra la colección `products` restaurada desde un snapshot en un Qdrant local (80 puntos; cada sincronización dio `unchanged=80`, `providerRequests=0`). Las tablas salen de `scripts/model_bench_report.py`; los `.log` quedan en `target/` y no se versionan.
 
-**Resultado: `meta/muse-glimmer-30b` no se adopta en ningún rol. Los defaults siguen siendo los Nemotron, y el siguiente candidato lo elige el grupo.**
+**Resultado del primer intento: `meta/muse-glimmer-30b` no se adoptó en ningún rol.** El grupo pidió un segundo intento, con los problemas de integración corregidos, y después de verlo decidió **adoptar `muse-glimmer-30b` en los dos roles, con los Nemotron como plan B** (ver "Segundo intento").
 
 ### Ensayo del pipeline (task 2.2)
 
@@ -373,3 +373,54 @@ Embeddings de indexación: 0.
 - **Para el próximo candidato con `reasoning_effort`:** no ponerlo en el `extra-body` (400 con tools). Usar `SPRING_AI_OPENAI_CHAT_OPTIONS_REASONING_EFFORT` o adaptar `ReasoningPolicy` en un change propio.
 - **Cambios de la evaluación al benchmark:** `controlledToolCalling` suma una vuelta con `tool_choice: "required"` (1 request más que las 3 de D5). `ModelSpikeSmokeIT` acepta `-Dspike.main-off-reasoning=minimum` (el `off` es un nivel mínimo, no un apagado) y `-Dspike.rewrite-max-tokens`.
 
+## Segundo intento
+
+Corridas del 2026-10-06 (19:29 a 20:24) con `scripts/model-bench.sh`, un ledger aparte (`target/model-bench/intento2/ledger.tsv`, topes 550 NVIDIA y 280 Gemini aprobados por el grupo) y la colección `products` restaurada desde el snapshot (cada sincronización: `unchanged=80`, `providerRequests=0`). Antes de medir se corrigieron los tres problemas de integración del primer intento:
+
+- **`reasoning_effort` duplicado (400 con tools):** `ExtraBody` lo manda por la opción nativa del request, una sola vez y con el nivel del turno (`ReasoningEffortRequestTest` mira el cuerpo crudo).
+- **`tool_choice: "required"` ignorado por muse:** `retail.assistant.tools.corrective-tool-choice=prompt`, en el que la vuelta correctiva de un pedido de carrito no manda `tool_choice` y le pide el tool call en el aviso. `CartClaimFilter` sigue bloqueando las confirmaciones falsas.
+- **`read-timeout` de 10 s contra los 12 s de la reescritura:** pasa a 30 s, y el servicio no arranca si no es mayor que el tiempo límite de la reescritura.
+
+Configuración medida: principal `meta/muse-glimmer-30b` con `{"reasoning_effort":"low"}` / `{"reasoning_effort":"high"}` y `corrective-tool-choice=prompt`; reescritura por defecto de ese momento (`nemotron-3.5-lightning`). M7 no fue parada temprana: se midió para que el grupo decida el trade-off entre calidad y latencia.
+
+**Rol principal** (M1 a M8 contra la línea base registrada):
+
+| Métrica | Umbral (D2) | Línea base (Nemotron) | `muse-glimmer-30b` | ✔/✘ |
+| --- | --- | --- | --- | --- |
+| M1 Capacidades | Todas OK | Todas OK | Con el fix, tool calls en streaming, ciclo controlado, segunda vuelta y `tool_choice: "none"` OK, y el nivel por request OK (primer intento). `tool_choice: "required"` sigue ignorado: se reemplaza por el modo `prompt` | ✔ con la adaptación (`required` ✘) |
+| M2 Confirmaciones falsas | 0 | 0 | **0** en todas las corridas. Una afirmación sin `addToCart` la descartó el filtro, y la vuelta correctiva en modo `prompt` terminó en `addToCart:ok` | ✔ |
+| M3 Producto equivocado | 0 | 0 | **0** de 20 agregados | ✔ |
+| M4 `MultiTurnCartSmokeIT` | ≥ 10/15 | 3/6 (50 %) | **14/15** (93 %). La restante fue un timeout de 20 s al primer fragmento ("cheaper") | ✔ |
+| M5 Ambiguo: agrega sin preguntar | ≤ 1/5 | 1/5 | 0 de 2 muestras válidas; las otras 3 se cortaron por el timeout de 20 s | — (no concluyente) |
+| M6 Escenarios estables 3/3 | 3/3 | Pasan | Chat: los 5 estables 3/3. Tools: `lampsUnder100CheapestFirst`, `diningTableUnder300InSpanish` y `cartsDownIsNotConfirmed` 3/3; `priceRightNowComesFromGetProductDetails` 1/3, `addThatOneToMyCart` 2/3 y `addTwoOfTheFirstOne` 2/3, todas las fallas por el timeout de 20 s al primer fragmento (ninguna respuesta incorrecta) | ✘ (por latencia) |
+| M7 Latencia del modelo al primer texto visible | `low` p50 ≤ 3 s y p95 ≤ 8 s; `high` máx ≤ 30 s | 1,3 s (spike); 18 s en una comparación | `low`: p50 **6,8 s**, p95 **19,6 s**, máx 51,1 s (137 turnos). `high`: máx 49,6 s (8 turnos). **Primer evento de razonamiento:** `low` p50 1,2 s y p95 4,7 s; `high` p50 1,3 s. Lo que ve el usuario (`firstFragmentMs` completo): p50 9,3 s y p95 24,1 s | ✘ |
+| M8 Requests a NVIDIA por turno | ≤ 3,5 | 3,1 | **2,43** (145 turnos) | ✔ |
+| **Resultado** | | | **Adoptado por decisión del grupo** (mejor que Nemotron en calidad del carrito; peor en latencia) | |
+
+Sin umbral: inestables `cheaper` 3/3, `notALamp` 3/3, `justifiedComparisonWithReasoning` 3/3, `answersInTheUserLanguage` 3/3 (Nemotron: 1/5 y 2/5 en castellano), `greetingDoesNotSearch` 2/3 y `stalePayloadPriceIsNotShown` 2/3. `ChatEndToEndSmokeIT`: 29/30 escenarios en 3 corridas. Correcciones: `claim+prompt` 1 y `announce` 1. Reescritura (Nemotron) en esos turnos: fallback 6/145 (4 %).
+
+**Rol de reescritura:** la comparación lado a lado con Nemotron en la misma sesión (spike de reescritura y `RewriteEvalSmokeIT`, ×3 cada uno) **no se corrió, por decisión del grupo**. Quedan los valores del primer intento, medidos con el `read-timeout` de 10 s que cortaba antes de tiempo: R1 0 inválidas de 15 (✔), R2 p50 5,0 s y p95 10,1 s (✘), R3 5/20 fallbacks, todos cortes a los 10 s (✘), R4 44 contra 42 en una sola corrida. **Adoptado por decisión del grupo**, sin R1 a R4 medidos con el fix: el grupo prioriza un único modelo en los dos roles (D8). El riesgo conocido es la latencia de la reescritura, que con el razonamiento obligatorio puede caer al fallback de 12 s.
+
+**Fallas por latencia y fix posterior.** Las 8 fallas `llm-provider-unavailable` (1 en MultiTurn, 6 en Tools y 1 en el ambiguo suelto) fueron el tiempo límite de 20 s al primer fragmento: muse razona siempre y el primer texto visible llegaba después. Después de las corridas, el tiempo límite cuenta como primer fragmento al primer chunk con texto, razonamiento o un tool call (`reasoningContentCountsAsTheFirstFragment`). En los turnos que sí terminaron, el primer razonamiento llegó con un p95 de 4,7 s, así que es esperable que la mayoría de esos cortes desaparezcan, pero no se volvió a medir.
+
+**Eventos SSE y latencia percibida (sin cambios en la `ui`).** El `assistant` no expone el razonamiento: emite `products` (después de la reescritura y la búsqueda, antes del modelo), los fragmentos de texto, `tool` (cada tool ejecutada, con su nombre y resultado), `cart-updated`, `done` o `error`, y comentarios `:keepalive`. El razonamiento solo se cuenta (`reasoningChars` y, desde este intento, `firstReasoningMs` en la línea `assistant.turn`). La `ui` reenvía los eventos con `data` y muestra un spinner hasta el primer texto. `products` y `tool` llegan al navegador, pero `chat.js` los ignora (D4 de `integrate-ui-assistant`). Hoy la `ui` podría mostrar "buscando…" o "consultando el precio…" con esos dos eventos sin cambiar el `assistant`. Para un "pensando…" haría falta un evento nuevo del `assistant`, por ejemplo uno sin contenido al llegar el primer `reasoning_content` (sería ≈ 1,2 s de p50 contra 6,8 s del primer texto). No se recomienda mandar el contenido del razonamiento: rompería la persona y podría filtrar el prompt.
+
+**Cuota del segundo intento (ledger):**
+
+| Etapa | NVIDIA | Gemini |
+| --- | --- | --- |
+| Revalidación de M1 (`controlledToolCalling` + `mainCallsToolsWhileStreaming`) | 6 | 0 |
+| `MultiTurnCartSmokeIT` ×5 | 170 | 35 |
+| `ToolsEndToEndSmokeIT` ×3 | 83 | 20 |
+| `#ambiguousRequestAsksInsteadOfAdding` ×2 | 7 | 2 |
+| `ChatEndToEndSmokeIT` ×3 | 92 | 38 |
+| **Total** | **358 de 550** | **95 de 280** |
+
+Embeddings de indexación: 0. Con el primer intento, el change suma 403 requests a NVIDIA y 113 a Gemini. Docker y Qdrant local quedaron apagados.
+
+### Desvíos respecto de este design
+
+- **Adopción por decisión del grupo, no por D2/D3.** El principal no cumple M6 (por latencia) ni M7, y la reescritura no tiene R1 a R4 medidos con el fix. El grupo lo adoptó en los dos roles por la mejora en el flujo del carrito (M4 14/15 contra 3/6, M2 y M3 en 0) y por usar un único modelo (D8). Los umbrales de D2 y D3 no se cambiaron: la tabla muestra qué métricas no se cumplen.
+- **Prompts y salvaguarda.** El non-goal "cambiar prompts o la salvaguarda para favorecer al candidato" se levantó a pedido del grupo, solo para la vuelta correctiva (`corrective-tool-choice=prompt`, con un aviso adicional). El prompt del sistema y `CartClaimFilter` no cambiaron.
+- **Tiempo límite al primer fragmento.** Ahora lo cumple el primer chunk con texto, razonamiento o un tool call (delta de `assistant-chat`, "Errores del proveedor de chat"). Antes contaba solo el texto visible.
+- **D8 aplicado.** Un mismo modelo en los dos roles, con la tabla de desvíos de `docs/arquitectura.md` actualizada.

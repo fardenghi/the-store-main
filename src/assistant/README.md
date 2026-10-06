@@ -23,9 +23,9 @@ con variables de entorno (en el cluster, desde el ConfigMap `assistant`).
 | `NVIDIA_API_KEY`                                      | Clave de NVIDIA (chat). Viene del Secret             | `not-configured`                        |
 | `GOOGLE_API_KEY`                                      | Clave de la Gemini API (embeddings). Viene del Secret | `not-configured`                        |
 | `SPRING_AI_OPENAI_BASE_URL`                           | URL base del proveedor de chat                       | `https://integrate.api.nvidia.com`      |
-| `SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL`                 | Modelo principal (razonamiento + tools)              | `nvidia/nemotron-3-super-120b-a12b`     |
+| `SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL`                 | Modelo principal (razonamiento + tools)              | `meta/muse-glimmer-30b`                 |
 | `SPRING_AI_OPENAI_CHAT_OPTIONS_MAX_TOKENS`            | Límite de tokens de salida (NVIDIA lo exige)         | `1024`                                  |
-| `RETAIL_ASSISTANT_MODELS_REWRITE`                     | Modelo de reescritura de consultas                   | `nvidia/nemotron-3.5-lightning-30b-a3b` |
+| `RETAIL_ASSISTANT_MODELS_REWRITE`                     | Modelo de reescritura de consultas                   | `meta/muse-glimmer-30b`                 |
 | `SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_MODEL` | Modelo de embeddings                                 | `gemini-embedding-001`                  |
 | `SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_DIMENSIONS` | Dimensiones de los embeddings                   | `768`                                   |
 | `SPRING_AI_VECTORSTORE_QDRANT_HOST`                   | Host de Qdrant (gRPC)                                | `localhost`                             |
@@ -42,7 +42,8 @@ con variables de entorno (en el cluster, desde el ConfigMap `assistant`).
 | `RETAIL_ASSISTANT_SEARCH_QUERY_CACHE_SIZE`            | Entradas del caché de embeddings de consultas        | `256`                                   |
 | `RETAIL_ASSISTANT_REWRITE_TIMEOUT`                    | Tiempo límite de la reescritura; si se excede, se usa el mensaje crudo | `12s`                 |
 | `RETAIL_ASSISTANT_REWRITE_HISTORY_TURNS`              | Turnos de la sesión que recibe la reescritura        | `3`                                     |
-| `RETAIL_ASSISTANT_REWRITE_MAX_TOKENS`                 | Tokens de salida de la reescritura (incluyen el razonamiento si el modelo no lo apaga) | `256` |
+| `RETAIL_ASSISTANT_REWRITE_MAX_TOKENS`                 | Tokens de salida de la reescritura (incluyen el razonamiento si el modelo no lo apaga; con Nemotron alcanza con `256`) | `1024` |
+| `SPRING_HTTP_CLIENT_READ_TIMEOUT`                     | Lectura HTTP de los `RestClient`: la reescritura (sin streaming) y el catálogo al indexar. Tiene que ser mayor que `RETAIL_ASSISTANT_REWRITE_TIMEOUT`; si no, el servicio no arranca | `30s` |
 | `RETAIL_ASSISTANT_CHAT_RETRIEVAL_K`                   | Productos que recibe el modelo principal (1 a 20)    | `5`                                     |
 | `RETAIL_ASSISTANT_CHAT_MIN_SCORE`                     | Umbral de score de la búsqueda (0 lo desactiva)      | `0`                                     |
 | `RETAIL_ASSISTANT_CHAT_MAX_TOKENS`                    | Tokens de salida sin razonamiento                    | `1024`                                  |
@@ -53,7 +54,7 @@ con variables de entorno (en el cluster, desde el ConfigMap `assistant`).
 | `RETAIL_ASSISTANT_CHAT_MEMORY_MAX_TURNS`              | Turnos que se recuerdan por sesión                   | `10`                                    |
 | `RETAIL_ASSISTANT_CHAT_MEMORY_IDLE_TTL`               | Inactividad después de la cual se olvida la sesión   | `30m`                                   |
 | `RETAIL_ASSISTANT_CHAT_MEMORY_MAX_SESSIONS`           | Máximo de sesiones en memoria                        | `10000`                                 |
-| `RETAIL_ASSISTANT_CHAT_TIMEOUTS_FIRST_TOKEN`          | Espera máxima del primer fragmento sin razonamiento  | `20s`                                   |
+| `RETAIL_ASSISTANT_CHAT_TIMEOUTS_FIRST_TOKEN`          | Espera máxima del primer fragmento sin razonamiento (cuenta el primer fragmento de texto, de `reasoning_content` o un tool call) | `20s` |
 | `RETAIL_ASSISTANT_CHAT_TIMEOUTS_FIRST_TOKEN_REASONING` | Espera máxima del primer fragmento con razonamiento | `60s`                                   |
 | `RETAIL_ASSISTANT_CHAT_TIMEOUTS_TURN`                 | Duración máxima de un turno                          | `120s`                                  |
 | `RETAIL_ASSISTANT_CHAT_TIMEOUTS_KEEPALIVE`            | Intervalo del comentario `:keepalive` sin eventos    | `10s`                                   |
@@ -63,6 +64,7 @@ con variables de entorno (en el cluster, desde el ConfigMap `assistant`).
 | `RETAIL_ASSISTANT_TOOLS_SEARCH_DEFAULT_LIMIT` / `_SEARCH_MAX_LIMIT` | Resultados de `searchProducts` (default / máximo, hasta 20) | `5` / `10`                |
 | `RETAIL_ASSISTANT_TOOLS_DESCRIPTION_MAX_CHARS`        | Largo máximo de las descripciones en los resultados de las tools | `300`                       |
 | `RETAIL_ASSISTANT_TOOLS_HTTP_CONNECT_TIMEOUT` / `_READ_TIMEOUT` | Tiempos límite de las tools hacia `catalog` y `carts` | `2s` / `5s`                     |
+| `RETAIL_ASSISTANT_TOOLS_CORRECTIVE_TOOL_CHOICE`       | Vuelta correctiva de un pedido de carrito: `required` (`tool_choice: "required"`, para Nemotron) o `prompt` (el aviso pide el tool call, para modelos que ignoran `required`, como muse) | `prompt` |
 | `RETAIL_ASSISTANT_RATE_LIMIT_REQUESTS_PER_MINUTE`     | Solicitudes a NVIDIA en cualquier ventana de 60 s (todas las sesiones) | `36`                  |
 | `RETAIL_ASSISTANT_RATE_LIMIT_MAX_WAIT`                | Espera máxima del modelo principal por un lugar en el limitador | `30s`                        |
 | `RETAIL_ASSISTANT_RATE_LIMIT_MAX_429_RETRIES`         | Reintentos de una vuelta del modelo principal ante un 429 | `2`                                |
@@ -77,24 +79,30 @@ llamadas al proveedor con el placeholder fallan con 401/403.
 
 Cada modelo activa o desactiva el razonamiento con un campo distinto del
 request, así que esos campos (`extra-body`) son mapas configurables. Por
-defecto son los de Nemotron:
+defecto son los de `meta/muse-glimmer-30b`, que no permite apagar el
+razonamiento y lo regula por nivel (`low` es su "sin razonamiento"):
 
-| Propiedad                                       | Default                                               |
-| ----------------------------------------------- | ----------------------------------------------------- |
-| `retail.assistant.rewrite.extra-body`           | `{"chat_template_kwargs": {"enable_thinking": false}}` |
-| `retail.assistant.chat.reasoning.on-extra-body` | `{"chat_template_kwargs": {"enable_thinking": true}}`  |
-| `retail.assistant.chat.reasoning.off-extra-body`| `{"chat_template_kwargs": {"enable_thinking": false}}` |
+| Propiedad                                       | Default (muse)                  | Plan B (Nemotron)                                      |
+| ----------------------------------------------- | ------------------------------- | ------------------------------------------------------ |
+| `retail.assistant.rewrite.extra-body`           | `{"reasoning_effort": "low"}`   | `{"chat_template_kwargs": {"enable_thinking": false}}` |
+| `retail.assistant.chat.reasoning.on-extra-body` | `{"reasoning_effort": "high"}`  | `{"chat_template_kwargs": {"enable_thinking": true}}`  |
+| `retail.assistant.chat.reasoning.off-extra-body`| `{"reasoning_effort": "low"}`   | `{"chat_template_kwargs": {"enable_thinking": false}}` |
 
 Se reemplazan con `SPRING_APPLICATION_JSON` en el ConfigMap. El mapa que se
 define reemplaza completo al default (los defaults viven en `ChatProperties` y
 no en el YAML porque Spring combina las claves de un mapa definido en varias
-fuentes), y un mapa vacío `{}` manda el request sin campos extra. Para cambiar
-de modelo, en el ConfigMap `assistant` (el ejemplo tiene los valores de los
-Nemotron, que son los defaults verificados):
+fuentes), y un mapa vacío `{}` manda el request sin campos extra.
+
+**Plan B verificado: los Nemotron** (`nvidia/nemotron-3-super-120b-a12b` como
+principal y `nvidia/nemotron-3.5-lightning-30b-a3b` como reescritura, los
+defaults hasta `select-assistant-models`). Para pasar al plan B, en el
+ConfigMap `assistant`:
 
 ```yaml
   SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: nvidia/nemotron-3-super-120b-a12b
   RETAIL_ASSISTANT_MODELS_REWRITE: nvidia/nemotron-3.5-lightning-30b-a3b
+  RETAIL_ASSISTANT_REWRITE_MAX_TOKENS: "256"
+  RETAIL_ASSISTANT_TOOLS_CORRECTIVE_TOOL_CHOICE: required
   SPRING_APPLICATION_JSON: >-
     {"retail.assistant.chat.reasoning.on-extra-body": {"chat_template_kwargs": {"enable_thinking": true}},
      "retail.assistant.chat.reasoning.off-extra-body": {"chat_template_kwargs": {"enable_thinking": false}},
@@ -103,22 +111,23 @@ Nemotron, que son los defaults verificados):
 
 y `kubectl rollout restart deployment/assistant -n the-store`.
 
-**Plan B: pendiente del grupo.** El plan B anterior
-(`deepseek-ai/deepseek-v4.1-flash` y `google/gemma-3-12b-it`) no funciona con
-la cuenta (ver "Spike de modelos de chat"), y el único candidato evaluado en
-`select-assistant-models`, `meta/muse-glimmer-30b`, no se adoptó en ningún rol
-(ver "Selección de modelos"). No se documenta como plan B ningún modelo sin
-verificar.
+Para volver a muse, se sacan esas cinco variables (quedan los defaults). El
+plan B anterior (`deepseek-ai/deepseek-v4.1-flash` y `google/gemma-3-12b-it`)
+no funciona con la cuenta (ver "Spike de modelos de chat"), y no se documenta
+como plan B ningún modelo sin verificar.
 
-**`reasoning_effort` no va en un `extra-body`.** Con Spring AI 1.1.8, un campo
-del `extra-body` que también es un campo propio del request de OpenAI
-(`reasoning_effort`) sale duplicado en los requests con tools, y NVIDIA
-responde `400` "duplicate field `reasoning_effort`" en todos los turnos del
-modelo principal. Para un modelo que regula el razonamiento con
-`reasoning_effort` hay que usar la opción nativa
-(`SPRING_AI_OPENAI_CHAT_OPTIONS_REASONING_EFFORT`), que es la misma para todos
-los turnos: elegir el nivel por turno (bajo por defecto y alto en las
-comparaciones) necesitaría un cambio en `ReasoningPolicy`.
+**`reasoning_effort` en un `extra-body`.** Un modelo que regula el
+razonamiento por nivel (como `meta/muse-glimmer-30b`) lo configura igual que
+los demás, por ejemplo `{"reasoning_effort": "low"}` sin razonamiento y
+`{"reasoning_effort": "high"}` en las comparaciones. Spring AI 1.1.8 mandaba
+duplicado un campo del `extra-body` que también es un campo propio del request
+de OpenAI cuando el request lleva tools, y NVIDIA respondía `400` "duplicate
+field `reasoning_effort`". Desde el segundo intento de
+`select-assistant-models`, `ExtraBody` saca `reasoning_effort` del mapa y lo
+manda por la opción nativa `reasoningEffort` del request (una sola vez, con el
+nivel del turno). Cualquier otro campo propio del request (`temperature`,
+`top_p`, etc.) en un `extra-body` es un error de configuración y el servicio
+no arranca.
 
 ## Indexación del catálogo
 
@@ -814,17 +823,19 @@ Elegir el reemplazo es una decisión del grupo; para probar uno alcanza con
 
 | Fecha      | Uso         | Modelo                                  | Resultado                          |
 | ---------- | ----------- | --------------------------------------- | ---------------------------------- |
-| 2026-10-06 | Principal   | `nvidia/nemotron-3-super-120b-a12b`     | OK, responde con thinking apagado  |
-| 2026-10-06 | Reescritura | `nvidia/nemotron-3.5-lightning-30b-a3b` | OK, responde con thinking apagado  |
+| 2026-10-06 | Principal   | `nvidia/nemotron-3-super-120b-a12b`     | OK, responde con thinking apagado. Plan B del principal |
+| 2026-10-06 | Reescritura | `nvidia/nemotron-3.5-lightning-30b-a3b` | OK, responde con thinking apagado. Plan B de la reescritura |
 | 2026-10-06 | Embeddings  | `gemini-embedding-001`                  | OK, vector de 768 dimensiones      |
-| 2026-10-06 | Principal y reescritura | `meta/muse-glimmer-30b`   | No adoptado en ningún rol (ver abajo) |
+| 2026-10-06 | Principal y reescritura | `meta/muse-glimmer-30b`   | Primer intento: no adoptado. Segundo intento: adoptado en los dos roles por decisión del grupo (default; ver abajo) |
 
 ### Selección de modelos (`select-assistant-models`)
 
 Evaluación secuencial de un único candidato, `meta/muse-glimmer-30b`, en los
 dos roles, con los umbrales de D2 y D3 del change fijados antes de la primera
-corrida y el benchmark de "Tests". **Resultado: no se adopta en ningún rol; los
-defaults siguen siendo los Nemotron.** El siguiente candidato lo elige el grupo.
+corrida y el benchmark de "Tests". **Resultado del primer intento: no se
+adoptó en ningún rol. Resultado final (segundo intento, decisión del grupo):
+`muse-glimmer-30b` se adopta en los dos roles, con los Nemotron como plan B**
+(ver "Segundo intento" más abajo).
 
 `muse-glimmer-30b` no permite apagar el razonamiento: con
 `chat_template_kwargs.enable_thinking: false`, `chat_template_kwargs.thinking: false`,
@@ -857,12 +868,58 @@ Observaciones para el próximo candidato:
 - Los 5 fallbacks de la reescritura cortaron a los **10 s**, no a los 12 s de
   `RETAIL_ASSISTANT_REWRITE_TIMEOUT`: el `read-timeout` de los `RestClient`
   (`spring.http.client.read-timeout: 10s`) también alcanza al cliente de
-  NVIDIA, así que el tiempo máximo efectivo de la reescritura es 10 s.
-- Un modelo con `reasoning_effort` no puede llevarlo en el `extra-body` (ver
-  "Razonamiento y plan B").
+  NVIDIA, así que el tiempo máximo efectivo de la reescritura era 10 s.
+  Corregido en el segundo intento (`read-timeout` de 30 s, validado al arrancar).
+- Un modelo con `reasoning_effort` no podía llevarlo en el `extra-body`.
+  Corregido en el segundo intento (ver "Razonamiento y plan B").
 - Con `low`, el razonamiento de muse crece con el pedido: 985 caracteres
   para una descripción de cuatro oraciones, y eso explica los 9,6 s al primer
   fragmento.
+
+#### Segundo intento
+
+Corridas del 2026-10-06 (19:29 a 20:24) con `scripts/model-bench.sh`, un ledger aparte (`target/model-bench/intento2/ledger.tsv`, topes 550 NVIDIA y 280 Gemini aprobados por el grupo) y la colección `products` restaurada desde el snapshot (cada sincronización: `unchanged=80`, `providerRequests=0`). Antes de medir se corrigieron los tres problemas de integración del primer intento:
+
+- **`reasoning_effort` duplicado (400 con tools):** `ExtraBody` lo manda por la opción nativa del request, una sola vez y con el nivel del turno (`ReasoningEffortRequestTest` mira el cuerpo crudo).
+- **`tool_choice: "required"` ignorado por muse:** `retail.assistant.tools.corrective-tool-choice=prompt`, en el que la vuelta correctiva de un pedido de carrito no manda `tool_choice` y le pide el tool call en el aviso. `CartClaimFilter` sigue bloqueando las confirmaciones falsas.
+- **`read-timeout` de 10 s contra los 12 s de la reescritura:** pasa a 30 s, y el servicio no arranca si no es mayor que el tiempo límite de la reescritura.
+
+Configuración medida: principal `meta/muse-glimmer-30b` con `{"reasoning_effort":"low"}` / `{"reasoning_effort":"high"}` y `corrective-tool-choice=prompt`; reescritura por defecto de ese momento (`nemotron-3.5-lightning`). M7 no fue parada temprana: se midió para que el grupo decida el trade-off entre calidad y latencia.
+
+**Rol principal** (M1 a M8 contra la línea base registrada):
+
+| Métrica | Umbral (D2) | Línea base (Nemotron) | `muse-glimmer-30b` | ✔/✘ |
+| --- | --- | --- | --- | --- |
+| M1 Capacidades | Todas OK | Todas OK | Con el fix, tool calls en streaming, ciclo controlado, segunda vuelta y `tool_choice: "none"` OK, y el nivel por request OK (primer intento). `tool_choice: "required"` sigue ignorado: se reemplaza por el modo `prompt` | ✔ con la adaptación (`required` ✘) |
+| M2 Confirmaciones falsas | 0 | 0 | **0** en todas las corridas. Una afirmación sin `addToCart` la descartó el filtro, y la vuelta correctiva en modo `prompt` terminó en `addToCart:ok` | ✔ |
+| M3 Producto equivocado | 0 | 0 | **0** de 20 agregados | ✔ |
+| M4 `MultiTurnCartSmokeIT` | ≥ 10/15 | 3/6 (50 %) | **14/15** (93 %). La restante fue un timeout de 20 s al primer fragmento ("cheaper") | ✔ |
+| M5 Ambiguo: agrega sin preguntar | ≤ 1/5 | 1/5 | 0 de 2 muestras válidas; las otras 3 se cortaron por el timeout de 20 s | — (no concluyente) |
+| M6 Escenarios estables 3/3 | 3/3 | Pasan | Chat: los 5 estables 3/3. Tools: `lampsUnder100CheapestFirst`, `diningTableUnder300InSpanish` y `cartsDownIsNotConfirmed` 3/3; `priceRightNowComesFromGetProductDetails` 1/3, `addThatOneToMyCart` 2/3 y `addTwoOfTheFirstOne` 2/3, todas las fallas por el timeout de 20 s al primer fragmento (ninguna respuesta incorrecta) | ✘ (por latencia) |
+| M7 Latencia del modelo al primer texto visible | `low` p50 ≤ 3 s y p95 ≤ 8 s; `high` máx ≤ 30 s | 1,3 s (spike); 18 s en una comparación | `low`: p50 **6,8 s**, p95 **19,6 s**, máx 51,1 s (137 turnos). `high`: máx 49,6 s (8 turnos). **Primer evento de razonamiento:** `low` p50 1,2 s y p95 4,7 s; `high` p50 1,3 s. Lo que ve el usuario (`firstFragmentMs` completo): p50 9,3 s y p95 24,1 s | ✘ |
+| M8 Requests a NVIDIA por turno | ≤ 3,5 | 3,1 | **2,43** (145 turnos) | ✔ |
+| **Resultado** | | | **Adoptado por decisión del grupo** (mejor que Nemotron en calidad del carrito; peor en latencia) | |
+
+Sin umbral: inestables `cheaper` 3/3, `notALamp` 3/3, `justifiedComparisonWithReasoning` 3/3, `answersInTheUserLanguage` 3/3 (Nemotron: 1/5 y 2/5 en castellano), `greetingDoesNotSearch` 2/3 y `stalePayloadPriceIsNotShown` 2/3. `ChatEndToEndSmokeIT`: 29/30 escenarios en 3 corridas. Correcciones: `claim+prompt` 1 y `announce` 1. Reescritura (Nemotron) en esos turnos: fallback 6/145 (4 %).
+
+**Rol de reescritura:** la comparación lado a lado con Nemotron en la misma sesión (spike de reescritura y `RewriteEvalSmokeIT`, ×3 cada uno) **no se corrió, por decisión del grupo**. Quedan los valores del primer intento, medidos con el `read-timeout` de 10 s que cortaba antes de tiempo: R1 0 inválidas de 15 (✔), R2 p50 5,0 s y p95 10,1 s (✘), R3 5/20 fallbacks, todos cortes a los 10 s (✘), R4 44 contra 42 en una sola corrida. **Adoptado por decisión del grupo**, sin R1 a R4 medidos con el fix: el grupo prioriza un único modelo en los dos roles (D8). El riesgo conocido es la latencia de la reescritura, que con el razonamiento obligatorio puede caer al fallback de 12 s.
+
+**Fallas por latencia y fix posterior.** Las 8 fallas `llm-provider-unavailable` (1 en MultiTurn, 6 en Tools y 1 en el ambiguo suelto) fueron el tiempo límite de 20 s al primer fragmento: muse razona siempre y el primer texto visible llegaba después. Después de las corridas, el tiempo límite cuenta como primer fragmento al primer chunk con texto, razonamiento o un tool call (`reasoningContentCountsAsTheFirstFragment`). En los turnos que sí terminaron, el primer razonamiento llegó con un p95 de 4,7 s, así que es esperable que la mayoría de esos cortes desaparezcan, pero no se volvió a medir.
+
+**Eventos SSE y latencia percibida (sin cambios en la `ui`).** El `assistant` no expone el razonamiento: emite `products` (después de la reescritura y la búsqueda, antes del modelo), los fragmentos de texto, `tool` (cada tool ejecutada, con su nombre y resultado), `cart-updated`, `done` o `error`, y comentarios `:keepalive`. El razonamiento solo se cuenta (`reasoningChars` y, desde este intento, `firstReasoningMs` en la línea `assistant.turn`). La `ui` reenvía los eventos con `data` y muestra un spinner hasta el primer texto. `products` y `tool` llegan al navegador, pero `chat.js` los ignora (D4 de `integrate-ui-assistant`). Hoy la `ui` podría mostrar "buscando…" o "consultando el precio…" con esos dos eventos sin cambiar el `assistant`. Para un "pensando…" haría falta un evento nuevo del `assistant`, por ejemplo uno sin contenido al llegar el primer `reasoning_content` (sería ≈ 1,2 s de p50 contra 6,8 s del primer texto). No se recomienda mandar el contenido del razonamiento: rompería la persona y podría filtrar el prompt.
+
+**Cuota del segundo intento (ledger):**
+
+| Etapa | NVIDIA | Gemini |
+| --- | --- | --- |
+| Revalidación de M1 (`controlledToolCalling` + `mainCallsToolsWhileStreaming`) | 6 | 0 |
+| `MultiTurnCartSmokeIT` ×5 | 170 | 35 |
+| `ToolsEndToEndSmokeIT` ×3 | 83 | 20 |
+| `#ambiguousRequestAsksInsteadOfAdding` ×2 | 7 | 2 |
+| `ChatEndToEndSmokeIT` ×3 | 92 | 38 |
+| **Total** | **358 de 550** | **95 de 280** |
+
+Embeddings de indexación: 0. Con el primer intento, el change suma 403 requests a NVIDIA y 113 a Gemini. Docker y Qdrant local quedaron apagados.
 
 ### Evaluación de la reescritura (`RewriteEvalSmokeIT`)
 

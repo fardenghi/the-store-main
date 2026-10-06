@@ -37,6 +37,15 @@ class ParseTest(unittest.TestCase):
         tools = runs("tools-1.log")[0]
         self.assertEqual([report.model_latency(t) for t in tools.turns], [2000, 3000, 8000])
 
+    def test_reasoning_latency_is_measured_apart_from_the_text(self):
+        tools = runs("tools-1.log")[0]
+        compare = [t for t in tools.turns if t.get("reasoning") == "on"][0]
+        self.assertEqual(report.model_latency(compare), 8000)
+        self.assertEqual(report.model_latency(compare, "firstReasoningMs"), 500)
+        detail = report.latency_detail(tools.turns)
+        self.assertIn("primer razonamiento p50 0,5 s", detail[-1])
+        self.assertIn("primer texto visible p50 8,0 s", detail[-1])
+
     def test_results_keep_their_fields(self):
         tools = runs("tools-1.log")[0]
         down = tools.results[-1]

@@ -5,6 +5,7 @@ import com.amazon.sample.assistant.chat.ToolCallingLoop;
 import com.amazon.sample.assistant.chat.context.ContextRetriever;
 import com.amazon.sample.assistant.chat.context.SystemPromptFactory;
 import com.amazon.sample.assistant.chat.llm.ChatRateLimiter;
+import com.amazon.sample.assistant.chat.llm.ExtraBody;
 import com.amazon.sample.assistant.chat.llm.ReasoningPolicy;
 import com.amazon.sample.assistant.chat.rewrite.CatalogTagsCache;
 import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
@@ -13,7 +14,7 @@ import com.amazon.sample.assistant.products.catalog.CatalogClient;
 import com.amazon.sample.assistant.products.search.ProductSearchService;
 import com.amazon.sample.assistant.tools.SafeToolCallback;
 import com.amazon.sample.assistant.tools.StoreTools;
-import java.util.LinkedHashMap;
+import java.time.Duration;
 import java.util.List;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.model.tool.ToolCallingManager;
@@ -44,26 +45,50 @@ public class ChatConfiguration {
   @Bean
   OpenAiChatOptions mainChatOptions(
       @Value("${spring.ai.openai.chat.options.model}") String model, ChatProperties properties) {
-    return OpenAiChatOptions.builder()
+    OpenAiChatOptions options = OpenAiChatOptions.builder()
         .model(model)
         .temperature(MAIN_TEMPERATURE)
         .maxTokens(properties.chat().maxTokens())
-        .extraBody(new LinkedHashMap<>(properties.chat().reasoning().offExtraBody()))
         .build();
+    ExtraBody.apply(options, properties.chat().reasoning().offExtraBody());
+    return options;
   }
 
-  /** Modelo compacto de reescritura: temperatura 0, max-tokens acotado y thinking desactivado (D3). */
+  /**
+   * Modelo compacto de reescritura: temperatura 0, max-tokens acotado y thinking
+   * desactivado (D3). Va sin streaming, por el {@code RestClient} de Spring AI,
+   * así que su lectura HTTP tiene el {@code spring.http.client.read-timeout}.
+   */
   @Bean
   ChatClient rewriteChatClient(OpenAiChatModel chatModel,
-      @Value("${retail.assistant.models.rewrite}") String model, ChatProperties properties) {
-    return ChatClient.builder(chatModel)
-        .defaultOptions(OpenAiChatOptions.builder()
-            .model(model)
-            .temperature(0.0)
-            .maxTokens(properties.rewrite().maxTokens())
-            .extraBody(new LinkedHashMap<>(properties.rewrite().extraBody()))
-            .build())
+      @Value("${retail.assistant.models.rewrite}") String model, ChatProperties properties,
+      @Value("${spring.http.client.read-timeout:#{null}}") Duration readTimeout) {
+    checkRewriteTimeout(readTimeout, properties.rewrite().timeout());
+    OpenAiChatOptions options = OpenAiChatOptions.builder()
+        .model(model)
+        .temperature(0.0)
+        .maxTokens(properties.rewrite().maxTokens())
         .build();
+    ExtraBody.apply(options, properties.rewrite().extraBody());
+    return ChatClient.builder(chatModel).defaultOptions(options).build();
+  }
+
+  /**
+   * El {@code read-timeout} de los {@code RestClient} tiene que ser mayor que el
+   * tiempo límite de la reescritura: si no, la lectura HTTP corta la reescritura
+   * antes (con 10 s contra 12 s, los fallbacks llegaban a los 10 s como
+   * {@code llm-provider-unavailable}, {@code select-assistant-models}).
+   *
+   * @param readTimeout {@code spring.http.client.read-timeout}; sin valor, el del
+   *     cliente HTTP, que no corta antes
+   * @throws IllegalStateException si el {@code read-timeout} no es mayor
+   */
+  static void checkRewriteTimeout(Duration readTimeout, Duration rewriteTimeout) {
+    if (readTimeout != null && readTimeout.compareTo(rewriteTimeout) <= 0) {
+      throw new IllegalStateException("spring.http.client.read-timeout (" + readTimeout
+          + ") tiene que ser mayor que retail.assistant.rewrite.timeout (" + rewriteTimeout
+          + "): si no, la lectura HTTP corta la reescritura antes de su tiempo límite");
+    }
   }
 
   /**

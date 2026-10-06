@@ -30,9 +30,15 @@ spring:
       request-timeout: 150s
   http:
     client:
-      # Timeouts de los RestClient (lectura del catálogo).
+      # Timeouts de los RestClient: la lectura del catálogo al indexar y las
+      # llamadas sin streaming a NVIDIA (la reescritura). El read-timeout tiene
+      # que ser mayor que retail.assistant.rewrite.timeout, para que la
+      # reescritura la corte su propio tiempo límite y no la lectura HTTP; si no,
+      # el assistant no arranca (select-assistant-models, segundo intento). Las
+      # tools usan sus propios tiempos (retail.assistant.tools.http) y el modelo
+      # principal va por streaming (WebClient), que no usa este valor.
       connect-timeout: 2s
-      read-timeout: 10s
+      read-timeout: 30s
   ai:
     # Sin reintentos automáticos de Spring AI: gastarían la cuota de 40 RPM de
     # NVIDIA y dejarían al usuario esperando sin aviso. Alcanza también al
@@ -46,7 +52,9 @@ spring:
       api-key: ${NVIDIA_API_KEY:not-configured}
       chat:
         options:
-          model: nvidia/nemotron-3-super-120b-a12b
+          # select-assistant-models: muse-glimmer-30b en los dos roles; plan B,
+          # los Nemotron (ver "Razonamiento y plan B" en el README).
+          model: meta/muse-glimmer-30b
           max-tokens: 1024
     # Embeddings: gemini-embedding-001 con 768 dimensiones. El task-type por
     # defecto es el de indexación; las consultas lo sobreescriben por llamada.
@@ -82,7 +90,7 @@ spring.ai.model.moderation: none
 retail:
   assistant:
     models:
-      rewrite: nvidia/nemotron-3.5-lightning-30b-a3b
+      rewrite: meta/muse-glimmer-30b
     endpoints:
       catalog: http://localhost:8081
       carts: http://localhost:8082
@@ -98,15 +106,18 @@ retail:
     # ChatProperties, porque Spring combina las claves de un mapa definido en
     # varias fuentes y un default acá no se podría reemplazar desde
     # SPRING_APPLICATION_JSON (plan B, ver el README). Defaults:
-    #   rewrite.extra-body:              {"chat_template_kwargs": {"enable_thinking": false}}
-    #   chat.reasoning.on-extra-body:    {"chat_template_kwargs": {"enable_thinking": true}}
-    #   chat.reasoning.off-extra-body:   {"chat_template_kwargs": {"enable_thinking": false}}
+    #   rewrite.extra-body:              {"reasoning_effort": "low"}
+    #   chat.reasoning.on-extra-body:    {"reasoning_effort": "high"}
+    #   chat.reasoning.off-extra-body:   {"reasoning_effort": "low"}
+    # muse-glimmer-30b no permite apagar el razonamiento: "low" es su esfuerzo
+    # mínimo. reasoning_effort va por la opción nativa del request (ExtraBody).
     rewrite:
       timeout: 12s
       history-turns: 3
       # Tokens de salida de la reescritura. Con un modelo que no puede apagar el
-      # razonamiento, lo incluyen (select-assistant-models, task 1.6).
-      max-tokens: 256
+      # razonamiento, lo incluyen (select-assistant-models, task 1.6): 1024 para
+      # muse-glimmer-30b con "low"; con Nemotron (plan B) alcanza con 256.
+      max-tokens: 1024
     # Turno de chat con el modelo principal (add-assistant-chat, D5-D11).
     chat:
       retrieval-k: 5
@@ -116,8 +127,8 @@ retail:
       compare-raw-retrieval: true
       reasoning:
         mode: auto
-        # Nemotron devuelve el razonamiento en reasoning_content, fuera del
-        # texto (spike, D12): no hace falta filtrar <think>.
+        # muse-glimmer-30b y Nemotron devuelven el razonamiento en
+        # reasoning_content, fuera del texto: no hace falta filtrar <think>.
         strip-think-tags: false
       memory:
         max-turns: 10
@@ -139,6 +150,12 @@ retail:
       http:
         connect-timeout: 2s
         read-timeout: 5s
+      # Vuelta correctiva de un pedido de carrito (afirmó un agregado o anunció
+      # una acción sin llamar a la tool): required manda tool_choice "required";
+      # prompt no lo manda y se lo pide al modelo en el aviso, para los modelos
+      # que ignoran required, como muse-glimmer-30b (select-assistant-models,
+      # segundo intento). Con Nemotron (plan B) se puede volver a required.
+      corrective-tool-choice: prompt
     # Limitador hacia NVIDIA (40 RPM) y reintento ante 429 (add-assistant-tools, D8, D9).
     rate-limit:
       requests-per-minute: 36

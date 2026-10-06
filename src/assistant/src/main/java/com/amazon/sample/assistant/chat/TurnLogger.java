@@ -60,6 +60,8 @@ class TurnLogger {
     append(line, "retrievalMs", retrieval == null ? "-" : Long.toString(retrieval.latencyMillis()));
     append(line, "firstFragmentMs", stats.firstFragmentMillis < 0 ? "-"
         : Long.toString(stats.firstFragmentMillis));
+    append(line, "firstReasoningMs", stats.firstReasoningMillis < 0 ? "-"
+        : Long.toString(stats.firstReasoningMillis));
     append(line, "totalMs", stats.totalMillis < 0 ? "-" : Long.toString(stats.totalMillis));
     return line.toString();
   }

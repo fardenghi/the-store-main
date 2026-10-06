@@ -61,9 +61,8 @@ integrate-ui-assistant                <- add-product-indexing, add-assistant-cha
 ## Decisiones cerradas (no volver a discutirlas)
 
 - **LLM en la nube vía NVIDIA** (`https://integrate.api.nvidia.com`, API compatible con OpenAI), autorizado por la cátedra. No hay Ollama.
-  - Reescritura de consulta: `nvidia/nemotron-3.5-lightning-30b-a3b` con thinking desactivado.
-  - Modelo principal (razonamiento + tools): `nvidia/nemotron-3-super-120b-a12b`.
-  - Planes B: pendientes del grupo. Los anteriores (`deepseek-v4.1-flash` y `gemma-3-12b-it`) no funcionan con la cuenta, y `meta/muse-glimmer-30b` se evaluó en `select-assistant-models` y no se adoptó en ningún rol: ignora `tool_choice: "required"` y su reescritura es lenta. No se documenta como plan B ningún modelo sin verificar.
+  - Modelo principal (razonamiento + tools) y de reescritura: `meta/muse-glimmer-30b` en los dos roles (`select-assistant-models`, segundo intento). No permite apagar el razonamiento: `{"reasoning_effort": "low"}` por defecto y en la reescritura (con `max-tokens` 1024), `{"reasoning_effort": "high"}` en las comparaciones, y `corrective-tool-choice: prompt` porque ignora `tool_choice: "required"`.
+  - Plan B verificado: `nvidia/nemotron-3-super-120b-a12b` (principal) y `nvidia/nemotron-3.5-lightning-30b-a3b` (reescritura), con `{"chat_template_kwargs": {"enable_thinking": true|false}}`; los valores del ConfigMap están en el README del `assistant`. `deepseek-v4.1-flash` y `gemma-3-12b-it` no funcionan con la cuenta. No se documenta como plan B ningún modelo sin verificar.
 - **Embeddings:** `gemini-embedding-001` de Google (tier gratuito), con el starter nativo `spring-ai-starter-model-google-genai-embedding`, `task-type` `RETRIEVAL_DOCUMENT` al indexar y `RETRIEVAL_QUERY` al buscar, y **768 dimensiones**.
 - **Vector store:** Qdrant, 768d, coseno. El filtro por tags es OR (`match any`), igual que el `IN` de `GET /catalog/products`.
 - **Cuotas:** NVIDIA (chat) 40 RPM; Gemini (embeddings) 100 RPM y 1.000 requests por día, independientes entre sí. Embeber en lotes, calcular similares desde Qdrant sin llamar al proveedor, y manejar 429.

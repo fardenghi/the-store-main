@@ -180,9 +180,13 @@ def number(value):
         return None
 
 
-def model_latency(turn):
-    """M7: firstFragmentMs - rewriteMs - retrievalMs - limiterWaitMs (los '-' cuentan 0)."""
-    first = number(turn.get("firstFragmentMs"))
+def model_latency(turn, field="firstFragmentMs"):
+    """M7: firstFragmentMs - rewriteMs - retrievalMs - limiterWaitMs (los '-' cuentan 0).
+
+    Con field="firstReasoningMs", lo mismo para el primer fragmento de
+    razonamiento, que el usuario no ve (segundo intento con muse-glimmer-30b).
+    """
+    first = number(turn.get(field))
     if first is None:
         return None
     rest = sum(number(turn.get(key)) or 0 for key in ("rewriteMs", "retrievalMs", "limiterWaitMs"))
@@ -459,6 +463,7 @@ def informative(runs):
             ", ".join("{} {}".format(k, v) for k, v in corrections.items()) or "0"))
         lines.append("- `firstFragmentMs` completo (lo que ve el usuario): p50 {}, p95 {}".format(
             seconds(percentile(first, 50)), seconds(percentile(first, 95))))
+        lines += latency_detail(turns)
         if rewrite:
             lines.append("- Reescritura en los turnos: fallback {} ({:.0f} %)".format(
                 ratio(fallback, len(rewrite)), 100.0 * fallback / len(rewrite)))
@@ -468,6 +473,25 @@ def informative(runs):
             if outcomes:
                 lines.append("- Inestable `{}`: pasa {}".format(
                     scenario, ratio(outcomes.count("pass"), len(outcomes))))
+    return lines
+
+
+def latency_detail(turns):
+    """M7 por separado: primer texto visible y primer razonamiento, con y sin razonamiento."""
+    lines = []
+    for mode in ("off", "on"):
+        selected = [t for t in turns if t.get("reasoning") == mode]
+        if not selected:
+            continue
+        text = [v for v in (model_latency(t) for t in selected) if v is not None]
+        thought = [v for v in (model_latency(t, "firstReasoningMs") for t in selected)
+                   if v is not None]
+        lines.append("- M7 `reasoning={}` ({} turnos): primer texto visible p50 {}, p95 {}, máx {}; "
+                     "primer razonamiento p50 {}, p95 {} ({} turnos con razonamiento)".format(
+                         mode, len(selected), seconds(percentile(text, 50)),
+                         seconds(percentile(text, 95)), seconds(max(text) if text else None),
+                         seconds(percentile(thought, 50)), seconds(percentile(thought, 95)),
+                         len(thought)))
     return lines
 
 

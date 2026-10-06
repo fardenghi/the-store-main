@@ -529,15 +529,23 @@ data:
   SPRING_AI_VECTORSTORE_QDRANT_HOST: qdrant
   SPRING_AI_VECTORSTORE_QDRANT_PORT: "6334"
   SPRING_AI_OPENAI_BASE_URL: https://integrate.api.nvidia.com
-  SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: nvidia/nemotron-3-super-120b-a12b
+  # Modelos elegidos en select-assistant-models: meta/muse-glimmer-30b en los
+  # dos roles, con reasoning_effort low (high en las comparaciones), que son
+  # los extra-body por defecto de ChatProperties.
+  SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: meta/muse-glimmer-30b
   SPRING_AI_OPENAI_CHAT_OPTIONS_MAX_TOKENS: "1024"
-  RETAIL_ASSISTANT_MODELS_REWRITE: nvidia/nemotron-3.5-lightning-30b-a3b
+  RETAIL_ASSISTANT_MODELS_REWRITE: meta/muse-glimmer-30b
   SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_MODEL: gemini-embedding-001
   SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_DIMENSIONS: "768"
-  # Chat (add-assistant-chat, D11). Los extra-body de razonamiento se cambian
-  # con SPRING_APPLICATION_JSON (ver el README del assistant), por ejemplo:
-  # SPRING_APPLICATION_JSON: '{"retail.assistant.chat.reasoning.on-extra-body":{"chat_template_kwargs":{"thinking":true}}}'
+  # Chat (add-assistant-chat, D11). Plan B verificado (los Nemotron): cambiar
+  # los dos modelos y, además (ver "Razonamiento y plan B" en el README):
+  # SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: nvidia/nemotron-3-super-120b-a12b
+  # RETAIL_ASSISTANT_MODELS_REWRITE: nvidia/nemotron-3.5-lightning-30b-a3b
+  # RETAIL_ASSISTANT_REWRITE_MAX_TOKENS: "256"
+  # RETAIL_ASSISTANT_TOOLS_CORRECTIVE_TOOL_CHOICE: required
+  # SPRING_APPLICATION_JSON: '{"retail.assistant.chat.reasoning.on-extra-body":{"chat_template_kwargs":{"enable_thinking":true}},"retail.assistant.chat.reasoning.off-extra-body":{"chat_template_kwargs":{"enable_thinking":false}},"retail.assistant.rewrite.extra-body":{"chat_template_kwargs":{"enable_thinking":false}}}'
   RETAIL_ASSISTANT_REWRITE_TIMEOUT: 12s
+  RETAIL_ASSISTANT_REWRITE_MAX_TOKENS: "1024"
   RETAIL_ASSISTANT_REWRITE_HISTORY_TURNS: "3"
   RETAIL_ASSISTANT_CHAT_RETRIEVAL_K: "5"
   RETAIL_ASSISTANT_CHAT_MIN_SCORE: "0"
@@ -563,6 +571,7 @@ data:
   RETAIL_ASSISTANT_TOOLS_DESCRIPTION_MAX_CHARS: "300"
   RETAIL_ASSISTANT_TOOLS_HTTP_CONNECT_TIMEOUT: 2s
   RETAIL_ASSISTANT_TOOLS_HTTP_READ_TIMEOUT: 5s
+  RETAIL_ASSISTANT_TOOLS_CORRECTIVE_TOOL_CHOICE: prompt
   RETAIL_ASSISTANT_RATE_LIMIT_REQUESTS_PER_MINUTE: "36"
   RETAIL_ASSISTANT_RATE_LIMIT_MAX_WAIT: 30s
   RETAIL_ASSISTANT_RATE_LIMIT_MAX_429_RETRIES: "2"

@@ -22,7 +22,8 @@ import reactor.core.publisher.Sinks;
 class ToolsFixtures {
 
   static final ToolsProperties PROPERTIES = new ToolsProperties(4, 6, 10, 5, 10, 300,
-      new ToolsProperties.Http(Duration.ofSeconds(2), Duration.ofSeconds(5)));
+      new ToolsProperties.Http(Duration.ofSeconds(2), Duration.ofSeconds(5)),
+      ToolsProperties.CorrectiveToolChoice.REQUIRED);
 
   static final List<String> TAGS = List.of("seating", "lighting", "tables", "dining", "velvet",
       "leather", "decor");

@@ -17,7 +17,9 @@ import org.springframework.validation.annotation.Validated;
  * y turno de conversación ({@code retail.assistant.chat}) (D11).
  *
  * <p>Los {@code extra-body} son mapas anidados que se mandan tal cual en el
- * cuerpo del request a NVIDIA. Sus defaults (los de Nemotron) están acá y no
+ * cuerpo del request a NVIDIA (salvo {@code reasoning_effort}, que va por la
+ * opción nativa, ver {@code ExtraBody}). Sus defaults (los de
+ * {@code meta/muse-glimmer-30b}, elegido en {@code select-assistant-models}) están acá y no
  * en {@code application.yml}: Spring Boot combina las claves de un mapa
  * definido en varias fuentes, así que un default en el YAML no se podría
  * reemplazar por completo desde {@code SPRING_APPLICATION_JSON} (plan B). Un
@@ -47,7 +49,7 @@ public record ChatProperties(@NotNull @Valid Rewrite rewrite, @NotNull @Valid Ch
       Map<String, Object> extraBody) {
 
     public Rewrite {
-      extraBody = normalize(extraBody == null ? THINKING_OFF : extraBody);
+      extraBody = normalize(extraBody == null ? REASONING_LOW : extraBody);
     }
   }
 
@@ -89,8 +91,8 @@ public record ChatProperties(@NotNull @Valid Rewrite rewrite, @NotNull @Valid Ch
       boolean stripThinkTags) {
 
     public Reasoning {
-      onExtraBody = normalize(onExtraBody == null ? THINKING_ON : onExtraBody);
-      offExtraBody = normalize(offExtraBody == null ? THINKING_OFF : offExtraBody);
+      onExtraBody = normalize(onExtraBody == null ? REASONING_HIGH : onExtraBody);
+      offExtraBody = normalize(offExtraBody == null ? REASONING_LOW : offExtraBody);
     }
   }
 
@@ -118,12 +120,24 @@ public record ChatProperties(@NotNull @Valid Rewrite rewrite, @NotNull @Valid Ch
       @NotNull Duration keepalive) {
   }
 
-  /** Razonamiento activado en Nemotron (default de {@code reasoning.on-extra-body}). */
-  public static final Map<String, Object> THINKING_ON =
+  /**
+   * Razonamiento alto de {@code meta/muse-glimmer-30b} (default de
+   * {@code reasoning.on-extra-body}, en las comparaciones).
+   */
+  public static final Map<String, Object> REASONING_HIGH = Map.of("reasoning_effort", "high");
+
+  /**
+   * Esfuerzo mínimo de {@code meta/muse-glimmer-30b}, que no permite apagar el
+   * razonamiento: es su "sin razonamiento" (default de los demás {@code extra-body}).
+   */
+  public static final Map<String, Object> REASONING_LOW = Map.of("reasoning_effort", "low");
+
+  /** Razonamiento activado en Nemotron (plan B, {@code reasoning.on-extra-body}). */
+  public static final Map<String, Object> NEMOTRON_THINKING_ON =
       Map.of("chat_template_kwargs", Map.of("enable_thinking", true));
 
-  /** Razonamiento desactivado en Nemotron (default de los demás {@code extra-body}). */
-  public static final Map<String, Object> THINKING_OFF =
+  /** Razonamiento desactivado en Nemotron (plan B, los demás {@code extra-body}). */
+  public static final Map<String, Object> NEMOTRON_THINKING_OFF =
       Map.of("chat_template_kwargs", Map.of("enable_thinking", false));
 
   private static final Pattern INTEGER = Pattern.compile("-?\\d{1,18}");

@@ -142,7 +142,7 @@ class ToolEventsTest {
   @Test
   void toolBudgetIsEnforcedPerTurn() {
     ToolsFixtures small = new ToolsFixtures(new com.amazon.sample.assistant.config.ToolsProperties(
-        4, 2, 10, 5, 10, 300, ToolsFixtures.PROPERTIES.http()));
+        4, 2, 10, 5, 10, 300, ToolsFixtures.PROPERTIES.http(), null));
     when(small.catalog.getProduct(ARMCHAIR.id())).thenReturn(Optional.of(ARMCHAIR));
 
     small.tools.getProductDetails(ARMCHAIR.id(), small.context);
