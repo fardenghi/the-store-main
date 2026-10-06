@@ -152,3 +152,49 @@ La pre-entrega proponía `nomic-embed-text` en Ollama dentro del cluster. Se usa
 1. Desplegar con `./local.sh reload-images` (o `rebuild-cluster`). En el primer arranque se crea la colección `products` y se indexa el catálogo (1 a 3 requests a Gemini).
 2. Verificar `productIndex: UP` en `kubectl exec deploy/ui -- curl -s http://assistant/actuator/health`.
 3. Rollback: revertir el commit y reiniciar el `assistant`. La colección queda en el PVC de Qdrant sin que nadie la use. Para limpiarla: `curl -X DELETE localhost:6333/collections/products` con un `port-forward` a `svc/qdrant`.
+
+## Notas de implementación
+
+### Desvío: los embeddings no pasan por el `EmbeddingModel` de Spring AI (spike de la task 2.2)
+
+- **Hallazgo:** en Spring AI 1.1.8, `GoogleGenAiTextEmbeddingModel.call()` nunca envía el `taskType` a Gemini: arma el `EmbedContentConfig` solo con el modelo y `outputDimensionality`, y deja un comentario en su lugar (`spring-ai-google-genai-embedding-1.1.8-sources.jar`, `GoogleGenAiTextEmbeddingModel.java`, línea 149: *"Set task type if specified - this might need to be handled differently"*). O sea que ni `RETRIEVAL_DOCUMENT` ni `RETRIEVAL_QUERY` se aplicaban: el primer riesgo de este design se materializó para los documentos **y** para las consultas, no solo para las consultas como preveía el plan B.
+- **Además:** el `Client` de `google-genai` 1.37 trae un `RetryInterceptor` por defecto (5 intentos ante 408, 429 y 5xx), que multiplicaría las requests por debajo de los reintentos de D6.
+- **Decisión (consultada con el coordinador, opción A):** `ProductEmbedder` llama directo al `com.google.genai.Client` que expone el bean autoconfigurado `GoogleGenAiEmbeddingConnectionDetails` (misma clave y misma conexión), detrás de una interfaz `EmbeddingGateway`, para documentos y consultas. El `EmbedContentConfig` lleva el `taskType`, las dimensiones (de `spring.ai.google.genai.embedding.text.options.*`, las mismas que configuran el `EmbeddingModel`) y `httpOptions` con `retryOptions.attempts=1`, para que cada llamada sea una sola request y los reintentos los decida D6. El starter `spring-ai-starter-model-google-genai-embedding`, su autoconfiguración y el bean `EmbeddingModel` quedan intactos (sigue siendo el único `EmbeddingModel`, como pide `add-assistant-service`): el desvío es solo que la indexación y la búsqueda no pasan por él. Los tests que el `tasks.md` describe con el `EmbeddingModel` mockeado mockean `EmbeddingGateway`.
+- **Verificación:** `EmbeddingTaskTypeSmokeIT` embebe el mismo texto como documento y como consulta: ambos vectores tienen 768 dimensiones y su coseno es 0,880 (distintos). Con la clave `not-configured`, Gemini responde 400 y la causa es `UNAUTHORIZED`.
+
+### Plantilla de texto v2 (task 7.1)
+
+`SearchQualitySmokeIT` midió los criterios de `semantic-product-search` con el catálogo real, Gemini y la consulta sin reescribir. Con la plantilla de D3 (v1, tags al final) pasaban los tres criterios de búsqueda y el de similares fallaba en 3 de 80 productos, todos `decor`. Se probó una sola vez la v2, con los tags antes de la descripción:
+
+```
+<name>
+Tags: <displayName 1>, <displayName 2>, ...
+<description>
+```
+
+La v2 deja pasar 78 de 80 (se arregla "Velvet Texture Throw Pillow") sin empeorar los otros criterios ni los productos que ya pasaban, así que **se usa la v2** (`TEMPLATE_VERSION = "2"`; el hash incluye la versión, así que una colección indexada con la v1 se reembebe sola). Los dos productos que siguen fallando, "Two-Toned Stoneware Planter" y "Abstract Topographic Print", quedan reportados a la curación del catálogo: `decor` tiene solo 5 productos y es heterogéneo (2 almohadones, 2 macetas y 1 cuadro), así que ninguno de los dos tiene 2 "hermanos" de tipo. El smoke los lista como excepciones conocidas y falla si aparece cualquier otro producto. El detalle está en el README del servicio.
+
+### Decisiones menores
+
+- **`retryDelay` de Gemini:** el SDK conserva solo `error.message` del cuerpo del 429 y descarta el detalle `RetryInfo`. La espera se toma del texto del mensaje ("Please retry in 41.27s.") o de un `"retryDelay": "41s"` si viniera; si no hay ninguno, se usa el backoff de D6. En la búsqueda, el `Retry-After` por defecto es 60 s (la ventana de RPM).
+- **Otros 4xx de Gemini** (distintos de 400, 401, 403 y 429) se tratan como `UNAVAILABLE`.
+- **Lectura del catálogo:** ante un error reintentable (conexión, timeout, 5xx) se vuelve a leer desde la página 1, así que un error en cualquier página nunca deja un resultado parcial; un 4xx o una respuesta ilegible terminan la sincronización como `FAILED` (`catalog-unavailable`). La paginación también corta si una página llena no suma ningún id nuevo, para no paginar sin fin. Los timeouts del `RestClient` se configuran con `spring.http.client.connect-timeout=2s` y `read-timeout=10s`.
+- **Qdrant:** el reintento de D6 (hasta 10 intentos con el backoff de 2 s a 30 s) se aplica a cada operación de la sincronización, no solo al primer acceso. En la búsqueda y los similares, un Qdrant caído responde `503 index-unavailable`.
+- **Similares:** `nearest(PointId)` del cliente 1.13 funciona contra el servidor 1.19.2, así que no hizo falta el plan B. Antes de la consulta se hace un `retrieve` sin payload ni vector para distinguir el `404` de otros errores. Un id que no es un UUID también responde `404`.
+- **Propiedad `retail.assistant.indexing.sync-on-startup`** (por defecto `true`): los tests la apagan en `src/test/resources/application.properties` para que los tests de contexto no intenten sincronizar contra `localhost`; los que prueban el arranque la prenden.
+- **Ejecutor de un hilo** creado dentro de la configuración y no como bean `TaskExecutor`, para no reemplazar el executor que autoconfigura Spring Boot. Al apagar el servicio se interrumpe la sincronización en curso.
+- **Health:** además de `phase`, `points`, `lastSync` y `error`, el componente `productIndex` muestra los contadores de la última corrida exitosa en `lastRun`.
+- **Validación de las propiedades:** se agrega `spring-boot-starter-validation` para validar los `@ConfigurationProperties`.
+- **Tests de integración:** los que usan Qdrant (`ProductVectorRepositoryTest`, `ProductIndexerTest`, `ProductSearchEndToEndTest`) corren en `./mvnw test` y necesitan Docker; levantan `qdrant/qdrant:v1.19.2` con Testcontainers. El catálogo de prueba sale de `src/catalog/repository`, con los tags ordenados por nombre como los devuelve `GET /catalog/products`.
+
+### Verificación en el cluster (tasks 6.4 y 7.2 a 7.4)
+
+- **6.4:** con Qdrant en Docker, `catalog` con `go run` en el puerto 8081 y `./mvnw spring-boot:run`, los `curl` del README funcionan tal como están escritos (la primera sincronización tardó 3 s, con 1 request a Gemini).
+- **7.2:** no había cluster, así que se usó `./local.sh create-cluster --skip-tests`, que construye y carga las imágenes igual que `reload-images` y además despliega. Desde la `ui`: `productIndex` queda `UP` con `points: 80` igual a `GET http://catalog/catalog/size`; la búsqueda (`q=lamp&maxPrice=100&k=3`) y los similares responden; el log muestra la primera sincronización con 1 request al proveedor.
+- **7.3:** después de `kubectl rollout restart deployment/assistant`, la segunda sincronización hace 0 requests y deja 80 puntos. Con el `assistant` sin `GOOGLE_API_KEY` (se corrió `update-secrets` desde una copia de `local.sh` en un directorio sin `.env`, para no tocar el `.env` del repo), la sincronización termina `READY` sin llamar a Gemini (los hashes no cambian), los similares responden `200`, la búsqueda responde `503 embedding-provider-unauthorized` y el pod sigue Ready. Después se restauró la clave con `./local.sh update-secrets` y la búsqueda volvió a responder `200`.
+- **7.4:** con `./local.sh rebuild-cluster --skip-tests`, el `assistant` arrancó antes que Qdrant: 3 reintentos (2, 4 y 8 s) y la sincronización terminó en `READY` con 80 puntos sin intervención. En esa corrida `catalog` ya estaba listo, así que se forzó el caso: con `catalog` escalado a 0 y el `assistant` reiniciado, la readiness respondió `200` con `productIndex` en `SYNCING`, hubo 4 reintentos contra `catalog` (2 a 16 s) y, al volver a escalarlo a 1, la sincronización terminó en `READY` (0 requests, 80 puntos). Al terminar se borró el cluster.
+
+### Consumo de cuota durante el apply
+
+- **Gemini:** 27 requests aceptadas y 3 rechazadas por la clave placeholder (que no consumen cuota): 4 de dos corridas de `EmbeddingTaskTypeSmokeIT`, 15 de tres corridas de `SearchQualitySmokeIT` (v1, v2 y la final), 1 de `ProvidersSmokeIT`, 3 de la verificación local y 4 del cluster.
+- **NVIDIA:** 2 requests (`ProvidersSmokeIT`).

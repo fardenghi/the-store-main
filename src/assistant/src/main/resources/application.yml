@@ -20,6 +20,15 @@ management:
 spring:
   application:
     name: assistant
+  mvc:
+    # Errores de la API en formato ProblemDetail (RFC 9457).
+    problemdetails:
+      enabled: true
+  http:
+    client:
+      # Timeouts de los RestClient (lectura del catálogo).
+      connect-timeout: 2s
+      read-timeout: 10s
   ai:
     # Chat: NVIDIA expone una API compatible con OpenAI. El cliente agrega
     # /v1/chat/completions a la base URL. NVIDIA exige max-tokens explícito.
@@ -45,8 +54,10 @@ spring:
       qdrant:
         host: localhost
         port: 6334
-        # La colección la crea add-product-indexing.
+        # La colección la crea y la sincroniza ProductIndexer, no el
+        # QdrantVectorStore de Spring AI (que queda sin usar).
         initialize-schema: false
+        collection-name: products
 
 # Selección de modelos de Spring AI. Van como claves planas porque
 # spring.ai.model.embedding y spring.ai.model.embedding.text no se pueden
@@ -66,3 +77,16 @@ retail:
     endpoints:
       catalog: http://localhost:8081
       carts: http://localhost:8082
+    # Sincronización del catálogo con Qdrant al arrancar (add-product-indexing).
+    indexing:
+      sync-on-startup: true
+      page-size: 50
+      # Máximo de textos por request a Gemini (batchEmbedContents acepta 100).
+      batch-size: 100
+      max-provider-retries: 5
+    search:
+      default-k: 5
+      max-k: 20
+      similar-default-k: 4
+      similar-max-k: 12
+      query-cache-size: 256

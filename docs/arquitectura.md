@@ -12,6 +12,10 @@
   (`integrate.api.nvidia.com`, API compatible con OpenAI) y los embeddings a la
   Gemini API de Google (`generativelanguage.googleapis.com`, modelo
   `gemini-embedding-001`, 768 dimensiones).
+- **Modelo de embeddings:** `gemini-embedding-001` (768 dimensiones, coseno)
+  en lugar de `nomic-embed-text` en Ollama. Se mantienen Qdrant, las 768
+  dimensiones y la distancia coseno de la pre-entrega. El desvío se justifica
+  en la decisión D10 del `design.md` del change `add-product-indexing`.
 - **Aparece tráfico saliente**: solo desde el pod `assistant`, por HTTPS (TCP
   443), hacia esos dos destinos. El resto de los servicios, Qdrant incluido
   (con la telemetría desactivada), sigue sin tráfico hacia afuera del cluster.
@@ -68,7 +72,7 @@ flowchart TB
 | Almacenamiento | StorageClass `standard` (`rancher.io/local-path`, `WaitForFirstConsumer`) para el PVC de Qdrant (vectores, 1 GiB, `volumeClaimTemplates` del StatefulSet). Ya no hay PVC de Ollama |
 | Sistemas operativos | Host: Ubuntu 24.04.5 LTS (kernel 6.8) · Nodo `kind`: Debian 13 (containerd 2.3.4) · Contenedores de la app: Amazon Linux 2023 (Qdrant usa su imagen oficial `unprivileged`) |
 | Protocolos | HTTP/1.1 REST entre servicios (`ClusterIP`, puerto 80 → 8080 del contenedor) · SSE (`text/event-stream`) navegador ↔ `ui` y `ui` ↔ `assistant` · gRPC 6334 `assistant` → Qdrant (REST 6333 para probes y debug) · HTTPS 443 `assistant` → proveedores en la nube |
-| Tráfico hacia afuera del cluster | Solo desde el pod `assistant`, HTTPS (TCP 443) hacia `integrate.api.nvidia.com` (chat) y `generativelanguage.googleapis.com` (embeddings). Camino: pod (`10.244.0.0/24`) → SNAT/masquerade del nodo kind (`172.19.0.2`) → bridge Docker `kind` → NAT del host → internet. DNS: pod → kube-dns (`10.96.0.10`) → `forward` al resolver del nodo → DNS embebido de Docker. Ningún otro servicio sale a internet en operación (Qdrant corre con `QDRANT__TELEMETRY_DISABLED=true`). Credenciales en el Secret `assistant-api-keys`, nunca versionado |
+| Tráfico hacia afuera del cluster | Solo desde el pod `assistant`, HTTPS (TCP 443) hacia `integrate.api.nvidia.com` (chat) y `generativelanguage.googleapis.com` (embeddings con `gemini-embedding-001`, que reemplaza a `nomic-embed-text` de la pre-entrega: ver la decisión D10 del `design.md` de `add-product-indexing`). Consumo de cuota de Gemini (100 RPM y 1.000 requests por día, independiente de la de NVIDIA): 1 a 3 requests en el primer arranque (el catálogo se embebe en lotes de hasta 100 productos), 0 en los reinicios sin cambios en el catálogo, 1 por búsqueda no cacheada (las consultas repetidas salen de un caché en memoria) y 0 por productos similares (se calculan en Qdrant con el vector ya guardado). Camino: pod (`10.244.0.0/24`) → SNAT/masquerade del nodo kind (`172.19.0.2`) → bridge Docker `kind` → NAT del host → internet. DNS: pod → kube-dns (`10.96.0.10`) → `forward` al resolver del nodo → DNS embebido de Docker. Ningún otro servicio sale a internet en operación (Qdrant corre con `QDRANT__TELEMETRY_DISABLED=true`). Credenciales en el Secret `assistant-api-keys`, nunca versionado |
 
 ## Verificación de la salida a internet
 
