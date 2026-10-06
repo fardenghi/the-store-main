@@ -33,6 +33,7 @@ class ChatPropertiesTest {
 
       assertThat(properties.rewrite().timeout()).isEqualTo(Duration.ofSeconds(12));
       assertThat(properties.rewrite().historyTurns()).isEqualTo(3);
+      assertThat(properties.rewrite().maxTokens()).isEqualTo(256);
       ChatProperties.Chat chat = properties.chat();
       assertThat(chat.retrievalK()).isEqualTo(5);
       assertThat(chat.minScore()).isZero();

@@ -50,7 +50,7 @@ class QueryRewriterTest {
 
   private QueryRewriter rewriter(Duration timeout) {
     return new QueryRewriter(ChatClient.builder(chatModel).build(), tags,
-        new ChatProperties.Rewrite(timeout, 3, null), new ClassPathResource("prompts/rewrite.st"),
+        new ChatProperties.Rewrite(timeout, 3, 256, null), new ClassPathResource("prompts/rewrite.st"),
         limiter);
   }
 

@@ -52,7 +52,7 @@ public class ChatConfiguration {
         .build();
   }
 
-  /** Modelo compacto de reescritura: temperatura 0, 256 tokens y thinking desactivado (D3). */
+  /** Modelo compacto de reescritura: temperatura 0, max-tokens acotado y thinking desactivado (D3). */
   @Bean
   ChatClient rewriteChatClient(OpenAiChatModel chatModel,
       @Value("${retail.assistant.models.rewrite}") String model, ChatProperties properties) {
@@ -60,7 +60,7 @@ public class ChatConfiguration {
         .defaultOptions(OpenAiChatOptions.builder()
             .model(model)
             .temperature(0.0)
-            .maxTokens(256)
+            .maxTokens(properties.rewrite().maxTokens())
             .extraBody(new LinkedHashMap<>(properties.rewrite().extraBody()))
             .build())
         .build();

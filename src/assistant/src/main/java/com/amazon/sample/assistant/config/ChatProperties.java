@@ -36,11 +36,14 @@ public record ChatProperties(@NotNull @Valid Rewrite rewrite, @NotNull @Valid Ch
   /**
    * @param timeout tiempo límite de la llamada de reescritura; si se excede, fallback
    * @param historyTurns turnos de la sesión que recibe el modelo de reescritura
+   * @param maxTokens límite de tokens de salida de la reescritura; incluye el
+   *     razonamiento en los modelos que no lo pueden apagar ({@code select-assistant-models})
    * @param extraBody campos extra del request de reescritura (thinking desactivado)
    */
   public record Rewrite(
       @NotNull Duration timeout,
       @Min(0) @Max(10) int historyTurns,
+      @Min(1) int maxTokens,
       Map<String, Object> extraBody) {
 
     public Rewrite {

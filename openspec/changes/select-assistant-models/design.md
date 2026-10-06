@@ -146,6 +146,8 @@ Se mide sobre las 40 llamadas del paso 2 y del paso 3 (10 del spike y 3 × 10 de
 - **Principal:** se evalúa con `reasoning.mode=always` y `max-tokens` igual a `max-tokens-reasoning`, con los mismos umbrales.
 - En los dos casos se deja registrado que el thinking no se pudo apagar.
 
+**Desvío aplicado con `muse-glimmer-30b` (decisión del grupo, 2026-10-06).** Ninguna variante apagó el razonamiento, pero el modelo lo regula por request con `reasoning_effort` (`low`, `medium`, `high`, `xhigh`, según su ficha). En lugar de evaluar el principal con `reasoning.mode=always`, el grupo decidió interpretar "razonamiento activable por request" como **nivel por request**: `{"reasoning_effort":"low"}` como "sin razonamiento" y `{"reasoning_effort":"high"}` en las comparaciones. M1 pasa si el modelo acepta los dos niveles por request y cumple streaming y tool calling. M7 mide el primer fragmento de **texto visible** (no de razonamiento), y los demás umbrales no cambian. La reescritura se evalúa con `low` y un `max-tokens` configurable (task 1.6). Queda reflejado en la delta de `assistant-chat` ("el razonamiento desactivado SHALL entenderse como el esfuerzo mínimo").
+
 ### D5. Corridas por prueba y presupuesto de cuota
 
 **Corridas:**
@@ -294,3 +296,80 @@ Los dos roles, sus prompts y su configuración siguen separados, así que se pue
 ## Open Questions
 
 - Si `muse-glimmer-30b` pasa el principal y falla la reescritura solo por latencia (R2), ¿sirve igual como plan B verificado de la reescritura? No cambia las tasks: la tabla registra la medición, y lo decide el grupo al elegir el siguiente candidato.
+
+## Resultados de la evaluación
+
+Corridas del 2026-10-06 con `scripts/model-bench.sh`, contra la colección `products` restaurada desde un snapshot en un Qdrant local (80 puntos; cada sincronización dio `unchanged=80`, `providerRequests=0`). Las tablas salen de `scripts/model_bench_report.py`; los `.log` quedan en `target/` y no se versionan.
+
+**Resultado: `meta/muse-glimmer-30b` no se adopta en ningún rol. Los defaults siguen siendo los Nemotron, y el siguiente candidato lo elige el grupo.**
+
+### Ensayo del pipeline (task 2.2)
+
+`ToolsEndToEndSmokeIT#addThatOneToMyCart` con los Nemotron: sincronización `unchanged=80, providerRequests=0`, `bench.result ... outcome=pass added=ok falseClaims=0`, 2 líneas `assistant.turn` en el reporte y 7 requests a NVIDIA y 1 a Gemini en el ledger. Fueron 7 y no las ≈ 3 estimadas, porque el escenario tiene dos turnos; salieron de la reserva.
+
+### Parámetros del candidato (task 2.3, D4)
+
+- **Ficha de build.nvidia.com:** documenta "reasoning-strength settings" `low`, `medium`, `high` y `xhigh`, sin un campo ni un valor para apagarlo. No hay variante documentada para "apagado", así que el sondeo arrancó por la 2 de D4.
+- **Sondeo `off`** (`max_tokens` 64, una request por variante, todas 200 con `content="OK"` y `finish_reason=stop`):
+
+| Variante | Latencia | Tokens de salida | `reasoning_content` | ¿Apagado? |
+| --- | --- | --- | --- | --- |
+| `{"chat_template_kwargs":{"enable_thinking":false}}` | 4,0 s | 40 | 118 caracteres | No |
+| `{"chat_template_kwargs":{"thinking":false}}` | 2,6 s | 63 | 228 caracteres | No |
+| `{"reasoning_effort":"none"}` | 1,8 s | 40 | 118 caracteres | No |
+| `{"thinking":{"type":"disabled"}}` | 3,2 s | 40 | 118 caracteres | No |
+
+- **Niveles** (`max_tokens` 1024, después de la decisión del grupo): `{"reasoning_effort":"low"}`: 2,0 s, 40 tokens, 122 caracteres de razonamiento; `{"reasoning_effort":"high"}`: 6,2 s, 78 tokens, 283 caracteres. Los dos llegan en `reasoning_content`, nunca como `<think>` en el texto.
+- **`extra-body` evaluados:** principal `{"reasoning_effort":"low"}` (off) / `{"reasoning_effort":"high"}` (on); reescritura `{"reasoning_effort":"low"}` con `retail.assistant.rewrite.max-tokens=1024`.
+- **Sondeo:** 6 requests (tope: 12), sin timeouts ni 404/403.
+
+### Rol principal (D2)
+
+| Fecha | Rol | Candidato | `extra-body` off / on | Métrica | Umbral | Línea base | Candidato | ✔/✘ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-06 | Principal | `meta/muse-glimmer-30b` | `{"reasoning_effort":"low"}` / `{"reasoning_effort":"high"}` | M1 | Streaming, tool calls completos en el stream, segunda vuelta, `tool_choice` `none` y `required`, nivel por request, razonamiento fuera del texto | Todo OK | Streaming OK (6 fragmentos). Nivel por request OK (`reasoning_content`: 985 caracteres con `low` y 2053 con `high`; sin `<think>`). Tool calling en streaming y ciclo controlado: **400** "duplicate field `reasoning_effort`" en todos los requests con tools. Con la opción nativa `spring.ai.openai.chat.options.reasoning-effort=low` y el `extra-body` vacío: tool calls completos (2,7 s), segunda vuelta con el precio (2,9 s) y `tool_choice: "none"` OK, pero **`tool_choice: "required"` ignorado** ("Hello! How can I help you today?", 0 tool calls) | ✘ |
+| 2026-10-06 | Principal | | | M2 | 0 | 0 | No medido (parada temprana por M1) | — |
+| 2026-10-06 | Principal | | | M3 | 0 | 0 | No medido | — |
+| 2026-10-06 | Principal | | | M4 | ≥ 10/15 | 3/6 | No medido | — |
+| 2026-10-06 | Principal | | | M5 | ≤ 1/5 | 1/5 | No medido | — |
+| 2026-10-06 | Principal | | | M6 | 3/3 | Pasan | No medido | — |
+| 2026-10-06 | Principal | | | M7 | off p50 ≤ 3 s y p95 ≤ 8 s; on máx ≤ 30 s | 1,3 s (spike) | No medido en el e2e. En el spike, primer fragmento de texto a 9,6 s con `low` y 20,5 s con `high` (una muestra cada uno) | — |
+| 2026-10-06 | Principal | | | M8 | ≤ 3,5 | 3,1 | No medido | — |
+| 2026-10-06 | Principal | | | **Resultado** | | | **No adoptado** (M1) | ✘ |
+
+El 400 es de integración y no del modelo: el mismo request armado a mano (sin streaming, en streaming y con el schema exacto que genera Spring AI) responde 200 con el tool call correcto, y el request capturado con un proxy local mostró el motivo. Spring AI 1.1.8 serializa dos veces un campo del `extra-body` que coincide con un campo propio de `ChatCompletionRequest` cuando el request lleva tools. Esquivarlo con la opción nativa fija un único nivel para todos los turnos, y elegir `low` o `high` por turno requiere cambiar `ReasoningPolicy`, que es un non-goal de este change. Pero aun con la opción nativa, M1 falla por el modelo: `tool_choice: "required"` es la vuelta correctiva de los pedidos de carrito (`ToolCallingLoop`, corrección posterior de `add-assistant-tools`) y es la que evita las confirmaciones falsas. Por D1, el grupo de tasks 5 no se corrió.
+
+### Rol de reescritura (D3)
+
+| Fecha | Rol | Candidato | `extra-body` | Métrica | Umbral | Línea base | Candidato | ✔/✘ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-06 | Reescritura | `meta/muse-glimmer-30b` | `{"reasoning_effort":"low"}` (no se puede apagar), `max-tokens` 1024 | R1 | ≤ 1 inválida | 9/10 | 0 inválidas de 15 que respondieron | ✔ |
+| 2026-10-06 | Reescritura | | | R2 | p50 < 1,5 s y p95 ≤ 5 s | Mediana 1,5 s; p95 ≈ 10 s | p50 5,0 s, p95 10,1 s (20 llamadas: 10 del spike y 10 de `RewriteEvalSmokeIT`); ninguna por debajo de 1,5 s | ✘ |
+| 2026-10-06 | Reescritura | | | R3 | ≤ 2/40 (5 %) | 12-13 % | 5/20 (25 %): 2 en el spike y 3 en la evaluación, todas cortes a los 10 s | ✘ |
+| 2026-10-06 | Reescritura | | | R4 | Media ≥ 45 y cada corrida > 42 | 45, 43, 47 | 44 contra 42 en la única corrida | — (no se completaron las 3) |
+| 2026-10-06 | Reescritura | | | **Resultado** | | | **No adoptado** (R2 y R3) | ✘ |
+
+- **Spike (task 3.1):** mediana de 6,6 s, por debajo de los 12 s de descarte de D4, así que se corrió `RewriteEvalSmokeIT`.
+- **Parada temprana (task 4.1):** después de la primera de las 3 corridas, R3 ya no se podía cumplir (5 fallbacks contra un máximo de 2 en 40), y R2 tampoco: con 0 de 20 llamadas por debajo de 1,5 s, las 20 restantes tendrían que ser todas más rápidas. Las otras dos corridas no se hicieron (decisión del grupo: cortar si R2 fallaba claramente en la primera).
+
+### Consumo final del ledger (D5)
+
+| Etapa | NVIDIA | Gemini |
+| --- | --- | --- |
+| Ensayo del pipeline con Nemotron | 7 | 1 |
+| Sondeo del thinking (4 variantes `off` + `low` + `high`) | 6 | 0 |
+| `ModelSpikeSmokeIT` completo | 14 | 0 |
+| Diagnóstico del 400: `#controlledToolCalling` por el proxy (1 + 4) y 3 requests HTTP a mano | 8 | 0 |
+| `RewriteEvalSmokeIT` ×1 | 10 | 17 |
+| **Total** | **45 de 500** | **18 de 250** |
+
+Embeddings de indexación: 0.
+
+### Observaciones cualitativas
+
+- **Reescritura de buena calidad, pero lenta.** Las salidas que llegaron fueron JSON válido y correcto: `cheaper` → `maxPrice=138`, "not a lamp" → excluye `lighting`, saludo → `intent=other` y "compare the first two" → `intent=compare`. El problema es la latencia del razonamiento obligatorio, de 2 a 10 s.
+- **El tiempo máximo efectivo de la reescritura es 10 s, no 12 s.** Los 5 fallbacks fueron `llm-provider-unavailable` por "Request timed out" a los 10,04 a 10,08 s: el `spring.http.client.read-timeout: 10s` de `application.yml` también se aplica al `RestClient` de NVIDIA. Afecta igual a la línea base, y queda para el grupo (no se cambió).
+- **El razonamiento de muse con `low` crece con el pedido:** 40 tokens para "OK", 985 caracteres para una descripción de cuatro oraciones (primer fragmento a 9,6 s). Aunque pasara M1, M7 (p50 ≤ 3 s) se veía difícil.
+- **Para el próximo candidato con `reasoning_effort`:** no ponerlo en el `extra-body` (400 con tools). Usar `SPRING_AI_OPENAI_CHAT_OPTIONS_REASONING_EFFORT` o adaptar `ReasoningPolicy` en un change propio.
+- **Cambios de la evaluación al benchmark:** `controlledToolCalling` suma una vuelta con `tool_choice: "required"` (1 request más que las 3 de D5). `ModelSpikeSmokeIT` acepta `-Dspike.main-off-reasoning=minimum` (el `off` es un nivel mínimo, no un apagado) y `-Dspike.rewrite-max-tokens`.
+

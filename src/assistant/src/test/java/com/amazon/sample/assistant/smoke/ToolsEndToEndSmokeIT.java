@@ -2,13 +2,17 @@ package com.amazon.sample.assistant.smoke;
 
 import static io.qdrant.client.PointIdFactory.id;
 import static io.qdrant.client.ValueFactory.value;
+import static com.amazon.sample.assistant.smoke.BenchReporter.geminiRequests;
+import static com.amazon.sample.assistant.smoke.BenchReporter.nvidiaRequests;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.amazon.sample.assistant.products.catalog.CatalogProduct;
+import com.amazon.sample.assistant.products.embedding.ProductEmbedder;
 import com.amazon.sample.assistant.products.index.ProductIndexer;
+import com.amazon.sample.assistant.products.index.SyncReport;
 import com.amazon.sample.assistant.products.vector.QdrantTestSupport;
 import io.qdrant.client.QdrantClient;
 import java.time.Duration;
@@ -27,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,8 +59,14 @@ import org.springframework.test.context.DynamicPropertySource;
  * Igual que {@code ChatEndToEndSmokeIT}, con {@code -Dsmoke.qdrant.host},
  * {@code -Dsmoke.qdrant.port} y {@code -Dsmoke.qdrant.collection} reutiliza una
  * colección ya indexada y no gasta las 80 requests de la indexación.
+ *
+ * <p>Para el benchmark de modelos ({@code select-assistant-models}) imprime una
+ * línea {@code bench.result} por escenario ({@link BenchReporter}), con
+ * {@code added} en los de carrito y {@code askedInsteadOfAdding} en el ambiguo,
+ * y una {@code bench.usage} con el consumo de la corrida.
  */
 @Tag("smoke")
+@ExtendWith(BenchReporter.class)
 @EnabledIfEnvironmentVariable(named = "NVIDIA_API_KEY", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "GOOGLE_API_KEY", matches = ".+")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -105,16 +116,21 @@ class ToolsEndToEndSmokeIT {
   @Autowired
   private QdrantClient qdrant;
 
+  @Autowired
+  private ProductEmbedder embedder;
+
   @Value("${spring.ai.vectorstore.qdrant.collection-name}")
   private String collection;
 
   private final ListAppender<ILoggingEvent> toolLog = new ListAppender<>();
   private final ListAppender<ILoggingEvent> turnLog = new ListAppender<>();
   private long lastTurnStart;
+  private SyncReport sync;
 
   @BeforeAll
   void index() throws Exception {
-    System.out.printf("smoke tools: sincronización %s%n", indexer.sync());
+    sync = indexer.sync();
+    System.out.printf("smoke tools: sincronización %s%n", sync);
     toolLog.start();
     turnLog.start();
     ((Logger) LoggerFactory.getLogger("assistant.tool")).addAppender(toolLog);
@@ -125,6 +141,8 @@ class ToolsEndToEndSmokeIT {
   void close() {
     ((Logger) LoggerFactory.getLogger("assistant.tool")).detachAppender(toolLog);
     ((Logger) LoggerFactory.getLogger("assistant.turn")).detachAppender(turnLog);
+    BenchReporter.usage("ToolsEndToEndSmokeIT", nvidiaRequests(turnLog),
+        geminiRequests(embedder, sync));
     CATALOG.close();
     CARTS.close();
   }
@@ -185,6 +203,7 @@ class ToolsEndToEndSmokeIT {
     turn("addone-tl", "tell me about the " + AIDEN);
 
     SseEvents response = turn("addone-tl", "add that one to my cart");
+    BenchReporter.scenario().added(added(CARTS.items("addone-tl"), List.of(aiden.id())));
 
     assertThat(CARTS.items("addone-tl"))
         .containsExactly(new FakeCarts.Item(aiden.id(), 1, aiden.price()));
@@ -208,6 +227,7 @@ class ToolsEndToEndSmokeIT {
     List<String> shown = first.allProducts().stream().map(p -> (String) p.get("id")).toList();
 
     SseEvents response = turn("addtwo-tl", "add two of the first one to my cart");
+    BenchReporter.scenario().added(added(CARTS.items("addtwo-tl"), shown));
 
     assertThat(CARTS.items("addtwo-tl")).singleElement().satisfies(item -> {
       assertThat(item.quantity()).isEqualTo(2);
@@ -222,10 +242,15 @@ class ToolsEndToEndSmokeIT {
   @Order(6)
   void ambiguousRequestAsksInsteadOfAdding() {
     SseEvents first = turn("ambig-tl", "show me three lamps");
+    List<String> lamps = first.allProducts().stream().map(p -> (String) p.get("id"))
+        .filter(id -> CATALOG.byId(id).orElseThrow().tagNames().contains("lighting")).toList();
     assertThat(named(first.text()).stream().filter(p -> p.tagNames().contains("lighting")))
         .as("el primer turno muestra varias lámparas").hasSizeGreaterThanOrEqualTo(2);
 
     SseEvents response = turn("ambig-tl", "add the lamp to my cart");
+    BenchReporter.scenario().added(added(CARTS.items("ambig-tl"), lamps));
+    BenchReporter.scenario().askedInsteadOfAdding(CARTS.items("ambig-tl").isEmpty()
+        && response.text().contains("?"));
 
     assertThat(CARTS.items("ambig-tl")).isEmpty();
     assertThat(response.cartUpdates()).isEmpty();
@@ -285,6 +310,7 @@ class ToolsEndToEndSmokeIT {
     long millis = (System.nanoTime() - start) / 1_000_000;
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     SseEvents events = SseEvents.parse(response.getBody());
+    BenchReporter.scenario().turn(events);
     System.out.printf("smoke tools [%s] %d ms \"%s\"%n  tools: %s%n  carrito: %s%n"
             + "  respuesta: %s%n", session, millis, message, events.tools(),
         events.cartUpdates(), events.text().replace('\n', ' '));
@@ -321,6 +347,17 @@ class ToolsEndToEndSmokeIT {
       }
     }
     throw new AssertionError("No hubo " + tool + " en la sesión " + session);
+  }
+
+  /**
+   * Resultado del agregado para el benchmark: {@code none} sin ítems,
+   * {@code ok} si todos son de los productos esperados y {@code wrong} si no.
+   */
+  static String added(List<FakeCarts.Item> items, List<String> expectedIds) {
+    if (items.isEmpty()) {
+      return "none";
+    }
+    return items.stream().allMatch(item -> expectedIds.contains(item.itemId())) ? "ok" : "wrong";
   }
 
   /** Productos del catálogo que el texto nombra, en el orden en que aparecen. */

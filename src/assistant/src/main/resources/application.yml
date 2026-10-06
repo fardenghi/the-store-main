@@ -104,6 +104,9 @@ retail:
     rewrite:
       timeout: 12s
       history-turns: 3
+      # Tokens de salida de la reescritura. Con un modelo que no puede apagar el
+      # razonamiento, lo incluyen (select-assistant-models, task 1.6).
+      max-tokens: 256
     # Turno de chat con el modelo principal (add-assistant-chat, D5-D11).
     chat:
       retrieval-k: 5

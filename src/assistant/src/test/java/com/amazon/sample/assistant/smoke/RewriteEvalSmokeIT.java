@@ -2,6 +2,9 @@ package com.amazon.sample.assistant.smoke;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.amazon.sample.assistant.chat.context.ContextRetriever;
 import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
 import com.amazon.sample.assistant.chat.rewrite.Rewrite;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -38,6 +42,16 @@ import org.springframework.test.context.DynamicPropertySource;
  * <p>Gasta 10 requests a NVIDIA (una reescritura por consulta) y unas 21 a
  * Gemini (1 para indexar y 2 búsquedas por consulta, menos las que salen del
  * caché). Solo corre con {@code ./mvnw -Psmoke verify}.
+ *
+ * <p>Igual que los smoke de punta a punta, con {@code -Dsmoke.qdrant.host},
+ * {@code -Dsmoke.qdrant.port} y {@code -Dsmoke.qdrant.collection} reutiliza una
+ * colección ya indexada: la sincronización no vuelve a embeber los productos
+ * sin cambios y la corrida gasta solo las búsquedas.
+ *
+ * <p>Para el benchmark de modelos ({@code select-assistant-models}) imprime una
+ * línea {@code bench.rewrite} por consulta ({@code outcome} {@code ok},
+ * {@code fallback} o {@code invalid}, latencia y aciertos del top-5 crudo y
+ * reescrito) y una {@code bench.usage} con el consumo de la corrida.
  */
 @Tag("smoke")
 @EnabledIfEnvironmentVariable(named = "NVIDIA_API_KEY", matches = ".+")
@@ -54,10 +68,20 @@ class RewriteEvalSmokeIT {
   @DynamicPropertySource
   static void properties(DynamicPropertyRegistry registry) {
     registry.add("retail.assistant.endpoints.catalog", CATALOG::baseUrl);
-    registry.add("spring.ai.vectorstore.qdrant.host", QdrantTestSupport::host);
-    registry.add("spring.ai.vectorstore.qdrant.port", QdrantTestSupport::grpcPort);
-    registry.add("spring.ai.vectorstore.qdrant.collection-name",
-        QdrantTestSupport::uniqueCollection);
+    String host = System.getProperty("smoke.qdrant.host");
+    if (host != null) {
+      // Colección ya indexada: solo para no gastar cuota de Gemini en los smoke.
+      registry.add("spring.ai.vectorstore.qdrant.host", () -> host);
+      registry.add("spring.ai.vectorstore.qdrant.port",
+          () -> System.getProperty("smoke.qdrant.port", "6334"));
+      registry.add("spring.ai.vectorstore.qdrant.collection-name",
+          () -> System.getProperty("smoke.qdrant.collection", "products"));
+    } else {
+      registry.add("spring.ai.vectorstore.qdrant.host", QdrantTestSupport::host);
+      registry.add("spring.ai.vectorstore.qdrant.port", QdrantTestSupport::grpcPort);
+      registry.add("spring.ai.vectorstore.qdrant.collection-name",
+          QdrantTestSupport::uniqueCollection);
+    }
   }
 
   record Expected(List<String> all, List<String> any, List<String> none, Integer maxPrice) {
@@ -89,8 +113,12 @@ class RewriteEvalSmokeIT {
   @Autowired
   private ProductEmbedder embedder;
 
+  /** Avisos de {@link QueryRewriter}: distinguen un JSON inválido de un timeout o un error. */
+  private final ListAppender<ILoggingEvent> rewriterLog = new ListAppender<>();
+
   @AfterAll
   void close() {
+    ((Logger) LoggerFactory.getLogger(QueryRewriter.class)).detachAppender(rewriterLog);
     CATALOG.close();
   }
 
@@ -98,6 +126,10 @@ class RewriteEvalSmokeIT {
   void rewrittenQueriesFindMoreExpectedProducts() throws Exception {
     SyncReport report = indexer.sync();
     assertThat(report).isNotNull();
+    System.out.printf("eval reescritura: sincronización %s%n", report);
+    rewriterLog.start();
+    ((Logger) LoggerFactory.getLogger(QueryRewriter.class)).addAppender(rewriterLog);
+    long rewriteRequests = 0;
     List<EvalCase> cases;
     try (InputStream in = getClass().getResourceAsStream("/rewrite-eval.json")) {
       cases = new ObjectMapper().readValue(in, new TypeReference<>() { });
@@ -117,7 +149,9 @@ class RewriteEvalSmokeIT {
         session.commit(new Turn(evalCase.history().user(), evalCase.history().assistant()), shown);
       }
       List<ShownProduct> raw = retriever.search(evalCase.message(), null, null, List.of());
+      int warningsBefore = warnings();
       Rewrite rewrite = rewriter.rewrite(evalCase.message(), session);
+      rewriteRequests += rewrite.providerRequests();
       List<ShownProduct> rewritten = retriever.search(rewrite.query(), rewrite.minPrice(),
           rewrite.maxPrice(), rewrite.excludeTags());
       long rawCount = raw.stream().filter(evalCase.expected()::matches).count();
@@ -128,6 +162,9 @@ class RewriteEvalSmokeIT {
           evalCase.kind(), evalCase.message(), rewrite.query(), filters(rewrite), rawCount,
           rewrittenCount);
       rows.add(row);
+      System.out.printf("bench.rewrite smoke=RewriteEvalSmokeIT id=%s outcome=%s latencyMs=%d "
+              + "rawHits=%d rewrittenHits=%d%n", evalCase.id(), outcome(rewrite, warningsBefore),
+          rewrite.latencyMillis(), rawCount, rewrittenCount);
       System.out.printf("eval reescritura: %s%n  crudo:    %s%n  reescrito: %s%n", row,
           raw.stream().map(p -> p.name() + " " + p.tags()).toList(),
           rewritten.stream().map(p -> p.name() + " $" + p.price() + " " + p.tags()).toList());
@@ -137,8 +174,32 @@ class RewriteEvalSmokeIT {
     System.out.println("| Consulta | Tipo | Mensaje | Reescrita | Crudo | Reescrito |");
     System.out.println("| --- | --- | --- | --- | --- | --- |");
     rows.forEach(System.out::println);
+    BenchReporter.usage("RewriteEvalSmokeIT", rewriteRequests,
+        BenchReporter.geminiRequests(embedder, report));
 
     assertThat(rewrittenHits).isGreaterThan(rawHits);
+  }
+
+  private int warnings() {
+    synchronized (rewriterLog) {
+      return rewriterLog.list.size();
+    }
+  }
+
+  /**
+   * {@code ok}, {@code invalid} (el modelo respondió con una salida que no
+   * parsea o no valida) o {@code fallback} (timeout, error o limitador).
+   */
+  private String outcome(Rewrite rewrite, int warningsBefore) {
+    if (!rewrite.fallback()) {
+      return "ok";
+    }
+    synchronized (rewriterLog) {
+      boolean invalid = rewriterLog.list.subList(warningsBefore, rewriterLog.list.size()).stream()
+          .map(ILoggingEvent::getFormattedMessage)
+          .anyMatch(message -> message.contains("inválid"));
+      return invalid ? "invalid" : "fallback";
+    }
   }
 
   private static String filters(Rewrite rewrite) {

@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -88,6 +89,30 @@ import reactor.core.publisher.Flux;
  * ./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false \
  *   -Dit.test='ModelSpikeSmokeIT#controlledToolCalling+quotaBurst' -Dspike.quota-burst=true
  * </pre>
+ *
+ * <p>{@code select-assistant-models} (D4 y D6) agrega:
+ * <ul>
+ *   <li>una línea {@code bench.capability} por capacidad (incluida una vuelta de
+ *       {@code controlledToolCalling} con {@code tool_choice: "required"}, que
+ *       suma 1 request), una {@code bench.rewrite} por llamada de reescritura y
+ *       una {@code bench.usage} con las requests de la corrida, que lee
+ *       {@code scripts/model_bench_report.py};</li>
+ *   <li>{@code thinkingProbe}: cómo se apaga (o se prende) el razonamiento de un
+ *       modelo nuevo, con HTTP crudo para ver {@code reasoning_content} tal como
+ *       llega. Manda una request sin streaming por variante de
+ *       {@code -Dspike.probe-variants} (un arreglo JSON de {@code extra-body}),
+ *       en orden, y se frena en la primera que cumple el criterio de
+ *       {@code -Dspike.probe-mode} ({@code off} u {@code on}). Cada request
+ *       tiene un timeout de 30 s y un único reintento a los 60 s; un segundo
+ *       timeout, un 404 o un 403 descartan el modelo. Solo corre con
+ *       {@code -Dspike.probe-variants}.</li>
+ * </ul>
+ * <pre>
+ * ./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false \
+ *   -Dit.test='ModelSpikeSmokeIT#thinkingProbe' -Dspike.probe-model=meta/muse-glimmer-30b \
+ *   -Dspike.probe-mode=off -Dspike.probe-max-tokens=64 \
+ *   -Dspike.probe-variants='[{"chat_template_kwargs":{"enable_thinking":false}}]'
+ * </pre>
  */
 @Tag("smoke")
 @EnabledIfEnvironmentVariable(named = "NVIDIA_API_KEY", matches = ".+")
@@ -103,6 +128,15 @@ class ModelSpikeSmokeIT {
 
   private static final String NEMOTRON_ON = "{\"chat_template_kwargs\":{\"enable_thinking\":true}}";
   private static final String NEMOTRON_OFF = "{\"chat_template_kwargs\":{\"enable_thinking\":false}}";
+
+  /** Tiempo límite de la reescritura en el {@code assistant}: más lento cuenta como fallback. */
+  private static final Duration REWRITE_TIMEOUT = Duration.ofSeconds(12);
+
+  /** Timeout de descarte de {@code thinkingProbe} (D4) y pausa antes del reintento. */
+  private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(30);
+  private static final Duration PROBE_RETRY_PAUSE = Duration.ofSeconds(60);
+
+  private static final String PROBE_PROMPT = "Reply with exactly: OK";
 
   /** Mensajes de la demo para la reescritura, con el turno previo simulado en algunos. */
   private static final List<String> REWRITE_MESSAGES = List.of(
@@ -159,6 +193,18 @@ class ModelSpikeSmokeIT {
   private Map<String, Object> mainOff;
   private String rewriteModel;
   private Map<String, Object> rewriteExtra;
+  private int rewriteMaxTokens;
+
+  /**
+   * Con {@code -Dspike.main-off-reasoning=minimum}, {@code main-off} no apaga el
+   * razonamiento sino que lo baja al mínimo (modelos como {@code muse-glimmer-30b},
+   * que solo lo regulan): el texto tiene que llegar sin {@code <think>}, con el
+   * razonamiento fuera del texto.
+   */
+  private boolean offIsMinimum;
+
+  /** Requests a NVIDIA de la corrida, para la línea {@code bench.usage}. */
+  private final AtomicInteger requests = new AtomicInteger();
 
   @BeforeAll
   void models() throws Exception {
@@ -167,29 +213,49 @@ class ModelSpikeSmokeIT {
     mainOff = json(System.getProperty("spike.main-off", NEMOTRON_OFF));
     rewriteModel = System.getProperty("spike.rewrite-model", "nvidia/nemotron-3.5-lightning-30b-a3b");
     rewriteExtra = json(System.getProperty("spike.rewrite-extra", NEMOTRON_OFF));
+    rewriteMaxTokens = Integer.getInteger("spike.rewrite-max-tokens", 256);
+    offIsMinimum = "minimum".equals(System.getProperty("spike.main-off-reasoning"));
+  }
+
+  @AfterAll
+  void usage() {
+    BenchReporter.usage("ModelSpikeSmokeIT", requests.get(), 0);
   }
 
   @Test
   @Order(1)
   void mainStreamsWithReasoningOff() {
-    StreamResult result = stream(mainOff, 1024, null,
-        "Describe a mid-century velvet armchair for a reading corner in four sentences.");
+    StreamResult result = capturing("streaming", () -> stream(mainOff, 1024, null,
+        "Describe a mid-century velvet armchair for a reading corner in four sentences."));
 
     report("razonamiento off", result);
+    String text = result.text.toString();
+    capability("streaming", result.textChunks > 1 && !text.isBlank(),
+        "chunks=" + result.textChunks + " firstFragmentMs=" + result.firstTextMillis);
+    capability("reasoning-off", !text.isBlank() && !text.contains("<think>")
+            && (offIsMinimum || result.reasoningChars == 0),
+        (offIsMinimum ? "nivel=minimo " : "") + "reasoningChars=" + result.reasoningChars);
     assertThat(result.textChunks).isGreaterThan(1);
     assertThat(result.text.toString()).isNotBlank();
-    assertThat(result.reasoningChars).isZero();
+    if (!offIsMinimum) {
+      assertThat(result.reasoningChars).isZero();
+    }
     assertThat(result.text.toString()).doesNotContain("<think>");
   }
 
   @Test
   @Order(2)
   void mainStreamsWithReasoningOn() {
-    StreamResult result = stream(mainOn, 4096, null,
+    StreamResult result = capturing("reasoning-on", () -> stream(mainOn, 4096, null,
         "Compare two armchairs: Aiden velvet armchair $139 and Brooks leather armchair $249. "
-            + "Give the price difference and recommend one depending on use. Three sentences.");
+            + "Give the price difference and recommend one depending on use. Three sentences."));
 
     report("razonamiento on", result);
+    boolean think = result.text.toString().contains("<think>");
+    capability("reasoning-on", !result.text.toString().isBlank()
+            && (result.reasoningChars > 0 || think),
+        "where=" + (result.reasoningChars > 0 ? "reasoning_content" : think ? "think" : "none")
+            + " firstFragmentMs=" + result.firstTextMillis);
     assertThat(result.text.toString()).isNotBlank();
     // El razonamiento tiene que llegar por algún lado: fuera del texto
     // (reasoning_content) o dentro (<think>). El README registra cuál.
@@ -200,12 +266,16 @@ class ModelSpikeSmokeIT {
   @Order(3)
   void mainCallsToolsWhileStreaming() {
     PriceTool tool = new PriceTool();
-    StreamResult result = stream(mainOff, 1024, tool,
+    StreamResult result = capturing("tool-calling-stream", () -> stream(mainOff, 1024, tool,
         "What is the current price of the Aiden Mid-Century Velvet Armchair? Use the tool and "
-            + "answer with the price.");
+            + "answer with the price."));
+    // Una vuelta con el tool call y otra con el resultado (Spring AI ejecuta la tool).
+    requests.addAndGet(tool.calls.get() > 0 ? 1 : 0);
 
     report("tool calling", result);
     System.out.printf("spike %s: tool invocada %d veces%n", mainModel, tool.calls.get());
+    capability("tool-calling-stream", tool.calls.get() >= 1
+        && result.text.toString().contains("139"), "toolCalls=" + tool.calls.get());
     assertThat(tool.calls.get()).isGreaterThanOrEqualTo(1);
     assertThat(result.text.toString()).contains("139");
   }
@@ -216,13 +286,16 @@ class ModelSpikeSmokeIT {
     BeanOutputConverter<SpikeRewrite> converter = new BeanOutputConverter<>(SpikeRewrite.class);
     ChatClient client = ChatClient.builder(chatModel)
         .defaultOptions(OpenAiChatOptions.builder().model(rewriteModel).temperature(0.0)
-            .maxTokens(256).extraBody(rewriteExtra).build())
+            .maxTokens(rewriteMaxTokens).extraBody(rewriteExtra).build())
         .build();
     List<Long> latencies = new ArrayList<>();
     int invalid = 0;
-    for (String message : REWRITE_MESSAGES) {
+    for (int i = 0; i < REWRITE_MESSAGES.size(); i++) {
+      String message = REWRITE_MESSAGES.get(i);
       long start = System.nanoTime();
       String raw;
+      boolean error = false;
+      requests.incrementAndGet();
       try {
         raw = client.prompt()
             .system("""
@@ -238,14 +311,22 @@ class ModelSpikeSmokeIT {
             .content();
       } catch (RuntimeException e) {
         raw = null;
+        error = true;
         System.out.printf("spike %s: error %s%n", rewriteModel, e.getMessage());
       }
       long millis = (System.nanoTime() - start) / 1_000_000;
       latencies.add(millis);
       SpikeRewrite parsed = parse(converter, raw);
-      if (parsed == null || parsed.query() == null || parsed.intent() == null) {
+      boolean valid = parsed != null && parsed.query() != null && parsed.intent() != null;
+      if (!valid) {
         invalid++;
       }
+      // Como en el assistant: un error o más de 12 s es fallback; una salida
+      // que no parsea, inválida.
+      String outcome = error || millis > REWRITE_TIMEOUT.toMillis() ? "fallback"
+          : valid ? "ok" : "invalid";
+      System.out.printf("bench.rewrite smoke=ModelSpikeSmokeIT id=spike-%d outcome=%s "
+          + "latencyMs=%d%n", i + 1, outcome, millis);
       System.out.printf("spike %s: %d ms \"%s\" -> %s%n", rewriteModel, millis, message,
           parsed != null ? parsed : "JSON inválido: " + raw);
     }
@@ -283,10 +364,15 @@ class ModelSpikeSmokeIT {
     Prompt first = new Prompt(List.of(new UserMessage(
         "What is the current price of the Aiden Mid-Century Velvet Armchair? Use the tool.")),
         options);
-    Round round1 = round(first);
+    Round round1 = capturing("controlled-tool-calls", () -> round(first));
     System.out.printf("spike %s [tools controladas] vuelta 1: %d respuestas, %d tool calls %s, "
             + "texto \"%s\", %d ms%n", mainModel, round1.responses, round1.toolCalls.size(),
         round1.toolCalls, round1.text, round1.millis);
+    capability("controlled-tool-calls", tool.calls.get() == 0 && !round1.toolCalls.isEmpty()
+            && "currentPrice".equals(round1.toolCalls.get(0).name())
+            && round1.toolCalls.get(0).id() != null && !round1.toolCalls.get(0).id().isBlank()
+            && round1.toolCalls.get(0).arguments().contains("name"),
+        "toolCalls=" + round1.toolCalls.size() + " ms=" + round1.millis);
     assertThat(tool.calls.get()).as("la ejecución interna está desactivada").isZero();
     assertThat(round1.toolCalls).isNotEmpty();
     AssistantMessage.ToolCall call = round1.toolCalls.get(0);
@@ -308,23 +394,194 @@ class ModelSpikeSmokeIT {
         round1.toolCalls.size());
 
     // Vuelta 2: con el resultado de la tool, responde en texto.
-    Round round2 = round(new Prompt(history, options));
+    Round round2 = capturing("second-round", () -> round(new Prompt(history, options)));
     System.out.printf("spike %s [tools controladas] vuelta 2: %d fragmentos, %d tool calls, "
             + "texto \"%s\", %d ms%n", mainModel, round2.responses, round2.toolCalls.size(),
         round2.text.toString().replace('\n', ' '), round2.millis);
+    capability("second-round", round2.toolCalls.isEmpty()
+        && round2.text.toString().contains("139"), "ms=" + round2.millis);
     assertThat(round2.toolCalls).isEmpty();
     assertThat(round2.text.toString()).contains("139");
 
     // Vuelta final de D1: las mismas tools, con tool_choice "none".
     OpenAiChatOptions none = OpenAiChatOptions.fromOptions(options);
     none.setToolChoice("none");
-    Round round3 = round(new Prompt(List.of(new UserMessage(
-        "What is the current price of the Brooks leather armchair? Use the tool.")), none));
+    Round round3 = capturing("tool-choice-none", () -> round(new Prompt(List.of(new UserMessage(
+        "What is the current price of the Brooks leather armchair? Use the tool.")), none)));
     System.out.printf("spike %s [tools controladas] vuelta con tool_choice none: %d tool calls, "
             + "texto \"%s\", %d ms%n", mainModel, round3.toolCalls.size(),
         round3.text.toString().replace('\n', ' '), round3.millis);
+    capability("tool-choice-none", round3.toolCalls.isEmpty()
+        && !round3.text.toString().isBlank(), "ms=" + round3.millis);
+
+    // Vuelta correctiva de add-assistant-tools: tool_choice "required" obliga a
+    // pedir una tool aunque el mensaje no la necesite (select-assistant-models).
+    OpenAiChatOptions required = OpenAiChatOptions.fromOptions(options);
+    required.setToolChoice("required");
+    Round round4 = capturing("tool-choice-required", () -> round(new Prompt(List.of(
+        new UserMessage("Hi! Just say hello.")), required)));
+    System.out.printf("spike %s [tools controladas] vuelta con tool_choice required: %d tool "
+            + "calls %s, texto \"%s\", %d ms%n", mainModel, round4.toolCalls.size(),
+        round4.toolCalls, round4.text.toString().replace('\n', ' '), round4.millis);
+    capability("tool-choice-required", !round4.toolCalls.isEmpty(), "ms=" + round4.millis);
+
     assertThat(round3.toolCalls).as("tool_choice none").isEmpty();
     assertThat(round3.text.toString()).isNotBlank();
+    assertThat(round4.toolCalls).as("tool_choice required").isNotEmpty();
+  }
+
+  /**
+   * D4 de {@code select-assistant-models}: con qué {@code extra-body} se apaga
+   * ({@code -Dspike.probe-mode=off}, el default) o se prende ({@code on}) el
+   * razonamiento de {@code -Dspike.probe-model}. Una request sin streaming por
+   * variante, en orden, hasta la primera que cumple el criterio:
+   * <ul>
+   *   <li>apagado: {@code content} trae "OK", sin {@code reasoning_content} ni
+   *       {@code <think>}, {@code finish_reason=stop} y menos de 20 tokens de salida;</li>
+   *   <li>prendido: el razonamiento llega en {@code reasoning_content} o como
+   *       {@code <think>} en el texto (que se filtra con {@code strip-think-tags}).</li>
+   * </ul>
+   * Un timeout de 30 s se reintenta una vez a los 60 s; un segundo timeout, un
+   * 404 o un 403 descartan el modelo y cortan el sondeo.
+   */
+  @Test
+  @Order(7)
+  void thinkingProbe() throws Exception {
+    String variantsJson = System.getProperty("spike.probe-variants");
+    org.junit.jupiter.api.Assumptions.assumeTrue(variantsJson != null && !variantsJson.isBlank(),
+        "sondeo deshabilitado (usar -Dspike.probe-variants)");
+    String model = System.getProperty("spike.probe-model", mainModel);
+    boolean on = "on".equals(System.getProperty("spike.probe-mode", "off"));
+    int maxTokens = Integer.getInteger("spike.probe-max-tokens", on ? 1024 : 64);
+    List<Map<String, Object>> variants = JSON.readValue(variantsJson, new TypeReference<>() { });
+    HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    String capability = on ? "thinking-on" : "thinking-off";
+
+    for (Map<String, Object> extra : variants) {
+      ProbeResult result = probe(http, model, extra, maxTokens);
+      System.out.printf("bench.probe model=%s mode=%s extra=%s status=%d latencyMs=%d "
+              + "finishReason=%s completionTokens=%d reasoningChars=%d think=%s attempts=%d "
+              + "content=\"%s\"%n", model, on ? "on" : "off", JSON.writeValueAsString(extra),
+          result.status, result.millis, result.finishReason, result.completionTokens,
+          result.reasoningChars, result.think, result.attempts,
+          result.content == null ? "null" : result.content.replace("\n", "\\n"));
+      if (result.discarded != null) {
+        capability(capability, false, "model=" + model + " discarded=" + result.discarded);
+        throw new AssertionError("Modelo descartado: " + result.discarded);
+      }
+      boolean accepted = on
+          ? result.reasoningChars > 0 || result.think
+          : result.content != null && result.content.contains("OK") && result.reasoningChars == 0
+              && !result.think && "stop".equals(result.finishReason)
+              && result.completionTokens >= 0 && result.completionTokens < 20;
+      if (accepted) {
+        capability(capability, true, "model=" + model + " extra=" + JSON.writeValueAsString(extra)
+            + " where=" + (result.reasoningChars > 0 ? "reasoning_content"
+                : result.think ? "think" : "none"));
+        return;
+      }
+    }
+    capability(capability, false, "model=" + model + " ninguna variante cumple el criterio");
+    throw new AssertionError("Ninguna variante cumple el criterio de " + capability);
+  }
+
+  /** Resultado de una variante de {@link #thinkingProbe}. */
+  static class ProbeResult {
+    int status = -1;
+    long millis;
+    int attempts;
+    String content;
+    int reasoningChars;
+    boolean think;
+    String finishReason;
+    int completionTokens = -1;
+    /** Motivo del descarte ({@code timeout}, {@code 404}, {@code 403}), o {@code null}. */
+    String discarded;
+  }
+
+  private ProbeResult probe(HttpClient http, String model, Map<String, Object> extra,
+      int maxTokens) throws Exception {
+    Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("model", model);
+    body.put("messages", List.of(Map.of("role", "user", "content", PROBE_PROMPT)));
+    body.put("max_tokens", maxTokens);
+    body.put("temperature", 0);
+    body.put("stream", false);
+    body.putAll(extra);
+    HttpRequest request = HttpRequest.newBuilder(
+            URI.create("https://integrate.api.nvidia.com/v1/chat/completions"))
+        .timeout(PROBE_TIMEOUT)
+        .header("Authorization", "Bearer " + System.getenv("NVIDIA_API_KEY"))
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
+        .build();
+    ProbeResult result = new ProbeResult();
+    HttpResponse<String> response = null;
+    for (int attempt = 1; attempt <= 2 && response == null; attempt++) {
+      if (attempt == 2) {
+        System.out.printf("spike sondeo %s: timeout de %d s, reintento en %d s%n", model,
+            PROBE_TIMEOUT.toSeconds(), PROBE_RETRY_PAUSE.toSeconds());
+        Thread.sleep(PROBE_RETRY_PAUSE.toMillis());
+      }
+      result.attempts = attempt;
+      requests.incrementAndGet();
+      long start = System.nanoTime();
+      try {
+        response = http.send(request, HttpResponse.BodyHandlers.ofString());
+      } catch (java.net.http.HttpTimeoutException e) {
+        response = null;
+      }
+      result.millis = (System.nanoTime() - start) / 1_000_000;
+    }
+    if (response == null) {
+      result.discarded = "timeout";
+      return result;
+    }
+    result.status = response.statusCode();
+    if (result.status == 404 || result.status == 403) {
+      result.discarded = Integer.toString(result.status);
+      System.out.printf("spike sondeo %s: %s%n", model, response.body().length() > 300
+          ? response.body().substring(0, 300) : response.body());
+      return result;
+    }
+    if (result.status != 200) {
+      System.out.printf("spike sondeo %s: status %d %s%n", model, result.status,
+          response.body().length() > 300 ? response.body().substring(0, 300) : response.body());
+      return result;
+    }
+    var root = JSON.readTree(response.body());
+    var choice = root.path("choices").path(0);
+    var message = choice.path("message");
+    result.content = message.path("content").isTextual() ? message.path("content").asText() : null;
+    String reasoning = message.path("reasoning_content").isTextual()
+        ? message.path("reasoning_content").asText()
+        : message.path("reasoning").isTextual() ? message.path("reasoning").asText() : "";
+    result.reasoningChars = reasoning.length();
+    result.think = result.content != null && result.content.contains("<think>");
+    result.finishReason = choice.path("finish_reason").asText(null);
+    result.completionTokens = root.path("usage").path("completion_tokens").asInt(-1);
+    return result;
+  }
+
+  /** Línea {@code bench.capability} que lee el reporte del benchmark (M1). */
+  private void capability(String name, boolean ok, String detail) {
+    System.out.printf("bench.capability model=%s capability=%s ok=%s %s%n", mainModel, name, ok,
+        detail);
+  }
+
+  /**
+   * Corre una vuelta contra el modelo y cuenta la request. Si falla, deja la
+   * capacidad registrada como no cumplida antes de propagar el error.
+   */
+  private <T> T capturing(String name, java.util.function.Supplier<T> call) {
+    requests.incrementAndGet();
+    try {
+      return call.get();
+    } catch (RuntimeException e) {
+      capability(name, false, "error=\"" + String.valueOf(e.getMessage()).replace('"', '\'')
+          .replace('\n', ' ') + "\"");
+      throw e;
+    }
   }
 
   /**

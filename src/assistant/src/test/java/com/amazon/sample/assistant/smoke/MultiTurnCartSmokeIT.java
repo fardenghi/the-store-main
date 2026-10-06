@@ -1,5 +1,7 @@
 package com.amazon.sample.assistant.smoke;
 
+import static com.amazon.sample.assistant.smoke.BenchReporter.geminiRequests;
+import static com.amazon.sample.assistant.smoke.BenchReporter.nvidiaRequests;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.Logger;
@@ -8,7 +10,9 @@ import ch.qos.logback.core.read.ListAppender;
 import com.amazon.sample.assistant.chat.session.SessionStore;
 import com.amazon.sample.assistant.chat.session.ToolRound;
 import com.amazon.sample.assistant.products.catalog.CatalogProduct;
+import com.amazon.sample.assistant.products.embedding.ProductEmbedder;
 import com.amazon.sample.assistant.products.index.ProductIndexer;
+import com.amazon.sample.assistant.products.index.SyncReport;
 import com.amazon.sample.assistant.products.vector.QdrantTestSupport;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -21,6 +25,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -28,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -56,8 +62,16 @@ import org.springframework.test.context.DynamicPropertySource;
  * <p>Gasta unas 35 requests a NVIDIA (14 turnos espaciados) y un embedding de
  * Gemini por turno con búsqueda. Igual que los demás smoke de punta a punta,
  * con {@code -Dsmoke.qdrant.*} reutiliza una colección ya indexada.
+ *
+ * <p>Para el benchmark de modelos ({@code select-assistant-models}) imprime una
+ * línea {@code bench.result} por sesión ({@link BenchReporter}) con
+ * {@code added}: {@code ok} si el último pedido terminó con el producto pedido
+ * en el carrito, {@code none} si no se agregó y {@code wrong} si se agregó otro.
+ * En {@code mt-report} ("the first one" después de siete turnos) el pedido es
+ * ambiguo, así que vale el primer producto de cualquier lista de la sesión.
  */
 @Tag("smoke")
+@ExtendWith(BenchReporter.class)
 @EnabledIfEnvironmentVariable(named = "NVIDIA_API_KEY", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "GOOGLE_API_KEY", matches = ".+")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -124,12 +138,25 @@ class MultiTurnCartSmokeIT {
   @Autowired
   private SessionStore sessions;
 
+  @Autowired
+  private ProductEmbedder embedder;
+
   private final ListAppender<ILoggingEvent> turnLog = new ListAppender<>();
   private long lastTurnStart;
+  private SyncReport sync;
+
+  /** Primer producto de cada lista que mostró la sesión: candidatos de "the first one". */
+  private final List<String> firstOnes = new ArrayList<>();
+
+  @BeforeEach
+  void newSession() {
+    firstOnes.clear();
+  }
 
   @BeforeAll
   void index() {
-    System.out.printf("smoke multi-turno: sincronización %s%n", indexer.sync());
+    sync = indexer.sync();
+    System.out.printf("smoke multi-turno: sincronización %s%n", sync);
     turnLog.start();
     ((Logger) LoggerFactory.getLogger("assistant.turn")).addAppender(turnLog);
   }
@@ -141,6 +168,8 @@ class MultiTurnCartSmokeIT {
       turnLog.list.forEach(event -> System.out.println("assistant.turn " + event
           .getFormattedMessage()));
     }
+    BenchReporter.usage("MultiTurnCartSmokeIT", nvidiaRequests(turnLog),
+        geminiRequests(embedder, sync));
     CATALOG.close();
     CARTS.close();
   }
@@ -162,7 +191,9 @@ class MultiTurnCartSmokeIT {
     }
 
     String message = "add two of the first one to my cart";
+    List<String> candidates = List.copyOf(firstOnes);
     SseEvents last = turn(session, message);
+    BenchReporter.scenario().added(ToolsEndToEndSmokeIT.added(CARTS.items(session), candidates));
     check(last, message, problems);
     printMemory(session);
 
@@ -186,6 +217,8 @@ class MultiTurnCartSmokeIT {
     String message = "add two of the first lamp you showed me (the Curved Brass and Walnut "
         + "Desk Lamp) to my cart";
     SseEvents last = turn(session, message);
+    BenchReporter.scenario().added(ToolsEndToEndSmokeIT.added(CARTS.items(session),
+        List.of(CATALOG.byName("Curved Brass and Walnut Desk Lamp").orElseThrow().id())));
     check(last, message, problems);
     printMemory(session);
 
@@ -204,17 +237,24 @@ class MultiTurnCartSmokeIT {
     String message = "I need a lamp for my desk";
     check(turn(session, message), message, problems);
     message = "add two of the first one to my cart";
+    List<String> candidates = new ArrayList<>(firstOnes);
     SseEvents first = turn(session, message);
     check(first, message, problems);
     assertThat(first.cartUpdates()).as("primer agregado").hasSize(1);
 
     message = "add one Adjustable Pharmacy Desk Lamp to my cart too";
     SseEvents second = turn(session, message);
+    CatalogProduct pharmacy = CATALOG.byName("Adjustable Pharmacy Desk Lamp").orElseThrow();
+    List<FakeCarts.Item> items = CARTS.items(session);
+    candidates.add(pharmacy.id());
+    // Sin la lámpara pedida y sin otros productos, el segundo agregado no se hizo.
+    boolean pharmacyAdded = items.stream().anyMatch(i -> i.itemId().equals(pharmacy.id()));
+    String added = ToolsEndToEndSmokeIT.added(items, candidates);
+    BenchReporter.scenario().added(!pharmacyAdded && "ok".equals(added) ? "none" : added);
     check(second, message, problems);
     printMemory(session);
 
     assertThat(problems).as("turnos con alucinaciones").isEmpty();
-    CatalogProduct pharmacy = CATALOG.byName("Adjustable Pharmacy Desk Lamp").orElseThrow();
     assertThat(second.toolEvents("addToCart")).as("addToCart del segundo agregado")
         .anySatisfy(event -> assertThat(event.get("ok")).isEqualTo(true));
     assertThat(second.cartUpdates()).singleElement().satisfies(event -> {
@@ -301,6 +341,16 @@ class MultiTurnCartSmokeIT {
     return allowed;
   }
 
+  /** Productos del catálogo que el texto nombra, en el orden en que aparecen. */
+  private static List<CatalogProduct> named(String text) {
+    String lower = text.toLowerCase(Locale.ROOT);
+    return CATALOG.products().stream()
+        .filter(p -> lower.contains(p.name().toLowerCase(Locale.ROOT)))
+        .sorted(java.util.Comparator.comparingInt(p -> lower.indexOf(p.name()
+            .toLowerCase(Locale.ROOT))))
+        .toList();
+  }
+
   private static List<Long> dollars(String text) {
     List<Long> amounts = new ArrayList<>();
     Matcher matcher = DOLLARS.matcher(text);
@@ -339,6 +389,13 @@ class MultiTurnCartSmokeIT {
     long millis = (System.nanoTime() - start) / 1_000_000;
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     SseEvents events = SseEvents.parse(response.getBody());
+    BenchReporter.scenario().turn(events);
+    named(events.text()).stream().findFirst().ifPresent(p -> firstOnes.add(p.id()));
+    events.productIds().stream().findFirst().ifPresent(firstOnes::add);
+    events.tools().stream().map(tool -> tool.get("products"))
+        .filter(List.class::isInstance).map(list -> (List<?>) list)
+        .filter(list -> !list.isEmpty() && list.get(0) instanceof Map<?, ?>)
+        .forEach(list -> firstOnes.add(String.valueOf(((Map<?, ?>) list.get(0)).get("id"))));
     System.out.printf("smoke multi-turno [%s] %d ms \"%s\"%n  tools: %s%n  carrito: %s%n"
             + "  respuesta: %s%n", session, millis, message, events.tools(),
         events.cartUpdates(), events.text().replace('\n', ' '));

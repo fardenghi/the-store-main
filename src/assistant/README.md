@@ -42,6 +42,7 @@ con variables de entorno (en el cluster, desde el ConfigMap `assistant`).
 | `RETAIL_ASSISTANT_SEARCH_QUERY_CACHE_SIZE`            | Entradas del caché de embeddings de consultas        | `256`                                   |
 | `RETAIL_ASSISTANT_REWRITE_TIMEOUT`                    | Tiempo límite de la reescritura; si se excede, se usa el mensaje crudo | `12s`                 |
 | `RETAIL_ASSISTANT_REWRITE_HISTORY_TURNS`              | Turnos de la sesión que recibe la reescritura        | `3`                                     |
+| `RETAIL_ASSISTANT_REWRITE_MAX_TOKENS`                 | Tokens de salida de la reescritura (incluyen el razonamiento si el modelo no lo apaga) | `256` |
 | `RETAIL_ASSISTANT_CHAT_RETRIEVAL_K`                   | Productos que recibe el modelo principal (1 a 20)    | `5`                                     |
 | `RETAIL_ASSISTANT_CHAT_MIN_SCORE`                     | Umbral de score de la búsqueda (0 lo desactiva)      | `0`                                     |
 | `RETAIL_ASSISTANT_CHAT_MAX_TOKENS`                    | Tokens de salida sin razonamiento                    | `1024`                                  |
@@ -87,21 +88,37 @@ defecto son los de Nemotron:
 Se reemplazan con `SPRING_APPLICATION_JSON` en el ConfigMap. El mapa que se
 define reemplaza completo al default (los defaults viven en `ChatProperties` y
 no en el YAML porque Spring combina las claves de un mapa definido en varias
-fuentes), y un mapa vacío `{}` manda el request sin campos extra. Para pasar al
-plan B, en el ConfigMap `assistant`:
+fuentes), y un mapa vacío `{}` manda el request sin campos extra. Para cambiar
+de modelo, en el ConfigMap `assistant` (el ejemplo tiene los valores de los
+Nemotron, que son los defaults verificados):
 
 ```yaml
-  SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: deepseek-ai/deepseek-v4.1-flash
-  RETAIL_ASSISTANT_MODELS_REWRITE: google/gemma-3-12b-it
+  SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: nvidia/nemotron-3-super-120b-a12b
+  RETAIL_ASSISTANT_MODELS_REWRITE: nvidia/nemotron-3.5-lightning-30b-a3b
   SPRING_APPLICATION_JSON: >-
-    {"retail.assistant.chat.reasoning.on-extra-body": {"chat_template_kwargs": {"thinking": true}},
-     "retail.assistant.chat.reasoning.off-extra-body": {"chat_template_kwargs": {"thinking": false}},
-     "retail.assistant.rewrite.extra-body": {}}
+    {"retail.assistant.chat.reasoning.on-extra-body": {"chat_template_kwargs": {"enable_thinking": true}},
+     "retail.assistant.chat.reasoning.off-extra-body": {"chat_template_kwargs": {"enable_thinking": false}},
+     "retail.assistant.rewrite.extra-body": {"chat_template_kwargs": {"enable_thinking": false}}}
 ```
 
-y `kubectl rollout restart deployment/assistant -n the-store`. Los
-`extra-body` de DeepSeek y Gemma son los esperados según su chat template: no
-se pudieron verificar (ver "Spike de modelos de chat" más abajo).
+y `kubectl rollout restart deployment/assistant -n the-store`.
+
+**Plan B: pendiente del grupo.** El plan B anterior
+(`deepseek-ai/deepseek-v4.1-flash` y `google/gemma-3-12b-it`) no funciona con
+la cuenta (ver "Spike de modelos de chat"), y el único candidato evaluado en
+`select-assistant-models`, `meta/muse-glimmer-30b`, no se adoptó en ningún rol
+(ver "Selección de modelos"). No se documenta como plan B ningún modelo sin
+verificar.
+
+**`reasoning_effort` no va en un `extra-body`.** Con Spring AI 1.1.8, un campo
+del `extra-body` que también es un campo propio del request de OpenAI
+(`reasoning_effort`) sale duplicado en los requests con tools, y NVIDIA
+responde `400` "duplicate field `reasoning_effort`" en todos los turnos del
+modelo principal. Para un modelo que regula el razonamiento con
+`reasoning_effort` hay que usar la opción nativa
+(`SPRING_AI_OPENAI_CHAT_OPTIONS_REASONING_EFFORT`), que es la misma para todos
+los turnos: elegir el nivel por turno (bajo por defecto y alto en las
+comparaciones) necesitaría un cambio en `ReasoningPolicy`.
 
 ## Indexación del catálogo
 
@@ -583,7 +600,9 @@ reintentan ante un 429:
 - `ModelSpikeSmokeIT`: spike de los modelos de chat (15 requests a NVIDIA, ver
   abajo).
 - `RewriteEvalSmokeIT`: evaluación de la reescritura (10 requests a NVIDIA; en
-  Gemini, 80 para indexar y unas 20 búsquedas, ver abajo).
+  Gemini, 80 para indexar y unas 20 búsquedas, ver abajo). Con
+  `-Dsmoke.qdrant.*` reutiliza una colección ya indexada y gasta solo las
+  búsquedas.
 - `ChatEndToEndSmokeIT`: los escenarios de la spec `assistant-chat` de punta a
   punta por `POST /assistant/chat` (unas 28 requests a NVIDIA; en Gemini, 80
   para indexar y 1 por turno con búsqueda).
@@ -604,6 +623,78 @@ reintentan ante un 429:
 
 Para correr uno solo:
 `./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=SearchQualitySmokeIT`.
+
+### Benchmark de modelos (`select-assistant-models`)
+
+Para comparar un modelo de chat contra los criterios de aceptación del change
+`select-assistant-models` (D2 y D3 de su `design.md`), los smoke imprimen
+líneas parseables, sin cambiar lo que afirman:
+
+- `bench.result` (`ChatEndToEndSmokeIT`, `ToolsEndToEndSmokeIT` y
+  `MultiTurnCartSmokeIT`): una por escenario o sesión, con `outcome`
+  (`pass`, `fail` o `provider-error`), `falseClaims` (oraciones que afirman un
+  agregado sin un `addToCart` correcto, con el chequeo `ADD_CLAIM` del smoke),
+  `added` (`ok`, `none` o `wrong`) en los de carrito y `askedInsteadOfAdding`
+  en el pedido ambiguo.
+- `bench.rewrite` (`RewriteEvalSmokeIT` y el spike): una por reescritura, con
+  `outcome` (`ok`, `fallback` o `invalid`), la latencia y, en la evaluación,
+  los aciertos del top-5 crudo y reescrito.
+- `bench.capability` (`ModelSpikeSmokeIT`): una por capacidad del modelo
+  principal (streaming, razonamiento on/off, tool calling en streaming, ciclo
+  controlado, segunda vuelta, `tool_choice` `none` y `required`).
+- `bench.usage`: las requests a NVIDIA y a Gemini de la corrida.
+
+`ModelSpikeSmokeIT#thinkingProbe` (D4) busca con qué `extra-body` se apaga o
+se prende el razonamiento de un modelo nuevo: una request sin streaming por
+variante, en orden, hasta la primera que cumple el criterio, con un timeout de
+30 s y un reintento a los 60 s. Solo corre con `-Dspike.probe-variants`.
+
+El runner `scripts/model-bench.sh` corre un smoke N veces con los modelos y
+sus `extra-body` elegidos por `-D` (`spring.ai.openai.chat.options.model`,
+`retail.assistant.models.rewrite` y `spring.application.json`, o `-Dspike.*`
+en el spike), sin tocar los defaults versionados:
+
+```bash
+scripts/model-bench.sh --smoke MultiTurnCartSmokeIT --runs 5 \
+  --main meta/muse-glimmer-30b \
+  --main-on '{"chat_template_kwargs":{"enable_thinking":true}}' \
+  --main-off '{"chat_template_kwargs":{"enable_thinking":false}}' \
+  --rewrite meta/muse-glimmer-30b \
+  --rewrite-extra '{"chat_template_kwargs":{"enable_thinking":false}}' \
+  --qdrant localhost:6334/products --dry-run
+```
+
+| Flag | Qué hace |
+| --- | --- |
+| `--smoke <Clase[#método]>` | Smoke a correr |
+| `--runs <n>` | Corridas secuenciales, con `--pause` segundos entre una y otra (default 60) |
+| `--main`, `--main-on`, `--main-off` | Modelo principal y sus `extra-body` con el razonamiento prendido y apagado |
+| `--rewrite`, `--rewrite-extra` | Modelo de reescritura y su `extra-body` |
+| `--qdrant host:port/colección` | Colección ya indexada (`-Dsmoke.qdrant.*`). Antes de cada corrida verifica por REST (puerto 6333) que tenga 80 puntos |
+| `--ledger <archivo>` | Ledger acumulado (default `target/model-bench/ledger.tsv`) |
+| `--dry-run` | Imprime los comandos y el control del tope, sin correr nada |
+| `-- <args>` | Argumentos extra para `./mvnw` (por ejemplo `-Dspike.probe-variants=...`) |
+
+Cada corrida queda en `target/model-bench/<fecha>-<smoke>-<i>.log` y suma una
+fila al ledger con las requests medidas (`bench.usage` y `nvidiaRequests` de
+las líneas `assistant.turn`). El ledger fija los topes al crearse
+(`MODEL_BENCH_CAP_NVIDIA`, 500, y `MODEL_BENCH_CAP_GEMINI`, 250, los de D5), y
+el runner no arranca una corrida si lo consumido más su estimación los
+superaría. También corta la serie si la sincronización embebió algún producto
+(la colección tiene que dar `unchanged=80`, `providerRequests=0`).
+
+El reporte arma en Markdown una tabla por corrida y otra total con M1 a M8 y R1
+a R4 (valor, umbral, línea base y ✔/✘, con percentiles nearest-rank):
+
+```bash
+python3 scripts/model_bench_report.py target/model-bench            # todo
+python3 scripts/model_bench_report.py --role rewrite target/model-bench/*Rewrite*.log
+(cd scripts && python3 -m unittest test_model_bench_report)        # tests, con logs de ejemplo
+```
+
+Corridas del change (D5): 1 de spike, 3 de `RewriteEvalSmokeIT`,
+`ChatEndToEndSmokeIT` y `ToolsEndToEndSmokeIT`, 2 sueltas del escenario
+ambiguo y 5 de `MultiTurnCartSmokeIT`.
 
 ### Calidad de la búsqueda
 
@@ -704,13 +795,15 @@ mediodía, con un único request mínimo de `max_tokens` 32 a cada uno):
 | --- | --- | --- | --- | --- | --- |
 | `nvidia/nemotron-3-super-120b-a12b` | Principal | OK | OK (`enable_thinking`) | OK | Primer fragmento a 1,3 s (2,5 s con razonamiento) |
 | `nvidia/nemotron-3.5-lightning-30b-a3b` | Reescritura | — | Off OK (`enable_thinking: false`) | — | Mediana 1,5 s |
-| `deepseek-ai/deepseek-v4.1-flash` | Plan B principal | Sin verificar | Sin verificar | Sin verificar | Sin respuesta: el request no devolvió ni un byte en 100 s (spike) ni en 90 s (reintento) |
-| `google/gemma-3-12b-it` | Plan B reescritura | Sin verificar | Sin verificar | Sin verificar | `404` "Function '…': Not found for account" en 0,5 s: el modelo figura en `/v1/models` pero la cuenta no tiene acceso |
+| `deepseek-ai/deepseek-v4.1-flash` | Plan B anterior (descartado) | Sin verificar | Sin verificar | Sin verificar | Sin respuesta: el request no devolvió ni un byte en 100 s (spike) ni en 90 s (reintento) |
+| `google/gemma-3-12b-it` | Plan B anterior (descartado) | Sin verificar | Sin verificar | Sin verificar | `404` "Function '…': Not found for account" en 0,5 s: el modelo figura en `/v1/models` pero la cuenta no tiene acceso |
 
-Los `extra-body` del ejemplo de arriba (`chat_template_kwargs.thinking` para
-DeepSeek y `{}` para Gemma, que no tiene modo de razonamiento) son los de sus
-chat templates, sin verificar. Como los modelos principales cumplen D12, los
-defaults no cambian. El plan B de hoy no es usable con esta cuenta; candidatos
+Los `extra-body` que se habían propuesto para ellos (`chat_template_kwargs.thinking`
+para DeepSeek y `{}` para Gemma) eran los de sus chat templates, sin verificar,
+y se sacaron de la configuración documentada. Como los modelos principales
+cumplen D12, los defaults no cambian. Ese plan B no es usable con esta cuenta,
+y su reemplazo se evaluó en `select-assistant-models` (ver "Selección de
+modelos" más abajo); candidatos
 que la cuenta lista en `/v1/models` (solo leídos, sin llamarlos):
 `google/gemma-4-31b-it`, `google/gemma-3-4b-it`, `openai/gpt-oss-20b`,
 `nvidia/nemotron-nano-3-30b-a3b` y `nvidia/nemotron-3-ultra-550b-a55b`.
@@ -724,6 +817,52 @@ Elegir el reemplazo es una decisión del grupo; para probar uno alcanza con
 | 2026-10-06 | Principal   | `nvidia/nemotron-3-super-120b-a12b`     | OK, responde con thinking apagado  |
 | 2026-10-06 | Reescritura | `nvidia/nemotron-3.5-lightning-30b-a3b` | OK, responde con thinking apagado  |
 | 2026-10-06 | Embeddings  | `gemini-embedding-001`                  | OK, vector de 768 dimensiones      |
+| 2026-10-06 | Principal y reescritura | `meta/muse-glimmer-30b`   | No adoptado en ningún rol (ver abajo) |
+
+### Selección de modelos (`select-assistant-models`)
+
+Evaluación secuencial de un único candidato, `meta/muse-glimmer-30b`, en los
+dos roles, con los umbrales de D2 y D3 del change fijados antes de la primera
+corrida y el benchmark de "Tests". **Resultado: no se adopta en ningún rol; los
+defaults siguen siendo los Nemotron.** El siguiente candidato lo elige el grupo.
+
+`muse-glimmer-30b` no permite apagar el razonamiento: con
+`chat_template_kwargs.enable_thinking: false`, `chat_template_kwargs.thinking: false`,
+`reasoning_effort: "none"` y `thinking.type: "disabled"`, siempre manda
+`reasoning_content` (118 a 228 caracteres y 40 a 63 tokens para responder
+"OK"). La ficha de build.nvidia.com solo documenta niveles (`low`, `medium`,
+`high` y `xhigh`), y el modelo acepta `reasoning_effort` por request (`low`:
+122 caracteres de razonamiento; `high`: 283). Por eso, el grupo decidió
+evaluarlo con el esfuerzo mínimo como "sin razonamiento" (`low`) y `high` en
+las comparaciones.
+
+| Fecha | Rol | Candidato | `extra-body` off / on | Métrica | Umbral | Línea base | Candidato | ✔/✘ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-06 | Principal | `meta/muse-glimmer-30b` | `{"reasoning_effort":"low"}` / `{"reasoning_effort":"high"}` | M1 Capacidades | Todas OK | Todas OK | Streaming OK; nivel por request OK, con el razonamiento en `reasoning_content` (985 / 2053 caracteres). Tool calling: **400** "duplicate field `reasoning_effort`" en todos los requests con tools (Spring AI 1.1.8 duplica el campo del `extra-body`). Con la opción nativa `reasoning-effort=low`: tool calls completos, segunda vuelta y `tool_choice: "none"` OK, pero **`tool_choice: "required"` ignorado** (0 tool calls) | ✘ |
+| 2026-10-06 | Principal | | | M2 a M8 | D2 | — | No se midieron: parada temprana por M1 (D1) | — |
+| 2026-10-06 | Principal | | | Primer fragmento de texto en el spike (sin umbral) | — | 1,3 s / 2,5 s | 9,6 s con `low` / 20,5 s con `high` | — |
+| 2026-10-06 | Principal | | | **Resultado** | | | **No adoptado**: falla M1 (`tool_choice: "required"`, del que depende la vuelta correctiva de los pedidos de carrito, y tool calling incompatible con `reasoning_effort` en el `extra-body`) | ✘ |
+| 2026-10-06 | Reescritura | `meta/muse-glimmer-30b` | `{"reasoning_effort":"low"}` (no se puede apagar), `max-tokens` 1024 | R1 JSON válido | ≤ 1 inválida | 9/10 | 0 inválidas de 15 que respondieron | ✔ |
+| 2026-10-06 | Reescritura | | | R2 Latencia | p50 < 1,5 s y p95 ≤ 5 s | Mediana 1,5 s; p95 ≈ 10 s | p50 5,0 s, p95 10,1 s (20 llamadas; ninguna debajo de 1,5 s) | ✘ |
+| 2026-10-06 | Reescritura | | | R3 Fallback | ≤ 2/40 | 12-13 % | 5/20 (25 %): cortes a los 10 s | ✘ |
+| 2026-10-06 | Reescritura | | | R4 Top-5 | Media ≥ 45 y cada corrida > 42 | 45, 43, 47 | 44 contra 42 en la única corrida (no se completaron las 3) | — |
+| 2026-10-06 | Reescritura | | | **Resultado** | | | **No adoptado**: fallan R2 y R3 (parada temprana después de 1 de las 3 corridas de `RewriteEvalSmokeIT`) | ✘ |
+
+Consumo de la evaluación (ledger): 45 requests a NVIDIA de 500 y 18 a Gemini
+de 250, con 0 embeddings de indexación (la colección se restauró desde un
+snapshot y cada sincronización dio `unchanged=80`, `providerRequests=0`).
+
+Observaciones para el próximo candidato:
+
+- Los 5 fallbacks de la reescritura cortaron a los **10 s**, no a los 12 s de
+  `RETAIL_ASSISTANT_REWRITE_TIMEOUT`: el `read-timeout` de los `RestClient`
+  (`spring.http.client.read-timeout: 10s`) también alcanza al cliente de
+  NVIDIA, así que el tiempo máximo efectivo de la reescritura es 10 s.
+- Un modelo con `reasoning_effort` no puede llevarlo en el `extra-body` (ver
+  "Razonamiento y plan B").
+- Con `low`, el razonamiento de muse crece con el pedido: 985 caracteres
+  para una descripción de cuatro oraciones, y eso explica los 9,6 s al primer
+  fragmento.
 
 ### Evaluación de la reescritura (`RewriteEvalSmokeIT`)
 

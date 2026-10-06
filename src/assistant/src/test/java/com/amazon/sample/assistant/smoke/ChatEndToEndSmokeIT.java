@@ -1,5 +1,7 @@
 package com.amazon.sample.assistant.smoke;
 
+import static com.amazon.sample.assistant.smoke.BenchReporter.geminiRequests;
+import static com.amazon.sample.assistant.smoke.BenchReporter.nvidiaRequests;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.Logger;
@@ -8,6 +10,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.amazon.sample.assistant.products.catalog.CatalogProduct;
 import com.amazon.sample.assistant.products.embedding.ProductEmbedder;
 import com.amazon.sample.assistant.products.index.ProductIndexer;
+import com.amazon.sample.assistant.products.index.SyncReport;
 import com.amazon.sample.assistant.products.vector.QdrantTestSupport;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -28,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -58,8 +62,13 @@ import org.springframework.test.context.DynamicPropertySource;
  * ejemplo, la del {@code assistant} local con Qdrant en Docker): la
  * sincronización incremental no vuelve a embeber los productos sin cambios.
  * Sin esas propiedades, levanta un Qdrant con Testcontainers.
+ *
+ * <p>Para el benchmark de modelos ({@code select-assistant-models}) imprime una
+ * línea {@code bench.result} por escenario ({@link BenchReporter}) y una
+ * {@code bench.usage} con el consumo de la corrida.
  */
 @Tag("smoke")
+@ExtendWith(BenchReporter.class)
 @EnabledIfEnvironmentVariable(named = "NVIDIA_API_KEY", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "GOOGLE_API_KEY", matches = ".+")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -110,11 +119,13 @@ class ChatEndToEndSmokeIT {
 
   private final ListAppender<ILoggingEvent> turnLog = new ListAppender<>();
   private long lastTurnStart;
+  private SyncReport sync;
 
   @BeforeAll
   void index() throws Exception {
     var report = indexer.sync();
     assertThat(report).isNotNull();
+    sync = report;
     System.out.printf("smoke chat: sincronización %s%n", report);
     turnLog.start();
     ((Logger) LoggerFactory.getLogger("assistant.turn")).addAppender(turnLog);
@@ -123,6 +134,8 @@ class ChatEndToEndSmokeIT {
   @AfterAll
   void close() {
     ((Logger) LoggerFactory.getLogger("assistant.turn")).detachAppender(turnLog);
+    BenchReporter.usage("ChatEndToEndSmokeIT", nvidiaRequests(turnLog),
+        geminiRequests(embedder, sync));
     CATALOG.close();
   }
 
@@ -300,6 +313,7 @@ class ChatEndToEndSmokeIT {
     long millis = (System.nanoTime() - start) / 1_000_000;
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     SseEvents events = SseEvents.parse(response.getBody());
+    BenchReporter.scenario().turn(events);
     System.out.printf("smoke chat [%s] %d ms \"%s\"%n  products: %s%n  respuesta: %s%n", session,
         millis, message, events.products().stream()
             .map(p -> p.get("name") + " $" + p.get("price")).toList(),
