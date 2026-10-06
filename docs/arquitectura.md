@@ -150,3 +150,41 @@ del 2026-10-06 (catálogo de 80 productos, `gemini-embedding-001` 768d):
 En tres corridas la consulta reescrita acertó 45, 43 y 47 contra 42 de la
 cruda. La ganancia está en las referencias al turno anterior ("cheaper", "not a
 lamp"), de las que la consulta cruda no puede sacar el precio ni la exclusión.
+
+## Tools del asistente (`add-assistant-tools`)
+
+### Desvíos respecto de la pre-entrega
+
+Justificados en la decisión D13 del `design.md` del change `add-assistant-tools`.
+
+| Pre-entrega | Implementación | Justificación |
+|---|---|---|
+| "Búsqueda con filtros estructurados que combina tags y ordenamiento de `GET /catalog/products` junto con filtros de rango de precio sobre el payload en `qdrant`" (sección 2) | `searchProducts` tiene dos caminos según haya texto. Con texto: tags y rango de precio sobre el payload de Qdrant, y orden por el precio vivo en el `assistant`. Sin texto: tags y orden de `GET /catalog/products`, y rango de precio filtrado en el `assistant` | La API del catálogo no busca por texto ni filtra por precio, y la búsqueda vectorial de Qdrant no ordena por precio. Se usan los tres mecanismos de la pre-entrega, cada uno donde puede resolver el pedido. El caso de uso "Filtros estructurados" da el mismo resultado: categoría → tags reales, presupuesto → rango de precio, orden → orden por precio |
+| Modelo local en Ollama para el function calling | `nvidia/nemotron-3-super-120b-a12b` vía NVIDIA | Ya documentado en D8 de `add-assistant-service` y D13 de `add-assistant-chat`. Este change suma el limitador y la espera ante 429 que exige usar un proveedor con cuota |
+
+Agregados que no contradicen la pre-entrega: los eventos SSE `tool` y
+`cart-updated`, el límite de vueltas y de tools por turno, la validación de
+los argumentos en el servidor y la degradación de `searchProducts` al catálogo
+cuando la búsqueda semántica no está disponible. El contexto RAG del chat sigue
+mostrando el precio del payload; el caso de uso "Precio y detalle en tiempo
+real" se cumple con `getProductDetails`, `addToCart` y la hidratación de
+`searchProducts`, que siempre leen `GET /catalog/products/{id}`.
+
+### Consumo de NVIDIA por turno
+
+| Turno | Solicitudes a NVIDIA |
+|---|---|
+| Sin tools (saludo, recomendación con el contexto RAG) | 2: reescritura + 1 vuelta del modelo principal |
+| Con una tool (buscar con filtros, precio de un producto, agregar al carrito) | 3: reescritura + 2 vueltas |
+| Peor caso | 5: reescritura + 4 vueltas (la cuarta con `tool_choice: "none"`, para que termine en texto) |
+
+Los reintentos ante un 429 no cuentan en ese máximo (hasta 2 por vuelta). Todas
+las solicitudes, de todas las sesiones, pasan por un limitador en el proceso
+del `assistant` con ventana deslizante de 60 s y un tope de **36 solicitudes**
+(90 % de los 40 RPM de la cuenta). La reescritura no espera: si no hay lugar,
+el turno sigue con el mensaje crudo. Las vueltas del modelo principal esperan
+su lugar hasta 30 s; si haría falta más, el turno termina con
+`llm-quota-exceeded` sin llamar a NVIDIA. Con turnos de 3 solicitudes, el
+límite alcanza para unos 12 turnos con tools por minuto. Las tools que van a
+`catalog` y a `carts` son tráfico interno y no consumen cuota; solo
+`searchProducts` con texto consume un embedding de Gemini.

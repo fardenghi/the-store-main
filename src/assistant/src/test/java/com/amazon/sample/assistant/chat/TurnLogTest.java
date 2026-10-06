@@ -16,8 +16,6 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.amazon.sample.assistant.chat.context.ContextRetriever;
 import com.amazon.sample.assistant.chat.context.Retrieval;
-import com.amazon.sample.assistant.chat.context.SystemPromptFactory;
-import com.amazon.sample.assistant.chat.llm.ReasoningPolicy;
 import com.amazon.sample.assistant.chat.rewrite.Intent;
 import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
 import com.amazon.sample.assistant.chat.rewrite.Rewrite;
@@ -30,11 +28,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.core.io.ClassPathResource;
 import reactor.core.publisher.Flux;
 
 /** Línea de log por turno y top-k crudo en segundo plano (D9). */
@@ -69,10 +64,8 @@ class TurnLogTest {
 
   private ChatTurnService service(boolean compareRaw) {
     ChatProperties.Chat chat = ChatTurnServiceTest.properties(compareRaw);
-    return new ChatTurnService(new SessionStore(10, Duration.ofMinutes(30), 100), rewriter,
-        retriever, new SystemPromptFactory(new ClassPathResource("prompts/system.st")),
-        new ReasoningPolicy(OpenAiChatOptions.builder().model("main").build(), chat),
-        ChatClient.builder(chatModel).build(), chat);
+    return ChatTestSupport.service(new SessionStore(10, Duration.ofMinutes(30), 100), rewriter,
+        retriever, chatModel, chat);
   }
 
   private String turnLine() {

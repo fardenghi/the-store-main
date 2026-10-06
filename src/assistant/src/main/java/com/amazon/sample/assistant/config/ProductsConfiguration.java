@@ -60,9 +60,11 @@ public class ProductsConfiguration {
   @Bean
   CatalogClient catalogClient(RestClient.Builder builder,
       @Value("${retail.assistant.endpoints.catalog}") String catalogEndpoint,
-      IndexingProperties indexing) {
-    return new CatalogClient(builder.baseUrl(catalogEndpoint).build(), indexing.pageSize(),
-        Backoff.DEFAULT, Sleeper.THREAD);
+      IndexingProperties indexing, ToolsProperties tools) {
+    RestClient toolsRestClient = ToolsConfiguration.toolsRestClient(builder, catalogEndpoint,
+        tools.http());
+    return new CatalogClient(builder.baseUrl(catalogEndpoint).build(), toolsRestClient,
+        indexing.pageSize(), Backoff.DEFAULT, Sleeper.THREAD);
   }
 
   @Bean

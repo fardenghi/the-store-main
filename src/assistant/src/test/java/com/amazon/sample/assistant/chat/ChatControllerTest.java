@@ -13,28 +13,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.amazon.sample.assistant.chat.context.ContextRetriever;
 import com.amazon.sample.assistant.chat.context.Retrieval;
-import com.amazon.sample.assistant.chat.context.SystemPromptFactory;
-import com.amazon.sample.assistant.chat.llm.ReasoningPolicy;
 import com.amazon.sample.assistant.chat.rewrite.Intent;
 import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
 import com.amazon.sample.assistant.chat.rewrite.Rewrite;
 import com.amazon.sample.assistant.chat.session.SessionStore;
 import com.amazon.sample.assistant.chat.session.ShownProduct;
-import com.amazon.sample.assistant.config.ChatProperties;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -57,11 +51,8 @@ class ChatControllerTest {
     @Bean
     ChatTurnService chatTurnService(SessionStore sessions, QueryRewriter rewriter,
         ContextRetriever retriever, ChatModel chatModel) {
-      ChatProperties.Chat chat = ChatTurnServiceTest.properties(false);
-      return new ChatTurnService(sessions, rewriter, retriever,
-          new SystemPromptFactory(new ClassPathResource("prompts/system.st")),
-          new ReasoningPolicy(OpenAiChatOptions.builder().model("main").build(), chat),
-          ChatClient.builder(chatModel).build(), chat);
+      return ChatTestSupport.service(sessions, rewriter, retriever, chatModel,
+          ChatTurnServiceTest.properties(false));
     }
   }
 

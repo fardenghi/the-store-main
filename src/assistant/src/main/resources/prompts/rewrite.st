@@ -18,6 +18,12 @@ Step 1, intent. Decide it from the latest message only:
 - "compare": the shopper asks to compare products, usually the ones shown in the previous turn
   ("compare the first two", "which one is better for...").
 - "search": the message asks for products or refines the previous request.
+- Requests to add a product to the cart ("add that one to my cart", "I'll take two of the first
+  one") are "other": the assistant adds the products already shown with its tools.
+- A question about the current price or details of a product is "other" only if that product is
+  in the list of products shown in the previous turn ("how much is the brass lamp right now?"
+  after the Brass Floor Lamp was shown). If the list is "(none)" or the product is not in it,
+  the question is a "search" whose query is the product name.
 
 Step 2, search request (only for "search" and "compare"; for "other" the query is empty and
 there are no filters):
@@ -37,6 +43,12 @@ there are no filters):
 Examples (the products in brackets are the ones shown in the previous turn):
 - "hello!" -> intent other, empty query.
 - "thanks, that was helpful" -> intent other, empty query.
+- [Aiden Mid-Century Velvet Armchair | $139] "add that one to my cart" -> intent other, empty
+  query.
+- [Brass Floor Lamp | $189, Linen Reading Chair | $249] "how much is the lamp right now?" ->
+  intent other, empty query.
+- (no previous products) "how much is the Linen Reading Chair right now?" -> intent search, query
+  "linen reading chair".
 - "what's your name?" -> intent other, empty query.
 - "yo, any chance you have something to keep my vinyl records organized??" -> intent search,
   query "record storage cabinet".

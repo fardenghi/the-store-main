@@ -3,6 +3,10 @@ package com.amazon.sample.assistant.chat.llm;
 import com.amazon.sample.assistant.chat.llm.ChatProviderException.Reason;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -86,15 +90,32 @@ public final class ChatProviderErrors {
     return new ChatProviderException(Reason.UNAVAILABLE, null, message, cause);
   }
 
-  /** {@code Retry-After} en segundos; la forma de fecha HTTP no se usa en NVIDIA. */
+  /**
+   * {@code Retry-After} como espera: en segundos ({@code "3"}, también con
+   * decimales) o como fecha HTTP ({@code "Wed, 21 Oct 2026 07:28:00 GMT"}),
+   * relativa a ahora (D9 de {@code add-assistant-tools}). Ausente o inválido
+   * devuelve {@code null}, y el limitador usa {@code default-retry-after}.
+   */
   static Duration retryAfter(String header) {
+    return retryAfter(header, Instant.now());
+  }
+
+  static Duration retryAfter(String header, Instant now) {
     if (header == null || header.isBlank()) {
       return null;
     }
+    String value = header.trim();
     try {
-      double seconds = Double.parseDouble(header.trim());
-      return seconds < 0 ? null : Duration.ofMillis((long) Math.ceil(seconds * 1000));
+      double seconds = Double.parseDouble(value);
+      return seconds < 0 || Double.isNaN(seconds) || Double.isInfinite(seconds) ? null
+          : Duration.ofMillis((long) Math.ceil(seconds * 1000));
     } catch (NumberFormatException e) {
+      // No es un número: puede ser una fecha HTTP.
+    }
+    try {
+      Instant until = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
+      return until.isAfter(now) ? Duration.between(now, until) : Duration.ZERO;
+    } catch (DateTimeParseException e) {
       return null;
     }
   }

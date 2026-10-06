@@ -145,7 +145,7 @@ class ChatEndToEndSmokeIT {
 
     assertThat(response.products()).hasSizeGreaterThanOrEqualTo(3);
     assertNamedProductsAreInTheEventWithCatalogPrices(response);
-    assertPricesComeFrom(response.text(), prices(response.products()));
+    assertPricesComeFrom(response.text(), prices(response.allProducts()));
     assertThat(named(response.text())).isNotEmpty();
   }
 
@@ -155,7 +155,7 @@ class ChatEndToEndSmokeIT {
     SseEvents response = turn("laptop", "a gaming laptop");
 
     assertNamedProductsAreInTheEventWithCatalogPrices(response);
-    assertPricesComeFrom(response.text(), prices(response.products()));
+    assertPricesComeFrom(response.text(), prices(response.allProducts()));
     assertThat(response.text().toLowerCase(Locale.ROOT))
         .containsPattern("(don't|do not|doesn't|does not|no |not |only|sorry|outside)");
   }
@@ -374,12 +374,16 @@ class ChatEndToEndSmokeIT {
     return prices;
   }
 
-  /** Cada producto nombrado está en el evento con el precio de {@code GET /catalog/products/{id}}. */
+  /**
+   * Cada producto nombrado está en el evento {@code products} o en el de una
+   * tool ({@code add-assistant-tools}) con el precio de {@code GET /catalog/products/{id}}.
+   */
   private static void assertNamedProductsAreInTheEventWithCatalogPrices(SseEvents events) {
+    List<Map<String, Object>> all = events.allProducts();
     for (CatalogProduct product : named(events.text())) {
-      assertThat(events.productIds()).as("%s en el evento products", product.name())
-          .contains(product.id());
-      Map<String, Object> inEvent = events.products().stream()
+      assertThat(all).as("%s en el evento products o en el de una tool", product.name())
+          .anySatisfy(p -> assertThat(p.get("id")).isEqualTo(product.id()));
+      Map<String, Object> inEvent = all.stream()
           .filter(p -> product.id().equals(p.get("id"))).findFirst().orElseThrow();
       assertThat(inEvent.get("name")).isEqualTo(product.name());
       assertThat(((Number) inEvent.get("price")).longValue()).isEqualTo(product.price());

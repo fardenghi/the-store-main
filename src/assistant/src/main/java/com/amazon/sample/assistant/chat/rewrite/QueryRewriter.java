@@ -1,6 +1,8 @@
 package com.amazon.sample.assistant.chat.rewrite;
 
 import com.amazon.sample.assistant.chat.llm.ChatProviderErrors;
+import com.amazon.sample.assistant.chat.llm.ChatProviderException;
+import com.amazon.sample.assistant.chat.llm.ChatRateLimiter;
 import com.amazon.sample.assistant.chat.session.SessionState;
 import com.amazon.sample.assistant.chat.session.ShownProduct;
 import com.amazon.sample.assistant.chat.session.Turn;
@@ -35,6 +37,12 @@ import reactor.core.scheduler.Schedulers;
  * <p>Si el modelo falla, tarda más que {@code rewrite.timeout} o devuelve algo
  * que no valida, el turno sigue con el mensaje crudo y sin filtros
  * ({@link Rewrite#fallback}). Nunca lanza excepciones.
+ *
+ * <p>Pasa por el limitador de solicitudes a NVIDIA sin esperar (D8 de
+ * {@code add-assistant-tools}): si no hay lugar inmediato, no llama al modelo y
+ * usa el mensaje crudo ({@link Rewrite#rateLimited}). Un 429 pausa el
+ * limitador para todas las sesiones y también usa el mensaje crudo, sin
+ * reintentar (D9).
  */
 public class QueryRewriter {
 
@@ -47,18 +55,25 @@ public class QueryRewriter {
   private final CatalogTagsCache tags;
   private final ChatProperties.Rewrite properties;
   private final String template;
+  private final ChatRateLimiter limiter;
 
   public QueryRewriter(ChatClient rewriteChatClient, CatalogTagsCache tags,
-      ChatProperties.Rewrite properties, Resource template) {
+      ChatProperties.Rewrite properties, Resource template, ChatRateLimiter limiter) {
     this.rewriteChatClient = rewriteChatClient;
     this.tags = tags;
     this.properties = properties;
     this.template = read(template);
+    this.limiter = limiter;
   }
 
   /** Reescribe el mensaje con el contexto de la sesión. */
   public Rewrite rewrite(String message, SessionState session) {
     long start = System.nanoTime();
+    if (!limiter.reserve(Duration.ZERO).granted()) {
+      log.info("Sin lugar inmediato en el limitador de NVIDIA: la reescritura se saltea y se "
+          + "usa el mensaje crudo");
+      return Rewrite.rateLimited(message, elapsed(start));
+    }
     List<String> tagNames = tags.tagNames();
     String instructions = renderPrompt(session, tagNames);
     Duration timeout = properties.timeout();
@@ -84,8 +99,15 @@ public class QueryRewriter {
         log.warn("La reescritura devolvió un JSON inválido; se usa el mensaje crudo: {}",
             truncate(invalid.output(), 300));
       } else {
-        log.warn("La reescritura falló ({}); se usa el mensaje crudo",
-            ChatProviderErrors.describe(cause));
+        ChatProviderException translated = ChatProviderErrors.translate(cause);
+        if (translated.reason() == ChatProviderException.Reason.QUOTA) {
+          Duration pause = limiter.pause(translated);
+          log.warn("La reescritura recibió un 429: se pausan las solicitudes a NVIDIA por {} ms "
+              + "y se usa el mensaje crudo", pause.toMillis());
+        } else {
+          log.warn("La reescritura falló ({}); se usa el mensaje crudo",
+              ChatProviderErrors.describe(cause));
+        }
       }
       return Rewrite.fallback(message, 1, millis);
     }

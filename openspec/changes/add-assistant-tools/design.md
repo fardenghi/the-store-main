@@ -230,3 +230,30 @@ El contexto RAG del chat sigue mostrando el precio del payload (D5 de `add-assis
 1. Desplegar con `./local.sh reload-images` y `kubectl apply -f dist/kubernetes.yaml -n the-store` (ConfigMap `assistant` con las variables de D11). No hay datos que migrar.
 2. Verificar desde el pod de la `ui` con `curl -N` a `http://assistant/assistant/chat` un pedido de agregar al carrito, y después `curl http://carts/carts/<sesión>`.
 3. Rollback: revertir el commit y reiniciar el `assistant`. El chat vuelve a funcionar sin tools, con el comportamiento de `add-assistant-chat`. Los ítems agregados quedan en `carts` (en memoria) hasta que se reinicie.
+
+## Resultados de la implementación
+
+### Spikes (tasks 1.1 y 1.2)
+
+- **D1, tool calling controlado:** con `nvidia/nemotron-3-super-120b-a12b`, el stream con `internalToolExecutionEnabled=false` devuelve los tool calls completos (id, nombre y argumentos JSON) en un solo `ChatResponse`, sin ejecutarlos; `ToolCallingManager.executeToolCalls` arma el historial `USER, ASSISTANT, TOOL` y la segunda vuelta responde en texto; y una vuelta con las tools definidas y `tool_choice: "none"` no pide tools. Queda la variante de D1 (mismas tools con `tool_choice: "none"` en la última vuelta); no hizo falta mandarla sin `tools`. `deepseek-ai/deepseek-v4.1-flash` no respondió en 120 s, igual que en el spike de `add-assistant-chat`. El caso está en `ModelSpikeSmokeIT` (el archivo de `add-assistant-chat` se llama así, no `ModelSpikeSmokeTest`).
+- **D9, 429 de NVIDIA:** una ráfaga de 45 requests mínimas al modelo de reescritura (corrida una sola vez) no provocó ningún 429: NVIDIA respondió 200 a todas, demorándolas (34 s en total). No se pudo ver el formato de un 429 real, así que se mantiene `default-retry-after=5s` y el parseo de `Retry-After` en segundos y como fecha HTTP se verifica con tests unitarios. El limitador de D8 se mantiene, porque la cuota autorizada es de 40 RPM.
+
+### Decisiones menores tomadas al implementar
+
+- **Tool calls ilegibles o inexistentes:** las tools se registran envueltas (`SafeToolCallback`) y el `ToolCallingManager` del ciclo resuelve cualquier nombre desconocido a una tool que devuelve error. Un JSON de argumentos que no se puede convertir o un nombre de tool inventado vuelven al modelo como `invalid-argument` en lugar de cortar el turno con `llm-provider-unavailable`. El bean `storeToolCallingManager` reemplaza al que autoconfigura Spring AI (que es `@ConditionalOnMissingBean`); el `OpenAiChatModel` solo lo usa para resolver las definiciones de las tools.
+- **Texto fijo de D1:** se emite cuando la vuelta que cierra el turno no trae texto, sea la cuarta o una anterior que terminó sin texto ni tool calls, para que el usuario siempre reciba una respuesta antes de `done`.
+- **Limitador (D8):** las reservas se otorgan en orden de llegada (cada una no antes que la anterior), lo que garantiza el tope en cualquier ventana de 60 s contando también las reservas que esperan su instante. Una reserva que no se usa (el cliente cortó mientras esperaba) no se devuelve: el error queda del lado seguro.
+- **`max-429-retries`:** la propiedad lleva `@Name("max-429-retries")`, porque el nombre canónico de `max429Retries` (`max429-retries`) no se asociaba a la variable `RETAIL_ASSISTANT_RATE_LIMIT_MAX_429_RETRIES` del ConfigMap. Lo detectó el test de binding del ConfigMap.
+- **Clientes de las tools (D5):** `catalog` y `carts` usan un `RestClient` propio para las tools, creado con una copia del `RestClient.Builder` y los tiempos límite de `retail.assistant.tools.http`, para no cambiar los de la indexación ni los del cliente de NVIDIA. El reintento de las lecturas es inmediato (sin backoff). Un `addToCart` que falla en `carts` no cuenta como agregado: el modelo puede reintentarlo en el mismo turno.
+- **Memoria (D7):** los productos de las tools que entran al snapshot de la sesión son todos los que devolvieron (por ejemplo, los 10 de una búsqueda), no solo los que el modelo nombró, porque el `assistant` no sabe cuáles presentó.
+- **`search-max-limit`:** se valida hasta 20, el `max-k` de la búsqueda semántica.
+
+### Ajustes de prompts (D10) a partir del smoke de punta a punta
+
+`ToolsEndToEndSmokeIT` (task 9.1) mostró desvíos del modelo que se corrigieron en los prompts, sin cambiar el diseño:
+
+- En `system.st`, la regla 1 ahora acepta los productos devueltos por una tool, además de los del contexto. Se agregó la regla 8 (prioritaria): un producto solo se agrega con `addToCart` y nunca se dice que se agregó sin `added`, porque en una corrida el modelo confirmó un agregado sin llamar a la tool. La sección de tools pide pasar la categoría como tags (con OR, solo los más específicos) y usar el monto que dice el usuario como límite ("under $100" es `maxPrice` 100), indica que los ids salen del contexto o de una tool y no se inventan, y que con el precio de una tool no se menciona el del contexto (en una corrida la respuesta citaba el precio viejo del payload).
+- En `rewrite.st`, la regla de D10 quedó así: los pedidos de carrito son `other`, y una pregunta por el precio o el detalle de un producto es `other` solo si ese producto se mostró en el turno anterior; si no, es una búsqueda del producto. Con la primera versión, una pregunta por el precio de un producto que no se había mostrado quedaba sin contexto y el modelo inventaba el id.
+- El error `invalid-argument` de `productId` le indica al modelo que busque el producto con `searchProducts` si no tiene el id.
+
+El modelo de reescritura (`nemotron-3.5-lightning`) todavía clasifica a veces como `other` una pregunta por un producto no mostrado; el turno lo resuelve igual con una o dos vueltas más (id inválido y búsqueda), dentro del presupuesto de 4. El tiempo límite de la reescritura sigue en 12 s, como lo dejó `add-assistant-chat` (D8 menciona los 5 s del diseño original).

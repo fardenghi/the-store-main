@@ -32,7 +32,8 @@ class TurnLogger {
     append(line, "session", truncate(stats.sessionId, 8));
     append(line, "outcome", stats.outcome);
     append(line, "intent", rewrite == null ? "-" : rewrite.intent().value());
-    append(line, "rewrite", rewrite == null ? "-" : rewrite.fallback() ? "fallback" : "ok");
+    append(line, "rewrite", rewrite == null ? "-" : rewrite.rateLimited() ? "rate-limited"
+        : rewrite.fallback() ? "fallback" : "ok");
     append(line, "raw", quote(stats.message));
     append(line, "query", rewrite == null ? "-" : quote(rewrite.query()));
     append(line, "minPrice", rewrite == null ? "-" : Objects.toString(rewrite.minPrice(), "-"));
@@ -48,6 +49,10 @@ class TurnLogger {
     append(line, "overlap", topK == null || rawTopK == null ? "-"
         : Long.toString(topK.stream().filter(rawTopK::contains).count()));
     append(line, "nvidiaRequests", Integer.toString(providerRequests));
+    append(line, "modelCalls", Integer.toString(stats.modelCalls));
+    append(line, "tools", stats.tools.isEmpty() ? "-" : String.join(",", stats.tools));
+    append(line, "limiterWaitMs", Long.toString(stats.limiterWaitMillis));
+    append(line, "retries429", Integer.toString(stats.retries429));
     append(line, "rewriteMs", rewrite == null ? "-" : Long.toString(rewrite.latencyMillis()));
     append(line, "retrievalMs", retrieval == null ? "-" : Long.toString(retrieval.latencyMillis()));
     append(line, "firstFragmentMs", stats.firstFragmentMillis < 0 ? "-"

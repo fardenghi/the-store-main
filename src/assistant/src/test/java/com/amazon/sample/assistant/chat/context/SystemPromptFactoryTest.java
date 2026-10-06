@@ -10,8 +10,8 @@ import org.springframework.core.io.ClassPathResource;
 /** Persona A.G.E.N.T., reglas y contexto en el system prompt (D8). */
 class SystemPromptFactoryTest {
 
-  private final SystemPromptFactory factory =
-      new SystemPromptFactory(new ClassPathResource("prompts/system.st"));
+  private final SystemPromptFactory factory = new SystemPromptFactory(
+      new ClassPathResource("prompts/system.st"), () -> List.of("seating", "lighting", "velvet"));
 
   @Test
   void rendersPersonaRulesAndContext() {
@@ -48,5 +48,34 @@ class SystemPromptFactoryTest {
     String prompt = factory.render(new Retrieval(true, true, List.of(), List.of(), false, 1));
 
     assertThat(prompt).contains("CATALOG UNAVAILABLE");
+  }
+
+  @Test
+  void rendersTheToolsSectionWithTheCatalogTags() {
+    String prompt = factory.render(new Retrieval(false, false, List.of(), List.of(), false, 0));
+
+    // add-assistant-tools (D10).
+    assertThat(prompt).contains("searchProducts", "getProductDetails", "addToCart")
+        .contains("order price_asc")
+        .contains("do not mention the price in the product context")
+        .contains("never make one up")
+        .contains("only when the user explicitly asks to add a product to the cart")
+        .contains("ask which one instead of calling it")
+        .contains("Never say that a product was added unless the tool result contains \"added\"")
+        .contains("Never say that you added, are adding or will add a product unless addToCart "
+            + "returned \"added\" in this turn")
+        .contains("Tags are combined with OR")
+        .contains("without inventing products, prices or results")
+        .contains("Catalog tags: seating, lighting, velvet")
+        .contains("or returned by a tool");
+    assertThat(prompt).doesNotContain("{tags}").doesNotContainPattern("\\{[a-zA-Z_]+\\}");
+  }
+
+  @Test
+  void tagsNotAvailableAreSaid() {
+    String prompt = new SystemPromptFactory(new ClassPathResource("prompts/system.st"))
+        .render(new Retrieval(false, false, List.of(), List.of(), false, 0));
+
+    assertThat(prompt).contains("Catalog tags: (not available right now)");
   }
 }

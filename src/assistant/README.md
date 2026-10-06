@@ -9,8 +9,8 @@ el LLM (NVIDIA, API compatible con OpenAI), con el modelo de embeddings
 (`gemini-embedding-001` de Google) y con el vector store (Qdrant). Al arrancar
 indexa el catálogo en Qdrant y expone la búsqueda semántica de productos, los
 productos similares y el chat con el asistente (persona A.G.E.N.T., reescritura
-de consulta, RAG y memoria por sesión); las tools llegan en el change
-siguiente.
+de consulta, RAG, memoria por sesión y tools que buscan con filtros, consultan
+el precio vivo y agregan productos al carrito).
 
 ## Configuración
 
@@ -56,6 +56,16 @@ con variables de entorno (en el cluster, desde el ConfigMap `assistant`).
 | `RETAIL_ASSISTANT_CHAT_TIMEOUTS_FIRST_TOKEN_REASONING` | Espera máxima del primer fragmento con razonamiento | `60s`                                   |
 | `RETAIL_ASSISTANT_CHAT_TIMEOUTS_TURN`                 | Duración máxima de un turno                          | `120s`                                  |
 | `RETAIL_ASSISTANT_CHAT_TIMEOUTS_KEEPALIVE`            | Intervalo del comentario `:keepalive` sin eventos    | `10s`                                   |
+| `RETAIL_ASSISTANT_TOOLS_MAX_MODEL_CALLS`              | Solicitudes al modelo principal por turno; la última va sin poder pedir tools | `4`            |
+| `RETAIL_ASSISTANT_TOOLS_MAX_TOOL_CALLS`               | Tools ejecutadas por turno                           | `6`                                     |
+| `RETAIL_ASSISTANT_TOOLS_MAX_QUANTITY`                 | Cantidad máxima de `addToCart`                       | `10`                                    |
+| `RETAIL_ASSISTANT_TOOLS_SEARCH_DEFAULT_LIMIT` / `_SEARCH_MAX_LIMIT` | Resultados de `searchProducts` (default / máximo, hasta 20) | `5` / `10`                |
+| `RETAIL_ASSISTANT_TOOLS_DESCRIPTION_MAX_CHARS`        | Largo máximo de las descripciones en los resultados de las tools | `300`                       |
+| `RETAIL_ASSISTANT_TOOLS_HTTP_CONNECT_TIMEOUT` / `_READ_TIMEOUT` | Tiempos límite de las tools hacia `catalog` y `carts` | `2s` / `5s`                     |
+| `RETAIL_ASSISTANT_RATE_LIMIT_REQUESTS_PER_MINUTE`     | Solicitudes a NVIDIA en cualquier ventana de 60 s (todas las sesiones) | `36`                  |
+| `RETAIL_ASSISTANT_RATE_LIMIT_MAX_WAIT`                | Espera máxima del modelo principal por un lugar en el limitador | `30s`                        |
+| `RETAIL_ASSISTANT_RATE_LIMIT_MAX_429_RETRIES`         | Reintentos de una vuelta del modelo principal ante un 429 | `2`                                |
+| `RETAIL_ASSISTANT_RATE_LIMIT_DEFAULT_RETRY_AFTER`     | Pausa ante un 429 sin `Retry-After`                  | `5s`                                    |
 | `SPRING_APPLICATION_JSON`                             | Campos extra de los requests a NVIDIA (`extra-body`), ver abajo | —                            |
 
 Sin claves el servicio arranca igual y queda listo: al iniciar loguea, sin
@@ -239,6 +249,8 @@ corta no se guarda.
 | Evento                  | `data`                                       | Cuándo                                                        |
 | ----------------------- | -------------------------------------------- | ------------------------------------------------------------- |
 | `products`              | `[{"id", "name", "price"}]`                  | Una vez, antes del primer fragmento. Vacío si no hubo búsqueda |
+| `tool`                  | `{"tool", "ok", "error"?, "products"?: [{"id", "name", "price"}]}` | Después de cada tool ejecutada, antes del texto que el modelo genera con su resultado. `products` solo en `searchProducts` y `getProductDetails` correctas (ver "Tools") |
+| `cart-updated`          | `{"itemId", "name", "quantity", "unitPrice", "cartItemCount"?}` | Después de cada `addToCart` correcto, a continuación de su `tool`. `cartItemCount` es el total de unidades del carrito; se omite si no se pudo leer |
 | (sin nombre)            | `{"text": "<fragmento>"}`                    | Cada fragmento de la respuesta; concatenados, el texto completo |
 | `done`                  | `{}`                                         | Fin correcto                                                  |
 | `error`                 | `{"type", "detail", "retryAfterSeconds"?}`   | Falla después de abrir el stream                              |
@@ -248,7 +260,7 @@ Tipos del evento `error`:
 
 | `type`                       | Cuándo                                                                 |
 | ---------------------------- | ---------------------------------------------------------------------- |
-| `llm-quota-exceeded`         | NVIDIA respondió 429. Trae `retryAfterSeconds` si NVIDIA mandó `Retry-After` |
+| `llm-quota-exceeded`         | NVIDIA respondió 429 y siguió respondiendo 429 en los 2 reintentos, o el limitador no tenía lugar dentro de 30 s (ver "Limitador y 429"). Trae `retryAfterSeconds` si se conoce la espera |
 | `llm-provider-unauthorized`  | Clave de NVIDIA sin configurar o inválida (401/403)                    |
 | `llm-provider-unavailable`   | NVIDIA respondió 5xx, no hubo red, o se excedió un tiempo límite (20 s al primer fragmento, 60 s con razonamiento, 120 s por turno) |
 
@@ -300,8 +312,10 @@ fragmentos y `done`, con 2 requests a NVIDIA y la primera respuesta a ≈2,3 s.
 
 Pendiente para `integrate-ui-assistant`: hoy `chat.js` de la `ui` toma como
 texto cualquier línea `data:`. Tiene que distinguir los eventos con nombre
-(`products`, `done`, `error`) de los fragmentos sin nombre, e ignorar los
-comentarios `:keepalive`.
+(`products`, `tool`, `cart-updated`, `done`, `error`) de los fragmentos sin
+nombre, e ignorar los comentarios `:keepalive`. En particular, tiene que
+manejar `cart-updated` para refrescar el contador y la vista del carrito sin
+recargar: cuando llega, `GET /carts/{customerId}` ya refleja el cambio.
 
 #### Log por turno
 
@@ -310,10 +324,140 @@ caracteres), el resultado, la intención, si la reescritura usó el fallback, el
 mensaje crudo, la consulta reescrita, los filtros, si hubo razonamiento, los
 ids del top-k con la consulta reescrita y con la cruda (calculado después de
 cerrar el stream; se apaga con `RETAIL_ASSISTANT_CHAT_COMPARE_RAW_RETRIEVAL`),
-el solapamiento, las requests a NVIDIA y las latencias:
+el solapamiento, las requests a NVIDIA y las latencias. Con las tools suma
+`modelCalls` (vueltas del modelo principal), `tools` (cada tool con su
+resultado), `limiterWaitMs` y `retries429`; `nvidiaRequests` cuenta la
+reescritura más todas las vueltas, y `rewrite=rate-limited` indica que el
+limitador no tenía lugar y la reescritura se salteó:
 
 ```
-session=demo outcome=done intent=search rewrite=ok raw="ummm i need like a lamp for my desk lol" query="desk lamp" minPrice=- maxPrice=- excludeTags=[] searched=true catalog=ok reasoning=off reasoningChars=0 topk=[…] rawTopk=[…] overlap=4 nvidiaRequests=2 rewriteMs=1210 retrievalMs=310 firstFragmentMs=2650 totalMs=4100
+session=demo-rea outcome=done intent=other rewrite=ok raw="add the Tinted Glass Pendant Light to my cart" query="" minPrice=- maxPrice=- excludeTags=[] searched=false catalog=ok reasoning=off reasoningChars=0 topk=[] rawTopk=- overlap=- nvidiaRequests=3 modelCalls=2 tools=addToCart:ok limiterWaitMs=0 retries429=0 rewriteMs=5679 retrievalMs=0 firstFragmentMs=7964 totalMs=8987
+```
+
+## Tools
+
+En cada turno, el modelo principal tiene tres tools (el de reescritura no tiene
+ninguna). El ciclo lo controla el `assistant` y no Spring AI: el modelo se
+llama en streaming con la ejecución interna de tools desactivada, el
+`assistant` ejecuta los tool calls, emite el evento `tool` y vuelve a llamar al
+modelo con los resultados, hasta que responde en texto. Por turno hay como
+máximo 4 llamadas al modelo principal (la última con `tool_choice: "none"`,
+para que termine en texto) y 6 tools; con la reescritura, de 2 a 5 requests a
+NVIDIA.
+
+| Tool | Argumentos | Resultado (JSON para el modelo) |
+| --- | --- | --- |
+| `searchProducts` | `query?`, `tags?[]`, `minPrice?`, `maxPrice?` (enteros, inclusivos), `order?` (`relevance`, `price_asc`, `price_desc`), `limit?` (1 a 10, por defecto 5). Al menos uno de `query`, `tags` o precios | `{"products": [{id, name, price, tags, description}], "source": "semantic"\|"catalog", "degraded"?}` |
+| `getProductDetails` | `productId` (UUID) | `{id, name, price, tags, description}` |
+| `addToCart` | `productId` (UUID), `quantity?` (1 a 10, por defecto 1) | `{"added": {id, name, quantity, unitPrice}, "cartItemCount"?}` |
+
+- `searchProducts` con `query` busca en Qdrant (tags con OR y rango de precio
+  sobre el payload), y después lee cada resultado con
+  `GET /catalog/products/{id}`: el precio, el nombre y los tags son los
+  vigentes, y el rango y el orden por precio se aplican sobre el precio vivo.
+  Sin `query`, usa `GET /catalog/products?tags=&order=` (hasta 10 páginas de
+  50), filtra el precio en el `assistant` y no gasta embeddings. Si con
+  `query` la búsqueda semántica no está disponible y hay tags o precios,
+  responde por el camino sin texto con `"degraded": "semantic-search-unavailable"`.
+- `getProductDetails` lee `GET /catalog/products/{id}` en cada llamada, sin
+  caché.
+- `addToCart` no recibe el cliente: usa el `X-Session-ID` del turno como
+  `customerId`, así que el modelo no puede tocar el carrito de otra sesión.
+  Lee el precio vivo con `GET /catalog/products/{id}`, hace
+  `POST /carts/{customerId}/items` con `{itemId, quantity, unitPrice}` (igual
+  que el botón de la `ui`) y lee `GET /carts/{customerId}` para
+  `cartItemCount`. Con `carts` en memoria, agregar un producto que ya está en
+  el carrito suma una línea, como en la `ui`. En un mismo turno, el mismo
+  producto no se agrega dos veces.
+- Las lecturas al `catalog` tienen tiempos límite de 2 s (conexión) y 5 s
+  (lectura) y se reintentan una vez ante 5xx, timeout o error de red. El
+  `POST` al carrito no se reintenta, para no duplicar la línea.
+
+Los argumentos se validan en el servidor antes de llamar a cualquier servicio,
+y los errores vuelven al modelo como resultado, para que los explique:
+`{"error": "<tipo>", "message": "...", ...}`.
+
+| `error` | Cuándo |
+| --- | --- |
+| `invalid-argument` | Un argumento inválido; `argument` lo nombra. Para tags desconocidos trae `validTags`. También para un JSON ilegible o una tool inexistente |
+| `missing-criteria` | `searchProducts` sin `query`, ni tags, ni precios |
+| `product-not-found` | `catalog` respondió 404 |
+| `already-added-this-turn` | El producto ya se agregó en este turno; no se llama a `carts` |
+| `tool-budget-exhausted` | Ya se ejecutaron 6 tools en el turno |
+| `catalog-unavailable` | `catalog` falló también en el reintento, o no se pudieron leer los tags |
+| `cart-unavailable` | `carts` falló en el `POST`: el producto no se agregó |
+| `search-unavailable` | La búsqueda semántica no está disponible y no hay otro criterio |
+
+Cada tool deja una línea en el logger `assistant.tool`, con la sesión truncada
+a 8 caracteres (nunca completa) y sin la sesión en los argumentos:
+
+```
+session=demo-rea tool=searchProducts args={tags=[lighting], maxPrice=100, order="price_asc", limit=10} outcome=ok products=3 catalogCalls=1 cartsCalls=0 latencyMs=11
+session=demo-rea tool=addToCart args={productId="84677bb1-a318-585a-b01c-565b4463cc4b"} outcome=ok products=0 catalogCalls=1 cartsCalls=2 latencyMs=156
+```
+
+Ejemplo, con el `assistant` local y `catalog` y `carts` en Docker (ver
+"Running"): buscar con presupuesto, agregar y comprobar el carrito.
+
+```bash
+curl -sN -H 'X-Session-ID: demo-readme' -H 'Content-Type: application/json' \
+  -d '{"message":"show me lamps under $100, cheapest first"}' localhost:8080/assistant/chat
+curl -sN -H 'X-Session-ID: demo-readme' -H 'Content-Type: application/json' \
+  -d '{"message":"add the Tinted Glass Pendant Light to my cart"}' localhost:8080/assistant/chat
+curl -s localhost:8082/carts/demo-readme
+```
+
+```
+event:products
+data:[…]
+
+event:tool
+data:{"tool":"addToCart","ok":true}
+
+event:cart-updated
+data:{"itemId":"84677bb1-a318-585a-b01c-565b4463cc4b","name":"Tinted Glass Pendant Light","quantity":1,"unitPrice":89,"cartItemCount":1}
+
+data:{"text":"Mission"}
+
+…
+
+event:done
+data:{}
+```
+
+```json
+{"customerId":"demo-readme","items":[{"itemId":"84677bb1-a318-585a-b01c-565b4463cc4b","quantity":1,"unitPrice":89}]}
+```
+
+En el cluster, el carrito se comprueba desde el pod de la `ui`:
+`kubectl exec -n the-store deploy/ui -- curl -s http://carts/carts/demo-readme`.
+Verificado el 2026-10-06 tal como está escrito, contra el `assistant` local
+(`./mvnw spring-boot:run`) con Qdrant, `catalog` y `carts` en Docker.
+
+### Limitador y 429
+
+Todas las requests a NVIDIA (reescritura y vueltas del modelo principal, de
+todas las sesiones) pasan por un limitador en el proceso: como máximo 36 en
+cualquier ventana de 60 s (la cuota es de 40 RPM). La reescritura no espera:
+si no hay lugar, el turno sigue con el mensaje crudo (`rewrite=rate-limited`).
+Cada vuelta del modelo principal espera su lugar hasta 30 s; si la espera
+sería mayor, el turno termina con `error` `llm-quota-exceeded` y
+`retryAfterSeconds`, sin llamar a NVIDIA. Mientras espera, el `:keepalive`
+mantiene viva la conexión, y el tiempo límite al primer fragmento empieza a
+contar cuando el limitador otorga el lugar.
+
+Si NVIDIA responde 429 a una vuelta antes de que llegue algún fragmento, el
+limitador se pausa para todas las sesiones por el `Retry-After` (en segundos o
+como fecha HTTP; 5 s si no viene) y la vuelta se reintenta hasta 2 veces. Un
+429 en la reescritura pausa el limitador y usa el mensaje crudo, sin
+reintentar. El limitador es por proceso: con más de una réplica, bajar
+`RETAIL_ASSISTANT_RATE_LIMIT_REQUESTS_PER_MINUTE` en proporción.
+
+Las reservas de la ventana actual están en el gauge
+`assistant.ratelimit.window`:
+
+```bash
+curl -s localhost:8080/actuator/metrics/assistant.ratelimit.window
 ```
 
 ## Health
@@ -344,6 +488,9 @@ docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant:v1.19.2-unpr
 
 # catalog local en el puerto 8081 (en otra terminal), para la indexación
 (cd ../catalog && PORT=8081 go run main.go)
+# o catalog y carts en Docker, con las imágenes de ./local.sh reload-images
+docker run -d --name catalog -p 8081:8080 the-store-catalog:latest
+docker run -d --name carts -p 8082:8080 the-store-cart:latest
 
 # Claves opcionales (desde el .env de la raíz del repo)
 set -a; . ../../.env; set +a
@@ -388,7 +535,11 @@ reintentan ante un 429:
   Gemini, 80 para indexar y unas 20 búsquedas, ver abajo).
 - `ChatEndToEndSmokeIT`: los escenarios de la spec `assistant-chat` de punta a
   punta por `POST /assistant/chat` (unas 28 requests a NVIDIA; en Gemini, 80
-  para indexar y 1 por turno con búsqueda). Con `-Dsmoke.qdrant.host`,
+  para indexar y 1 por turno con búsqueda).
+- `ToolsEndToEndSmokeIT`: los escenarios de la spec `assistant-tools`, con
+  `catalog` y `carts` falsos en el proceso (unas 40 requests a NVIDIA; en
+  Gemini, 1 por turno con búsqueda y 1 por consulta de `searchProducts`). Acepta
+  las mismas propiedades `-Dsmoke.qdrant.*` para no reindexar. Con `-Dsmoke.qdrant.host`,
   `-Dsmoke.qdrant.port` y `-Dsmoke.qdrant.collection` reutiliza una colección
   ya indexada (por ejemplo, la del `assistant` local) y no gasta las 80 de la
   indexación.
@@ -448,6 +599,42 @@ Resultado del 2026-10-06:
 Los dos cumplen el criterio de D12, así que los defaults no cambian. Como el
 razonamiento nunca llega dentro del texto, el `ThinkTagFilter` queda
 desactivado por defecto (`retail.assistant.chat.reasoning.strip-think-tags`).
+
+#### Tool calling controlado y 429 (`add-assistant-tools`)
+
+Dos casos más del mismo spike, que se corren aparte:
+
+```bash
+./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dit.test='ModelSpikeSmokeIT#controlledToolCalling'
+# la ráfaga agota la cuota de chat durante un minuto: solo con -Dspike.quota-burst=true
+./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dit.test='ModelSpikeSmokeIT#quotaBurst' -Dspike.quota-burst=true
+```
+
+`controlledToolCalling` (D1 de `add-assistant-tools`, 3 requests) llama al
+modelo principal en streaming con `internalToolExecutionEnabled=false`, ejecuta
+los tool calls con `ToolCallingManager` y hace una vuelta con
+`tool_choice: "none"`. Resultado del 2026-10-06:
+
+| Modelo | Tool calls en el stream | Ejecución con `ToolCallingManager` | Segunda vuelta | Vuelta con `tool_choice: "none"` |
+| --- | --- | --- | --- | --- |
+| `nvidia/nemotron-3-super-120b-a12b` | OK: llegan completos en un solo `ChatResponse` (id, nombre y argumentos JSON), sin que Spring AI los ejecute (1,6 s) | OK: historial `USER, ASSISTANT, TOOL` y el `ToolContext` llega a la tool sin figurar en el schema | OK: texto con el precio de la tool (0,9 s) | OK: 0 tool calls y respuesta en texto, con las tools definidas en el request |
+| `deepseek-ai/deepseek-v4.1-flash` | Sin respuesta: el request no devolvió nada en 120 s (igual que en el spike de `add-assistant-chat`) | — | — | — |
+
+Como Nemotron respeta `tool_choice: "none"`, la última vuelta del ciclo se
+manda con las tools y `tool_choice: "none"`, como dice D1 (no hizo falta la
+variante sin `tools`).
+
+`quotaBurst` (D9) manda 45 requests mínimas (1 token de salida) en paralelo
+al modelo de reescritura para provocar un 429 y ver si trae `Retry-After`.
+Resultado del 2026-10-06 (se corrió una sola vez): **las 45 respondieron 200**,
+en 34 s. NVIDIA no rechazó la ráfaga, sino que la demoró, así que no se pudo
+ver el formato de un 429 real. Quedan el `default-retry-after=5s` de D9 para
+el caso sin header y el parseo de los dos formatos de `Retry-After` (segundos y
+fecha HTTP), cubierto por tests unitarios con un proveedor falso. El
+limitador de 36 RPM sigue haciendo falta: la cuota que autorizó la cátedra es
+de 40 RPM y NVIDIA puede empezar a aplicarla en cualquier momento.
 
 #### Plan B
 
@@ -543,6 +730,41 @@ superaron los 12 s y usaron el mensaje crudo ("a gaming laptop" y la sesión
 aislada); ninguno de esos dos escenarios depende de los filtros.
 
 
+### Escenarios de las tools (`ToolsEndToEndSmokeIT`)
+
+Recorre los escenarios de la spec `assistant-tools` contra el `assistant`
+completo, con NVIDIA y Gemini reales, el catálogo real servido por HTTP y un
+`carts` en memoria que se puede "tirar":
+
+```bash
+./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dit.test=ToolsEndToEndSmokeIT \
+  -Dsmoke.qdrant.host=localhost -Dsmoke.qdrant.port=6334 -Dsmoke.qdrant.collection=products
+```
+
+Resultado del 2026-10-06, reutilizando la colección local (0 requests a Gemini
+para indexar). Se corrió 3 veces completo; entre corridas se ajustaron los
+prompts, y con los prompts finales pasaron los 8 escenarios (el de `carts`
+caído, en una cuarta corrida suelta, porque en la tercera la respuesta era
+correcta pero el test buscaba otras palabras).
+
+| Escenario | Resultado | Intentos |
+| --- | --- | --- |
+| "how much is the Aiden Mid-Century Velvet Armchair right now?": `getProductDetails` y el precio de la tool | OK: `GET /catalog/products/{id}` registrado y $139 en la respuesta | 3: en las dos primeras la reescritura lo clasificó como `other` (sin contexto), el modelo inventó un id (`invalid-argument`) y respondió con el precio vivo de `searchProducts`, sin llamar a `getProductDetails`. Se corrigió la regla de la reescritura y el mensaje de error de `productId` ("si no tenés el id, buscá primero"); en la tercera, 4 vueltas: id inválido, búsqueda, `getProductDetails` y texto |
+| "show me lamps under $100, cheapest first" | OK: `tags=[lighting]`, `maxPrice=100`, `order=price_asc`, 3 lámparas ordenadas | 1 (en la prueba manual previa, el modelo usó `maxPrice=99` y no pasó tags: se reforzó el prompt) |
+| "busco una mesa de comedor de menos de 300 dólares" | OK: `tags=[dining,tables]`, `maxPrice=300`, respuesta en español | 1 |
+| "add that one to my cart" | OK: el carrito tiene el sillón a $139, evento `cart-updated` con `cartItemCount=1`, y los carritos de otras sesiones no cambian | 1 |
+| "add two of the first one to my cart" | OK: una línea con cantidad 2 y el precio del catálogo | 2: en la segunda corrida el modelo dijo "Mission accomplished… added" **sin llamar a `addToCart`**. Se agregó la regla 8 del system prompt (solo se agrega con `addToCart` y no se confirma sin `added`) |
+| "add the lamp to my cart" con tres lámparas mostradas | OK: pregunta cuál y el carrito no cambia | 1 |
+| `carts` caído | OK: `addToCart` con `cart-unavailable`, sin `cart-updated`, `done`, y la respuesta dice que no se agregó | 2: en la tercera corrida la respuesta era correcta ("systems are currently offline… retry") pero el test no reconocía esas palabras; se amplió el patrón |
+| Precio del payload alterado en Qdrant (`setPayload` a $7) | OK: la respuesta da el precio vivo ($149) y no el del payload | 2: en la segunda corrida la respuesta daba $149 pero mencionaba "the $7 field report I had on file". Se agregó al prompt que, con el precio de una tool, no se menciona el del contexto |
+
+Limitaciones observadas: el modelo de reescritura a veces clasifica como
+`other` una pregunta por un producto que no se mostró, y entonces el turno
+gasta una o dos vueltas más (id inválido y búsqueda) dentro del presupuesto de
+4; la latencia bimodal de la reescritura (ver `POST /assistant/chat`) hizo caer
+al fallback 0, 3 y 1 de las 11 reescrituras de cada corrida.
+
 ### Verificación en el cluster
 
 Verificado el 2026-10-06 en kind (`./local.sh reload-images` y
@@ -576,3 +798,41 @@ Verificado el 2026-10-06 en kind (`./local.sh reload-images` y
    `event:error` / `{"type":"llm-provider-unauthorized",…}`; el pod sigue
    `1/1 Running` y `/actuator/health/readiness` en `UP`. Después se restauró la
    clave con `./local.sh update-secrets`.
+
+#### Tools en el cluster (`add-assistant-tools`)
+
+Verificado el 2026-10-06 en kind (`./local.sh reload-images` y
+`dist/kubernetes.yaml`, con el ConfigMap con las variables de las tools y del
+limitador; `kubectl apply --dry-run=server` sin errores). Igual que antes, se
+subió el snapshot de la colección con el Secret en placeholder y después se
+cargaron las claves: la sincronización dio `80 sin cambios, 0 requests al
+proveedor de embeddings`.
+
+1. **Conversación de tres turnos** desde el pod de la `ui`, con la sesión
+   `cluster-tools`:
+
+   | Turno | Tools | Resultado |
+   | --- | --- | --- |
+   | "I need a rug for the living room under $300, cheapest first" | `searchProducts` con `tags=[living-room,rugs]`, `maxPrice=300`, `order=price_asc` | Presenta las dos alfombras más baratas ($59) |
+   | "how much is the first one right now?" | `getProductDetails` del Geometric Wool Area Rug | "remains at $59", con el precio de la tool |
+   | "add it to my cart" | `addToCart` | `cart-updated` con `unitPrice` 59 y `cartItemCount` 1 |
+
+   ```bash
+   kubectl exec -n the-store deploy/ui -- curl -s http://carts/carts/cluster-tools
+   # {"customerId":"cluster-tools","items":[{"itemId":"1077927c-…","quantity":1,"unitPrice":59}]}
+   ```
+
+   `kubectl logs deploy/assistant` tiene una línea `assistant.tool` por tool y
+   las líneas `assistant.turn` con `nvidiaRequests=3 modelCalls=2` y
+   `tools=searchProducts:ok`, `tools=getProductDetails:ok` y
+   `tools=addToCart:ok`.
+2. **Diez turnos en paralelo** con sesiones distintas (búsquedas con
+   presupuesto y orden), lanzados a la vez desde el pod de la `ui` mientras se
+   leía `assistant.ratelimit.window` cada segundo: los 10 terminaron con `done`
+   en 5 a 15 s, con 31 requests a NVIDIA en total (3 por turno, 4 en uno que
+   buscó dos veces). El gauge llegó a 31 y nunca superó 36; en una ráfaga
+   anterior de 9 turnos, sumada a la conversación de arriba, llegó a 35. Como
+   esa carga no alcanza el tope, el limitador no tuvo que demorar ningún turno
+   (`limiterWaitMs=0`, ninguna reescritura `rate-limited`): la espera y el
+   rechazo con `llm-quota-exceeded` están cubiertos por los tests de
+   `ChatRateLimiterTest` y `ToolCallingLoopTest`.

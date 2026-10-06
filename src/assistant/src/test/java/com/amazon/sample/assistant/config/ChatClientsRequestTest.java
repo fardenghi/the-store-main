@@ -77,6 +77,18 @@ class ChatClientsRequestTest {
     assertThat(request.path("chat_template_kwargs").path("enable_thinking").isBoolean()).isTrue();
     assertThat(request.path("chat_template_kwargs").path("enable_thinking").asBoolean()).isFalse();
     assertThat(request.path("stream").asBoolean(false)).isFalse();
+    // add-assistant-tools (D2): la reescritura no tiene tools.
+    assertThat(request.has("tools")).isFalse();
+  }
+
+  @Test
+  void onlyTheMainClientSendsTheThreeTools() {
+    stream(Intent.SEARCH);
+
+    JsonNode tools = PROVIDER.requests().get(0).path("tools");
+    assertThat(tools.isArray()).isTrue();
+    assertThat(tools.findValuesAsText("name"))
+        .containsExactlyInAnyOrder("searchProducts", "getProductDetails", "addToCart");
   }
 
   @Test

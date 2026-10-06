@@ -1,18 +1,26 @@
 package com.amazon.sample.assistant.config;
 
 import com.amazon.sample.assistant.chat.ChatTurnService;
+import com.amazon.sample.assistant.chat.ToolCallingLoop;
 import com.amazon.sample.assistant.chat.context.ContextRetriever;
 import com.amazon.sample.assistant.chat.context.SystemPromptFactory;
+import com.amazon.sample.assistant.chat.llm.ChatRateLimiter;
 import com.amazon.sample.assistant.chat.llm.ReasoningPolicy;
 import com.amazon.sample.assistant.chat.rewrite.CatalogTagsCache;
 import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
 import com.amazon.sample.assistant.chat.session.SessionStore;
 import com.amazon.sample.assistant.products.catalog.CatalogClient;
 import com.amazon.sample.assistant.products.search.ProductSearchService;
+import com.amazon.sample.assistant.tools.SafeToolCallback;
+import com.amazon.sample.assistant.tools.StoreTools;
 import java.util.LinkedHashMap;
+import java.util.List;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -58,11 +66,48 @@ public class ChatConfiguration {
         .build();
   }
 
-  /** Modelo principal (D3). El razonamiento y el max-tokens se eligen por turno. */
+  /**
+   * Las tools del modelo principal ({@code add-assistant-tools}, D2), envueltas
+   * para que un tool call ilegible vuelva al modelo como error.
+   */
+  @Bean
+  List<ToolCallback> storeToolCallbacks(StoreTools storeTools) {
+    return SafeToolCallback.wrap(MethodToolCallbackProvider.builder().toolObjects(storeTools)
+        .build().getToolCallbacks());
+  }
+
+  /**
+   * Modelo principal (D3). El razonamiento y el max-tokens se eligen por turno.
+   * Es el único cliente con tools: el de reescritura no las tiene
+   * ({@code add-assistant-tools}, D2).
+   */
   @Bean
   ChatClient mainChatClient(OpenAiChatModel chatModel,
-      @Qualifier("mainChatOptions") OpenAiChatOptions mainChatOptions) {
-    return ChatClient.builder(chatModel).defaultOptions(mainChatOptions).build();
+      @Qualifier("mainChatOptions") OpenAiChatOptions mainChatOptions,
+      @Qualifier("storeToolCallbacks") List<ToolCallback> storeToolCallbacks) {
+    return ChatClient.builder(chatModel).defaultOptions(mainChatOptions)
+        .defaultToolCallbacks(storeToolCallbacks).build();
+  }
+
+  /**
+   * Ejecuta los tool calls del ciclo del turno. Un nombre de tool que no existe
+   * vuelve al modelo como error en lugar de cortar el turno.
+   */
+  @Bean
+  ToolCallingManager storeToolCallingManager() {
+    return ToolCallingManager.builder()
+        .toolCallbackResolver(SafeToolCallback.unknownToolResolver())
+        .build();
+  }
+
+  @Bean
+  ToolCallingLoop toolCallingLoop(@Qualifier("mainChatClient") ChatClient mainChatClient,
+      @Qualifier("storeToolCallingManager") ToolCallingManager toolCallingManager,
+      @Qualifier("storeToolCallbacks") List<ToolCallback> storeToolCallbacks,
+      ChatRateLimiter limiter, ToolsProperties tools, RateLimitProperties rateLimit,
+      ChatProperties properties) {
+    return new ToolCallingLoop(mainChatClient, toolCallingManager, storeToolCallbacks, limiter,
+        tools, rateLimit, properties.chat());
   }
 
   @Bean
@@ -79,8 +124,8 @@ public class ChatConfiguration {
   @Bean
   QueryRewriter queryRewriter(@Qualifier("rewriteChatClient") ChatClient rewriteChatClient,
       CatalogTagsCache tags, ChatProperties properties,
-      @Value("classpath:prompts/rewrite.st") Resource template) {
-    return new QueryRewriter(rewriteChatClient, tags, properties.rewrite(), template);
+      @Value("classpath:prompts/rewrite.st") Resource template, ChatRateLimiter limiter) {
+    return new QueryRewriter(rewriteChatClient, tags, properties.rewrite(), template, limiter);
   }
 
   @Bean
@@ -91,8 +136,8 @@ public class ChatConfiguration {
 
   @Bean
   SystemPromptFactory systemPromptFactory(
-      @Value("classpath:prompts/system.st") Resource template) {
-    return new SystemPromptFactory(template);
+      @Value("classpath:prompts/system.st") Resource template, CatalogTagsCache tags) {
+    return new SystemPromptFactory(template, tags::tagNames);
   }
 
   @Bean
@@ -104,8 +149,8 @@ public class ChatConfiguration {
   @Bean
   ChatTurnService chatTurnService(SessionStore sessions, QueryRewriter rewriter,
       ContextRetriever retriever, SystemPromptFactory systemPrompt, ReasoningPolicy reasoning,
-      @Qualifier("mainChatClient") ChatClient mainChatClient, ChatProperties properties) {
-    return new ChatTurnService(sessions, rewriter, retriever, systemPrompt, reasoning,
-        mainChatClient, properties.chat());
+      ToolCallingLoop loop, ToolsProperties tools, ChatProperties properties) {
+    return new ChatTurnService(sessions, rewriter, retriever, systemPrompt, reasoning, loop,
+        tools.maxToolCalls(), properties.chat());
   }
 }

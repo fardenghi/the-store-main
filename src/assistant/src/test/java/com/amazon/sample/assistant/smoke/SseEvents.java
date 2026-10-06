@@ -6,9 +6,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** Eventos SSE de una respuesta completa de {@code POST /assistant/chat}. */
+/**
+ * Eventos SSE de una respuesta completa de {@code POST /assistant/chat},
+ * incluidos los {@code tool} y {@code cart-updated} de {@code add-assistant-tools}.
+ */
 record SseEvents(List<Map<String, Object>> products, String text, boolean done,
-    Map<String, Object> error, String raw) {
+    Map<String, Object> error, String raw, List<Map<String, Object>> tools,
+    List<Map<String, Object>> cartUpdates) {
 
   private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -17,6 +21,8 @@ record SseEvents(List<Map<String, Object>> products, String text, boolean done,
     StringBuilder text = new StringBuilder();
     boolean done = false;
     Map<String, Object> error = null;
+    List<Map<String, Object>> tools = new ArrayList<>();
+    List<Map<String, Object>> cartUpdates = new ArrayList<>();
     try {
       for (String block : body.split("\n\n")) {
         String event = null;
@@ -35,6 +41,10 @@ record SseEvents(List<Map<String, Object>> products, String text, boolean done,
           products = JSON.readValue(data.toString(), new TypeReference<>() { });
         } else if ("done".equals(event)) {
           done = true;
+        } else if ("tool".equals(event)) {
+          tools.add(JSON.readValue(data.toString(), new TypeReference<>() { }));
+        } else if ("cart-updated".equals(event)) {
+          cartUpdates.add(JSON.readValue(data.toString(), new TypeReference<>() { }));
         } else if ("error".equals(event)) {
           error = JSON.readValue(data.toString(), new TypeReference<>() { });
         } else if (event == null) {
@@ -46,7 +56,30 @@ record SseEvents(List<Map<String, Object>> products, String text, boolean done,
       throw new IllegalStateException("SSE inválido: " + body, e);
     }
     return new SseEvents(products == null ? new ArrayList<>() : products, text.toString(), done,
-        error, body);
+        error, body, tools, cartUpdates);
+  }
+
+  /**
+   * Productos del evento {@code products} y de los eventos {@code tool}, sin
+   * repetidos: los que el turno puede nombrar (spec "Nombres verificables").
+   */
+  @SuppressWarnings("unchecked")
+  List<Map<String, Object>> allProducts() {
+    Map<Object, Map<String, Object>> all = new java.util.LinkedHashMap<>();
+    products.forEach(p -> all.putIfAbsent(p.get("id"), p));
+    for (Map<String, Object> tool : tools) {
+      Object listed = tool.get("products");
+      if (listed instanceof List<?> list) {
+        list.forEach(p -> all.putIfAbsent(((Map<String, Object>) p).get("id"),
+            (Map<String, Object>) p));
+      }
+    }
+    return new ArrayList<>(all.values());
+  }
+
+  /** Eventos {@code tool} de una tool. */
+  List<Map<String, Object>> toolEvents(String tool) {
+    return tools.stream().filter(t -> tool.equals(t.get("tool"))).toList();
   }
 
   List<String> productIds() {

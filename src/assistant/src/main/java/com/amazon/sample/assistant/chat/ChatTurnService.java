@@ -7,7 +7,6 @@ import com.amazon.sample.assistant.chat.llm.ChatProviderErrors;
 import com.amazon.sample.assistant.chat.llm.ChatProviderException;
 import com.amazon.sample.assistant.chat.llm.ReasoningPolicy;
 import com.amazon.sample.assistant.chat.llm.ReasoningPolicy.TurnOptions;
-import com.amazon.sample.assistant.chat.llm.ThinkTagFilter;
 import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
 import com.amazon.sample.assistant.chat.rewrite.Rewrite;
 import com.amazon.sample.assistant.chat.session.SessionState;
@@ -15,19 +14,20 @@ import com.amazon.sample.assistant.chat.session.SessionStore;
 import com.amazon.sample.assistant.chat.session.ShownProduct;
 import com.amazon.sample.assistant.chat.session.Turn;
 import com.amazon.sample.assistant.config.ChatProperties;
+import com.amazon.sample.assistant.tools.TurnToolContext;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -39,10 +39,15 @@ import reactor.core.scheduler.Schedulers;
  *
  * <pre>
  * lock de la sesión ─► reescritura ─► retrieval ─► evento products
- *   ─► modelo principal en streaming (persona + contexto + historial)
+ *   ─► modelo principal en streaming (persona + contexto + historial), con tools
  *   ─► fragmentos {"text"} ─► OK: guardar el turno y done │ error: evento error, sin guardar
  *   ─► liberar el lock ─► en segundo plano: top-k crudo y línea de log
  * </pre>
+ *
+ * <p>La parte del modelo principal la resuelve el {@link ToolCallingLoop}
+ * ({@code add-assistant-tools}, D1): vueltas con tools, eventos {@code tool} y
+ * {@code cart-updated}, limitador y reintento ante 429. El razonamiento se
+ * decide una vez por turno y vale para todas las vueltas.
  *
  * <p>La reescritura y la búsqueda son bloqueantes y corren en
  * {@code boundedElastic}. Todos los eventos salen por el {@link ChatTurn#sink()}
@@ -64,24 +69,29 @@ public class ChatTurnService {
   private record Prepared(Rewrite rewrite, Retrieval retrieval) {
   }
 
+  /** Productos que recuerda la sesión de un turno (D7 de {@code add-assistant-tools}). */
+  static final int MAX_SHOWN_PRODUCTS = 10;
+
   private final SessionStore sessions;
   private final QueryRewriter rewriter;
   private final ContextRetriever retriever;
   private final SystemPromptFactory systemPrompt;
   private final ReasoningPolicy reasoning;
-  private final ChatClient mainChatClient;
+  private final ToolCallingLoop loop;
+  private final int maxToolCalls;
   private final ChatProperties.Chat properties;
   private final TurnLogger turnLogger = new TurnLogger();
 
   public ChatTurnService(SessionStore sessions, QueryRewriter rewriter, ContextRetriever retriever,
-      SystemPromptFactory systemPrompt, ReasoningPolicy reasoning, ChatClient mainChatClient,
-      ChatProperties.Chat properties) {
+      SystemPromptFactory systemPrompt, ReasoningPolicy reasoning, ToolCallingLoop loop,
+      int maxToolCalls, ChatProperties.Chat properties) {
     this.sessions = sessions;
     this.rewriter = rewriter;
     this.retriever = retriever;
     this.systemPrompt = systemPrompt;
     this.reasoning = reasoning;
-    this.mainChatClient = mainChatClient;
+    this.loop = loop;
+    this.maxToolCalls = maxToolCalls;
     this.properties = properties;
   }
 
@@ -153,48 +163,47 @@ public class ChatTurnService {
 
     TurnOptions options = reasoning.optionsFor(prepared.rewrite().intent());
     stats.reasoning = options.reasoning();
-    List<Message> history = new ArrayList<>();
+    List<Message> messages = new ArrayList<>();
+    messages.add(new SystemMessage(systemPrompt.render(retrieval)));
     for (Turn previous : turn.session().turns()) {
-      history.add(new UserMessage(previous.user()));
-      history.add(new AssistantMessage(previous.assistant()));
+      messages.add(new UserMessage(previous.user()));
+      messages.add(new AssistantMessage(previous.assistant()));
     }
-    turn.countProviderRequest();
-    Flux<String> text = mainChatClient.prompt()
-        .system(systemPrompt.render(retrieval))
-        .messages(history)
-        .user(turn.message())
-        .options(options.options())
-        .stream()
-        .chatResponse()
-        .doOnNext(response -> stats.reasoningChars += reasoningLength(response))
-        .map(ChatTurnService::text)
-        .filter(fragment -> !fragment.isEmpty());
-    if (properties.reasoning().stripThinkTags()) {
-      text = ThinkTagFilter.apply(text);
-    }
-    Duration firstToken = options.reasoning()
-        ? properties.timeouts().firstTokenReasoning() : properties.timeouts().firstToken();
-    StringBuilder answer = new StringBuilder();
-    return text
-        .timeout(Mono.delay(min(firstToken, remaining(deadline))),
-            fragment -> Mono.delay(remaining(deadline)))
-        .doOnNext(fragment -> {
-          if (stats.firstFragmentMillis < 0) {
-            stats.firstFragmentMillis = stats.elapsedMillis();
-          }
-          answer.append(fragment);
-          turn.emit(ServerSentEvent.builder(Map.of("text", fragment)).build());
-        })
-        .then(Mono.fromRunnable(() -> {
+    messages.add(new UserMessage(turn.message()));
+    TurnToolContext toolTurn = new TurnToolContext(turn.sessionId(), turn.sink(), maxToolCalls);
+    return loop.run(turn, stats, messages, options, toolTurn, deadline)
+        .timeout(remaining(deadline))
+        .doOnTerminate(() -> stats.tools = toolTurn.outcomes())
+        .flatMap(answer -> Mono.<Void>fromRunnable(() -> {
           if (turn.isCancelled()) {
             return;
           }
-          List<ShownProduct> shown = retrieval.searched() && !retrieval.catalogUnavailable()
-              ? retrieval.products() : null;
-          turn.session().commit(new Turn(turn.message(), answer.toString()), shown);
+          turn.session().commit(new Turn(turn.message(), answer),
+              shownProducts(retrieval, toolTurn));
           stats.outcome = "done";
           turn.emit(ServerSentEvent.builder(Map.of()).event("done").build());
         }));
+  }
+
+  /**
+   * Productos que recuerda la sesión (D7 de {@code add-assistant-tools}): los
+   * que devolvieron las tools del turno, primero, y después los del evento
+   * {@code products}, sin repetidos y hasta 10. Sin productos de tools, sigue la
+   * regla del chat: los del retrieval si el turno buscó, o {@code null} para
+   * conservar los del turno anterior.
+   */
+  static List<ShownProduct> shownProducts(Retrieval retrieval, TurnToolContext toolTurn) {
+    List<ShownProduct> fromRetrieval = retrieval.searched() && !retrieval.catalogUnavailable()
+        ? retrieval.products() : null;
+    List<ShownProduct> fromTools = toolTurn.shownProducts();
+    if (fromTools.isEmpty()) {
+      return fromRetrieval;
+    }
+    Map<String, ShownProduct> merged = new LinkedHashMap<>();
+    Stream.concat(fromTools.stream(),
+            fromRetrieval == null ? Stream.<ShownProduct>empty() : fromRetrieval.stream())
+        .forEach(product -> merged.putIfAbsent(product.id(), product));
+    return merged.values().stream().limit(MAX_SHOWN_PRODUCTS).toList();
   }
 
   /**
@@ -245,23 +254,6 @@ public class ChatTurnService {
     return ServerSentEvent.<Map<String, Object>>builder(data).event("error").build();
   }
 
-  private static String text(ChatResponse response) {
-    if (response.getResult() == null || response.getResult().getOutput() == null) {
-      return "";
-    }
-    String text = response.getResult().getOutput().getText();
-    return text == null ? "" : text;
-  }
-
-  private static long reasoningLength(ChatResponse response) {
-    if (response.getResult() == null || response.getResult().getOutput() == null) {
-      return 0;
-    }
-    Object reasoningContent = response.getResult().getOutput().getMetadata()
-        .get("reasoningContent");
-    return reasoningContent instanceof String s ? s.length() : 0;
-  }
-
   /** Reloj del scheduler de Reactor, para que los tests con tiempo virtual lo controlen. */
   private static long now() {
     return Schedulers.parallel().now(TimeUnit.MILLISECONDS);
@@ -269,10 +261,6 @@ public class ChatTurnService {
 
   private static Duration remaining(long deadline) {
     return Duration.ofMillis(Math.max(0, deadline - now()));
-  }
-
-  private static Duration min(Duration a, Duration b) {
-    return a.compareTo(b) <= 0 ? a : b;
   }
 
   private static String abbreviate(String sessionId) {

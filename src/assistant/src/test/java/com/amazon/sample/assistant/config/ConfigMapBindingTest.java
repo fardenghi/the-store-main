@@ -30,14 +30,20 @@ class ConfigMapBindingTest {
     @Override
     public void initialize(ConfigurableApplicationContext context) {
       context.getEnvironment().getPropertySources().addFirst(
-          new SystemEnvironmentPropertySource("configmap-systemEnvironment", Map.of(
-              "NVIDIA_API_KEY", ApiKeysStartupLogger.PLACEHOLDER,
-              "GOOGLE_API_KEY", ApiKeysStartupLogger.PLACEHOLDER,
-              "SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL", "deepseek-ai/deepseek-v4.1-flash",
-              "SPRING_AI_OPENAI_CHAT_OPTIONS_MAX_TOKENS", "777",
-              "RETAIL_ASSISTANT_MODELS_REWRITE", "google/gemma-3-12b-it",
-              "SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_DIMENSIONS", "512",
-              "SPRING_AI_VECTORSTORE_QDRANT_PORT", "1")));
+          new SystemEnvironmentPropertySource("configmap-systemEnvironment", Map.ofEntries(
+              Map.entry("NVIDIA_API_KEY", ApiKeysStartupLogger.PLACEHOLDER),
+              Map.entry("GOOGLE_API_KEY", ApiKeysStartupLogger.PLACEHOLDER),
+              Map.entry("SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL", "deepseek-ai/deepseek-v4.1-flash"),
+              Map.entry("SPRING_AI_OPENAI_CHAT_OPTIONS_MAX_TOKENS", "777"),
+              Map.entry("RETAIL_ASSISTANT_MODELS_REWRITE", "google/gemma-3-12b-it"),
+              Map.entry("SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_DIMENSIONS", "512"),
+              Map.entry("SPRING_AI_VECTORSTORE_QDRANT_PORT", "1"),
+              Map.entry("RETAIL_ASSISTANT_TOOLS_MAX_MODEL_CALLS", "3"),
+              Map.entry("RETAIL_ASSISTANT_TOOLS_MAX_QUANTITY", "5"),
+              Map.entry("RETAIL_ASSISTANT_TOOLS_HTTP_READ_TIMEOUT", "7s"),
+              Map.entry("RETAIL_ASSISTANT_RATE_LIMIT_REQUESTS_PER_MINUTE", "18"),
+              Map.entry("RETAIL_ASSISTANT_RATE_LIMIT_MAX_WAIT", "15s"),
+              Map.entry("RETAIL_ASSISTANT_RATE_LIMIT_MAX_429_RETRIES", "1"))));
     }
   }
 
@@ -50,6 +56,12 @@ class ConfigMapBindingTest {
   @Value("${retail.assistant.models.rewrite}")
   private String rewriteModel;
 
+  @Autowired
+  private ToolsProperties tools;
+
+  @Autowired
+  private RateLimitProperties rateLimit;
+
   @Test
   void configMapVariablesOverrideDefaults() {
     OpenAiChatOptions options = (OpenAiChatOptions) chatModel.getDefaultOptions();
@@ -58,5 +70,15 @@ class ConfigMapBindingTest {
     assertThat(options.getMaxTokens()).isEqualTo(777);
     assertThat(rewriteModel).isEqualTo("google/gemma-3-12b-it");
     assertThat(embeddingModel.defaultOptions.getDimensions()).isEqualTo(512);
+  }
+
+  @Test
+  void toolsAndRateLimitVariablesOverrideDefaults() {
+    assertThat(tools.maxModelCalls()).isEqualTo(3);
+    assertThat(tools.maxQuantity()).isEqualTo(5);
+    assertThat(tools.http().readTimeout()).isEqualTo(java.time.Duration.ofSeconds(7));
+    assertThat(rateLimit.requestsPerMinute()).isEqualTo(18);
+    assertThat(rateLimit.maxWait()).isEqualTo(java.time.Duration.ofSeconds(15));
+    assertThat(rateLimit.max429Retries()).isEqualTo(1);
   }
 }

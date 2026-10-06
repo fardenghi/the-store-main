@@ -18,6 +18,14 @@ class TurnStats {
   volatile long totalMillis = -1;
   volatile String outcome = "cancelled";
   volatile List<String> rawTopK;
+  /** Solicitudes al modelo principal (vueltas del ciclo de tools, con sus reintentos). */
+  volatile int modelCalls;
+  /** Espera total en el limitador de NVIDIA. */
+  volatile long limiterWaitMillis;
+  /** Reintentos por 429 del modelo principal. */
+  volatile int retries429;
+  /** Resultado de cada tool, por ejemplo {@code searchProducts:ok}. */
+  volatile List<String> tools = List.of();
 
   TurnStats(String sessionId, String message) {
     this.sessionId = sessionId;

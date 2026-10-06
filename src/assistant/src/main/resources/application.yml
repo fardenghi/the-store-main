@@ -125,6 +125,23 @@ retail:
         first-token: 20s
         turn: 120s
         keepalive: 10s
+    # Tools del modelo principal (add-assistant-tools, D1-D5, D11).
+    tools:
+      max-model-calls: 4
+      max-tool-calls: 6
+      max-quantity: 10
+      search-default-limit: 5
+      search-max-limit: 10
+      description-max-chars: 300
+      http:
+        connect-timeout: 2s
+        read-timeout: 5s
+    # Limitador hacia NVIDIA (40 RPM) y reintento ante 429 (add-assistant-tools, D8, D9).
+    rate-limit:
+      requests-per-minute: 36
+      max-wait: 30s
+      max-429-retries: 2
+      default-retry-after: 5s
     search:
       default-k: 5
       max-k: 20

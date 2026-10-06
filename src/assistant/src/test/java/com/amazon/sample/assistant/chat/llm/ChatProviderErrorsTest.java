@@ -88,7 +88,28 @@ class ChatProviderErrorsTest {
   @Test
   void retryAfterParsing() {
     assertThat(ChatProviderErrors.retryAfter("2.5")).isEqualTo(Duration.ofMillis(2500));
-    assertThat(ChatProviderErrors.retryAfter("Wed, 21 Oct 2026 07:28:00 GMT")).isNull();
+    // Fecha HTTP: relativa a ahora (add-assistant-tools, D9).
+    java.time.Instant now = java.time.Instant.parse("2026-10-21T07:27:50Z");
+    assertThat(ChatProviderErrors.retryAfter("Wed, 21 Oct 2026 07:28:00 GMT", now))
+        .isEqualTo(Duration.ofSeconds(10));
+    assertThat(ChatProviderErrors.retryAfter("Wed, 21 Oct 2026 07:27:00 GMT", now))
+        .isEqualTo(Duration.ZERO);
+    assertThat(ChatProviderErrors.retryAfter("3", now)).isEqualTo(Duration.ofSeconds(3));
+    assertThat(ChatProviderErrors.retryAfter("soon", now)).isNull();
+    assertThat(ChatProviderErrors.retryAfter("-1", now)).isNull();
+    assertThat(ChatProviderErrors.retryAfter("", now)).isNull();
     assertThat(ChatProviderErrors.retryAfter(null)).isNull();
+  }
+
+  @Test
+  void quotaWithHttpDateRetryAfterExposesTheWait() {
+    String inTwentySeconds = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(
+        java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC).plusSeconds(20));
+
+    ChatProviderException e = ChatProviderErrors.translate(streamingError(429, inTwentySeconds));
+
+    assertThat(e.reason()).isEqualTo(Reason.QUOTA);
+    assertThat(e.retryAfter()).hasValueSatisfying(wait ->
+        assertThat(wait).isBetween(Duration.ofSeconds(15), Duration.ofSeconds(20)));
   }
 }

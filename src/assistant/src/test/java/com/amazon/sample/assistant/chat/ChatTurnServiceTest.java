@@ -8,8 +8,6 @@ import static org.mockito.Mockito.when;
 
 import com.amazon.sample.assistant.chat.context.ContextRetriever;
 import com.amazon.sample.assistant.chat.context.Retrieval;
-import com.amazon.sample.assistant.chat.context.SystemPromptFactory;
-import com.amazon.sample.assistant.chat.llm.ReasoningPolicy;
 import com.amazon.sample.assistant.chat.rewrite.Intent;
 import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
 import com.amazon.sample.assistant.chat.rewrite.Rewrite;
@@ -26,15 +24,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -76,10 +71,7 @@ class ChatTurnServiceTest {
   void setUp() {
     sessions = new SessionStore(10, Duration.ofMinutes(30), 100);
     ChatProperties.Chat chat = properties(false);
-    OpenAiChatOptions base = OpenAiChatOptions.builder().model("main").temperature(0.6).build();
-    service = new ChatTurnService(sessions, rewriter, retriever,
-        new SystemPromptFactory(new ClassPathResource("prompts/system.st")),
-        new ReasoningPolicy(base, chat), ChatClient.builder(chatModel).build(), chat);
+    service = ChatTestSupport.service(sessions, rewriter, retriever, chatModel, chat);
     when(rewriter.rewrite(any(), any())).thenReturn(
         new Rewrite(Intent.SEARCH, "velvet armchair", null, null, List.of(), false, 1, 5));
     when(retriever.retrieve(any(), any())).thenReturn(
@@ -261,17 +253,22 @@ class ChatTurnServiceTest {
 
   @Test
   void quotaErrorEndsWithErrorEventAndRetryAfterWithoutStoringTheTurn() {
+    // add-assistant-tools (D9): el 429 se reintenta 2 veces respetando el
+    // Retry-After; si persiste, el turno termina como antes.
     HttpHeaders headers = new HttpHeaders();
     headers.add(HttpHeaders.RETRY_AFTER, "12");
     model(() -> Flux.error(WebClientResponseException.create(429, "Too Many Requests", headers,
         new byte[0], null)));
 
-    StepVerifier.create(service.open("s1", "a velvet armchair"))
+    StepVerifier.withVirtualTime(() -> service.open("s1", "a velvet armchair"))
         .expectNextMatches(ChatTurnServiceTest::isProducts)
+        .thenAwait(Duration.ofSeconds(24))
+        .thenConsumeWhile(ChatTurnServiceTest::isKeepalive)
         .expectNextMatches(event -> isError(event, "llm-quota-exceeded")
             && Long.valueOf(12).equals(((Map<?, ?>) event.data()).get("retryAfterSeconds")))
         .verifyComplete();
 
+    assertThat(prompts).hasSize(3);
     assertThat(sessions.get("s1").turns()).isEmpty();
     assertThat(sessions.get("s1").isBusy()).isFalse();
   }
