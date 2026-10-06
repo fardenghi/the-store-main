@@ -11,8 +11,15 @@ Con los 6 changes implementados, el punto débil del asistente pasó a ser el mo
   - **Modelo principal:** soporte de streaming, tool calling y thinking por request; tasa de escenarios correctos; tool call correcto en el turno de agregado; producto equivocado; confirmaciones descartadas por la salvaguarda (`claimGuard`); vueltas correctivas; preguntar ante un pedido ambiguo; latencia al primer fragmento (p50/p95) y requests de NVIDIA por turno.
   - **Modelo de reescritura:** JSON válido, latencia p50/p95, tasa de fallback con el timeout vigente y el top-5 de `RewriteEvalSmokeIT`.
 - **Candidatos iniciales,** todos en `integrate.api.nvidia.com`; la lista final se confirma leyendo `/v1/models` y descartando los que den 404 para la cuenta:
-  - **Principal:** `nvidia/nemotron-3-super-120b-a12b` (línea base), `nvidia/nemotron-3-ultra-550b-a55b`, `openai/gpt-oss-20b`, `google/gemma-4-31b-it` y un reintento de `deepseek-ai/deepseek-v4.1-flash`.
-  - **Reescritura:** `nvidia/nemotron-3.5-lightning-30b-a3b` (línea base), `nvidia/nemotron-nano-3-30b-a3b`, `google/gemma-3-4b-it` y `openai/gpt-oss-20b`.
+  - **Principal:** `nvidia/nemotron-3-super-120b-a12b` (línea base), `z-ai/glm-5.3`, `moonshotai/kimi-k3`, `meta/muse-glimmer-30b`, `nvidia/nemotron-3-ultra-550b-a55b`, `openai/gpt-oss-20b`, `google/gemma-4-31b-it` y un reintento de `deepseek-ai/deepseek-v4.1-flash`.
+  - **Reescritura:** `nvidia/nemotron-3.5-lightning-30b-a3b` (línea base), `z-ai/glm-5.3-flash`, `meta/muse-glimmer-30b`, `nvidia/nemotron-nano-3-30b-a3b`, `google/gemma-3-4b-it` y `openai/gpt-oss-20b`.
+  - **Prioridad:** los propuestos por el grupo (`glm-5.3`, `glm-5.3-flash`, `kimi-k3` y `muse-glimmer-30b`) se evalúan primero, junto con la línea base.
+  - **Sondeo previo** (2026-10-06, un request por modelo, a modo de referencia):
+    - `muse-glimmer-30b` respondió en 1,1 s.
+    - `kimi-k3` respondió "OK" en 30 s.
+    - `glm-5.3` tardó 88 s y devolvió solo razonamiento, porque el thinking viene prendido por defecto.
+    - `glm-5.3-flash` no respondió en 120 s.
+  - **Parámetros:** el benchmark tiene que descubrir para cada modelo cómo apagar el thinking, y aplicar un timeout de descarte para los que no respondan.
 - **Decisión documentada:** una tabla comparativa con un criterio de elección explícito. La corrección del flujo de carrito pesa más que la latencia, y la latencia más que el costo en requests. Se elige un modelo principal y uno de reescritura, más un plan B verificado para cada uno.
 - **Nuevos defaults:** se actualizan el `application.yml`, el ConfigMap de `dist/kubernetes.yaml`, el README del `assistant` y las decisiones cerradas de CLAUDE.md con los modelos elegidos y el plan B. Si gana la línea base, solo se actualiza el plan B.
 - **Desvío respecto de la pre-entrega:** ninguno nuevo. El proveedor sigue siendo NVIDIA, autorizado por la cátedra; solo cambian los identificadores de modelo dentro de la misma API.
