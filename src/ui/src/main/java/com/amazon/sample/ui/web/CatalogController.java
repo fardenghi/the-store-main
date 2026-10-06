@@ -18,9 +18,10 @@
 
 package com.amazon.sample.ui.web;
 
+import com.amazon.sample.ui.config.AssistantProperties;
+import com.amazon.sample.ui.services.assistant.AssistantClient;
 import com.amazon.sample.ui.services.catalog.CatalogService;
 import com.amazon.sample.ui.web.util.RequiresCommonAttributes;
-import java.util.Collections;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -30,7 +31,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import reactor.core.publisher.Flux;
 
 @Controller
 @RequestMapping("/catalog")
@@ -38,13 +38,20 @@ import reactor.core.publisher.Flux;
 @RequiresCommonAttributes
 public class CatalogController {
 
-  private static final Integer DEFAULT_PAGE = 1;
-  private static final Integer DEFAULT_SIZE = 6;
-
   private CatalogService catalogService;
 
-  public CatalogController(@Autowired CatalogService catalogService) {
+  private AssistantClient assistantClient;
+
+  private AssistantProperties assistantProperties;
+
+  public CatalogController(
+    @Autowired CatalogService catalogService,
+    @Autowired AssistantClient assistantClient,
+    @Autowired AssistantProperties assistantProperties
+  ) {
     this.catalogService = catalogService;
+    this.assistantClient = assistantClient;
+    this.assistantProperties = assistantProperties;
   }
 
   @GetMapping("")
@@ -74,14 +81,8 @@ public class CatalogController {
   ) {
     model.addAttribute("item", catalogService.getProduct(id));
     model.addAttribute(
-      "recommendations",
-      catalogService
-        .getProducts("", "", DEFAULT_PAGE, DEFAULT_SIZE)
-        .map(p -> {
-          Collections.shuffle(p.getProducts());
-          return p.getProducts();
-        })
-        .flatMapMany(Flux::fromIterable)
+      "similarProducts",
+      assistantClient.similar(id, assistantProperties.getSimilarK())
     );
 
     return "detail";

@@ -53,7 +53,7 @@ flowchart TB
   UI -- "REST" --> CATALOG
   UI -- "REST" --> CART
   UI -- "REST" --> OTROS
-  UI -- "HTTP + SSE · header X-Session-ID<br/>(provider de chat 'assistant')" --> ASSIST
+  UI -- "HTTP + SSE · X-Session-ID (chat)<br/>REST (similares de la ficha)" --> ASSIST
   ASSIST -- "REST (tool: precio/detalle en vivo<br/>· lectura del catálogo al arrancar)" --> CATALOG
   ASSIST -- "REST (tool: agregar al carrito)" --> CART
   ASSIST -- "gRPC :6334 (indexación + retrieval)" --> QDRANT
@@ -188,3 +188,30 @@ su lugar hasta 30 s; si haría falta más, el turno termina con
 límite alcanza para unos 12 turnos con tools por minuto. Las tools que van a
 `catalog` y a `carts` son tráfico interno y no consumen cuota; solo
 `searchProducts` con texto consume un embedding de Gemini.
+
+## Integración con la UI (`integrate-ui-assistant`)
+
+La `ui` llama al `assistant` de dos formas, siempre por el `Service` interno
+`http://assistant` (el ingress sigue enrutando solo hacia la `ui`):
+
+- **Chat:** `POST /chat/submit` de la `ui` reenvía el mensaje a
+  `POST /assistant/chat` con el header `X-Session-ID`, que sale de la cookie
+  `SESSIONID` (la misma sesión que usa el carrito), y retransmite el stream SSE
+  al navegador. La `ui` agrega un comentario de keepalive cada 10 s para que el
+  ingress no corte la conexión durante el razonamiento.
+- **Similares de la ficha:** `GET /assistant/products/{id}/similar?k=4`, con un
+  tiempo límite de 2 s. Si falla, la ficha se muestra sin la sección.
+
+### Agregados respecto de la pre-entrega
+
+Justificados en la decisión D13 del `design.md` del change
+`integrate-ui-assistant`. No hay desvíos: son agregados que no contradicen la
+pre-entrega.
+
+| Agregado | Justificación |
+|---|---|
+| La `ui` también llama al `assistant` por REST (`GET /assistant/products/{id}/similar`), no solo por SSE | Es la forma de cumplir el caso "Productos similares" con la `ui` como presentación. El diagrama de la pre-entrega solo rotula la flecha `ui → assistant` con el chat |
+| Los providers `mock`, `openai` y `bedrock` de la `ui` quedan sin persona | La pre-entrega mueve la persona al `assistant`. Esos providers quedan solo para desarrollo sin `assistant` |
+| Cookie `SESSIONID` con `Path=/`, `HttpOnly` y `SameSite=Lax` | Garantiza que chat y carrito usen la misma sesión, que es la premisa del caso "Agregar al carrito desde el chat" |
+| Eventos `error` generados por la `ui` (`assistant-unavailable`, `session-busy`, `invalid-parameter`) y keepalive propio | Robustez del canal SSE que la pre-entrega declara entre navegador, `ui` y `assistant` |
+| Sanitización del markdown con DOMPurify | Seguridad del render de texto generado por un LLM |

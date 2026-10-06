@@ -816,6 +816,11 @@ data:
   RETAIL_UI_ENDPOINTS_CARTS: http://carts
   RETAIL_UI_ENDPOINTS_CHECKOUT: http://checkout
   RETAIL_UI_ENDPOINTS_ORDERS: http://orders
+  # Chat con el assistant y similares de la ficha (integrate-ui-assistant, D10).
+  # La ui no recibe claves de proveedores: solo las monta el assistant.
+  RETAIL_UI_ENDPOINTS_ASSISTANT: http://assistant
+  RETAIL_UI_CHAT_ENABLED: "true"
+  RETAIL_UI_CHAT_PROVIDER: assistant
 ---
 # Source: retail-store-sample-ui-chart/templates/service.yaml
 apiVersion: v1

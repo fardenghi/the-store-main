@@ -18,26 +18,31 @@
 
 package com.amazon.sample.ui.web;
 
+import com.amazon.sample.ui.chat.ChatEvents;
+import com.amazon.sample.ui.chat.ChatStreamService;
+import com.amazon.sample.ui.config.AssistantProperties;
+import com.amazon.sample.ui.web.util.SessionIDUtil;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import java.time.Duration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/chat")
 @ConditionalOnProperty(prefix = "retail.ui.chat", name = "enabled")
 public class ChatController {
 
-  private static class ChatRequest {
+  static class ChatRequest {
 
     @JsonProperty("message")
     private String message;
@@ -52,46 +57,60 @@ public class ChatController {
     }
   }
 
-  private static class ResponseMessage {
+  private final ChatStreamService chatStreamService;
 
-    @JsonProperty("text")
-    private String text;
+  private final Duration keepaliveInterval;
 
-    ResponseMessage(String text) {
-      this.text = text;
-    }
-
-    @SuppressWarnings("unused")
-    public String getText() {
-      return text;
-    }
+  public ChatController(
+    ChatStreamService chatStreamService,
+    AssistantProperties properties
+  ) {
+    this.chatStreamService = chatStreamService;
+    this.keepaliveInterval = properties.getKeepaliveInterval();
   }
 
-  @Value("${retail.ui.chat.prompt}")
-  private String systemPrompt;
-
-  @Autowired
-  private ChatClient client;
-
-  @PostMapping("/submit")
+  @PostMapping(value = "/submit", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public Flux<ServerSentEvent<String>> streamEvents(
-    @RequestBody ChatRequest request
+    @RequestBody ChatRequest body,
+    ServerHttpRequest request,
+    ServerHttpResponse response
   ) {
-    var objectMapper = new ObjectMapper();
+    response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-cache");
+    response.getHeaders().set("X-Accel-Buffering", "no");
 
-    return this.client.prompt(request.getMessage())
-      .system(this.systemPrompt)
-      .stream()
-      .content()
-      .map(c -> {
-        try {
-          var response = new ResponseMessage(c);
-          return ServerSentEvent.<String>builder()
-            .data(objectMapper.writeValueAsString(response))
-            .build();
-        } catch (JsonProcessingException e) {
-          throw new RuntimeException("Failed to serialize chat response", e);
-        }
-      });
+    // La sesión sale siempre de la cookie: SessionIDWebFilter pisa cualquier
+    // X-Session-ID que mande el navegador.
+    String sessionId = SessionIDUtil.getSessionId(request);
+
+    return withKeepalive(
+      this.chatStreamService.stream(sessionId, body.getMessage()),
+      this.keepaliveInterval
+    );
+  }
+
+  /**
+   * Intercala un comentario SSE cada {@code interval} para que ningún proxy
+   * corte la conexión mientras el assistant razona (D5). El intervalo termina
+   * junto con el stream principal.
+   */
+  static Flux<ServerSentEvent<String>> withKeepalive(
+    Flux<ServerSentEvent<String>> events,
+    Duration interval
+  ) {
+    return withKeepalive(events, Flux.interval(interval, interval));
+  }
+
+  static Flux<ServerSentEvent<String>> withKeepalive(
+    Flux<ServerSentEvent<String>> events,
+    Flux<Long> ticks
+  ) {
+    return events.publish(shared ->
+      Flux.merge(
+        shared,
+        ticks
+          .map(tick -> ChatEvents.keepalive())
+          .takeUntilOther(shared.then(Mono.just(true)))
+      )
+    );
   }
 }

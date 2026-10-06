@@ -20,8 +20,6 @@ public class ChatProperties {
 
   private String provider;
 
-  private String prompt;
-
   private String model;
 
   private double temperature;

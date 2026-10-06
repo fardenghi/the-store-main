@@ -36,10 +36,13 @@ public class SessionIDUtil {
   public static String addSessionCookie(ServerWebExchange exchange) {
     String sessionId = UUID.randomUUID().toString();
 
-    ResponseCookie newCookie = ResponseCookie.from(
-      COOKIE_NAME,
-      sessionId
-    ).build();
+    // Path=/ para que una primera visita a /catalog/{id} no deje la cookie
+    // limitada a /catalog y el chat y el carrito compartan la sesión (D7).
+    ResponseCookie newCookie = ResponseCookie.from(COOKIE_NAME, sessionId)
+      .path("/")
+      .httpOnly(true)
+      .sameSite("Lax")
+      .build();
 
     exchange.getResponse().getCookies().add(COOKIE_NAME, newCookie);
 

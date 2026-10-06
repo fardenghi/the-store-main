@@ -145,5 +145,26 @@
         </div>
       </div>
     </section>
+
+    <!-- Similar products (assistant) -->
+    <section
+      id="similar-products"
+      class="max-w-4xl mx-auto px-4 pb-8"
+      th:if="${similarProducts != null and !similarProducts.isEmpty()}"
+    >
+      <h2
+        class="text-xl font-semibold text-gray-800 mb-6"
+        th:text="#{detail.similar}"
+      >
+        Similar gear for your lair
+      </h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="similar-product" th:each="product : ${similarProducts}">
+          <div
+            th:replace="~{fragments/product_card :: card(${product}) }"
+          ></div>
+        </div>
+      </div>
+    </section>
   </body>
 </html>

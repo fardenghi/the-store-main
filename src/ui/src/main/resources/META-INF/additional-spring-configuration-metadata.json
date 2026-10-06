@@ -36,6 +36,11 @@
       "description": "HTTP endpoint for the orders service"
     },
     {
+      "name": "retail.ui.endpoints.assistant",
+      "type": "java.lang.String",
+      "description": "HTTP endpoint for the assistant service. Required when retail.ui.chat.provider is assistant; if empty the product page shows no similar products"
+    },
+    {
       "name": "retail.ui.chat.enabled",
       "type": "java.lang.String",
       "description": "Enabled the chat assistant"
@@ -43,27 +48,52 @@
     {
       "name": "retail.ui.chat.temperature",
       "type": "java.lang.String",
-      "description": "Chat assistant model temperature"
+      "description": "Chat assistant model temperature (only for the mock, openai and bedrock providers)"
     },
     {
       "name": "retail.ui.chat.max-tokens",
       "type": "java.lang.String",
-      "description": "Chat assistant model maximum output tokens"
+      "description": "Chat assistant model maximum output tokens (only for the mock, openai and bedrock providers)"
     },
     {
       "name": "retail.ui.chat.provider",
       "type": "java.lang.String",
-      "description": "Chat assistant model provider"
+      "description": "Chat assistant provider: mock, openai, bedrock or assistant"
     },
     {
       "name": "retail.ui.chat.model",
       "type": "java.lang.String",
-      "description": "Chat assistant model provider model ID"
+      "description": "Chat assistant model provider model ID (only for the mock, openai and bedrock providers)"
     },
     {
-      "name": "retail.ui.chat.prompt",
-      "type": "java.lang.String",
-      "description": "Chat assistant system prompt"
+      "name": "retail.ui.assistant.connect-timeout",
+      "type": "java.time.Duration",
+      "description": "Timeout to open a connection with the assistant service",
+      "defaultValue": "2s"
+    },
+    {
+      "name": "retail.ui.assistant.chat-timeout",
+      "type": "java.time.Duration",
+      "description": "Total time limit of a chat turn forwarded to the assistant service",
+      "defaultValue": "160s"
+    },
+    {
+      "name": "retail.ui.assistant.keepalive-interval",
+      "type": "java.time.Duration",
+      "description": "Interval between SSE keepalive comments sent to the browser during a chat turn",
+      "defaultValue": "10s"
+    },
+    {
+      "name": "retail.ui.assistant.similar-k",
+      "type": "java.lang.Integer",
+      "description": "Number of similar products shown in the product page",
+      "defaultValue": 4
+    },
+    {
+      "name": "retail.ui.assistant.similar-timeout",
+      "type": "java.time.Duration",
+      "description": "Time limit to fetch the similar products of the product page",
+      "defaultValue": "2s"
     }
   ]
 }

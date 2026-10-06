@@ -20,6 +20,7 @@ const ChatUI = {
   elements: null,
   converter: null,
   contextPath: null,
+  busy: false,
 
   init(contextPath) {
     this.elements = {
@@ -97,7 +98,7 @@ const ChatUI = {
 
   createMessageElement(sender, text) {
     const messageDiv = document.createElement("div");
-    messageDiv.className = "flex items-start space-x-3";
+    messageDiv.className = `flex items-start space-x-3 chat-message chat-message-${sender}`;
 
     // Create avatar container
     const avatarContainer = document.createElement("div");
@@ -183,73 +184,200 @@ const ChatUI = {
       this.elements.chatMessages.scrollHeight;
   },
 
+  renderMarkdown(element, text) {
+    // Sin DOMPurify no se asigna HTML: se muestra el texto plano (D4). Las
+    // imágenes también se descartan: el texto lo genera un LLM y una URL de
+    // imagen haría que el navegador cargue recursos de terceros.
+    if (window.DOMPurify) {
+      element.innerHTML = window.DOMPurify.sanitize(
+        this.converter.makeHtml(text),
+        { FORBID_TAGS: ["img", "style", "form", "input"] },
+      );
+    } else {
+      element.textContent = text;
+    }
+  },
+
   updateBotMessage(messageDiv, text) {
     const textDiv = messageDiv.querySelector(".message-text");
-    textDiv.innerHTML = this.converter.makeHtml(text);
+    this.renderMarkdown(textDiv, text);
     this.scrollToBottom();
   },
 
-  async sendMessage(message) {
-    if (!message) return;
-
-    ChatUI.elements.userInput.disabled = true;
-    ChatUI.appendMessage("user", message);
-
-    const loadingDiv = ChatUI.createLoadingIndicator();
-    ChatUI.elements.chatMessages.appendChild(loadingDiv);
-    ChatUI.scrollToBottom();
-
-    try {
-      await this.processResponse(message, loadingDiv);
-    } catch (error) {
-      console.error("Error:", error);
-      loadingDiv.remove();
-      ChatUI.appendMessage(
-        "bot",
-        "Sorry, there was an error processing your message.",
-      );
-    } finally {
-      ChatUI.elements.userInput.disabled = false;
+  setBusy(busy) {
+    this.busy = busy;
+    this.elements.userInput.disabled = busy;
+    this.elements.sendButton.disabled = busy;
+    if (!busy) {
+      this.elements.userInput.focus();
     }
   },
 
-  async processResponse(message, loadingDiv) {
+  async sendMessage(message) {
+    if (!message || this.busy) return;
+
+    this.setBusy(true);
+    this.appendMessage("user", message);
+
+    const turn = {
+      loadingDiv: this.createLoadingIndicator(),
+      botMessageDiv: null,
+      runningText: "",
+      finished: false,
+    };
+    this.elements.chatMessages.appendChild(turn.loadingDiv);
+    this.scrollToBottom();
+
+    try {
+      await this.processResponse(message, turn);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      if (!turn.finished) {
+        this.showError(turn, { type: "assistant-unavailable" });
+      }
+      turn.loadingDiv.remove();
+      this.setBusy(false);
+    }
+  },
+
+  async processResponse(message, turn) {
     const response = await this.fetchBotResponse(message);
 
-    if (response.status !== 200) {
-      throw new Error("Error fetching bot response");
+    if (response.status !== 200 || !response.body) {
+      throw new Error(`Unexpected chat response status ${response.status}`);
     }
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let runningText = "";
-    let botMessageDiv = null;
+    let buffer = "";
 
-    while (true) {
+    while (!turn.finished) {
       const { value, done } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n\n");
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n?/g, "\n");
 
-      for (const line of lines) {
-        if (line.startsWith("data:")) {
-          try {
-            const data = JSON.parse(line.slice(5));
+      let separator;
+      while (!turn.finished && (separator = buffer.indexOf("\n\n")) >= 0) {
+        const block = buffer.slice(0, separator);
+        buffer = buffer.slice(separator + 2);
 
-            if (!botMessageDiv) {
-              loadingDiv.remove();
-              botMessageDiv = ChatUI.createMessageElement("bot", "");
-              ChatUI.elements.chatMessages.appendChild(botMessageDiv);
-            }
-
-            runningText += data.text;
-            ChatUI.updateBotMessage(botMessageDiv, runningText);
-          } catch (e) {
-            console.error("Error parsing SSE data:", e);
-          }
+        const event = this.parseEvent(block);
+        if (event) {
+          this.dispatchEvent(event, turn);
         }
       }
     }
+
+    if (turn.finished) {
+      reader.cancel().catch(() => {});
+    }
+  },
+
+  // Un evento SSE: varias líneas "data:" se unen con "\n", "event:" da el
+  // nombre (sin nombre = "message") y las líneas que empiezan con ":" son
+  // comentarios (keepalive).
+  parseEvent(block) {
+    let name = "message";
+    const data = [];
+
+    for (const line of block.split("\n")) {
+      if (line === "" || line.startsWith(":")) continue;
+
+      const colon = line.indexOf(":");
+      const field = colon >= 0 ? line.slice(0, colon) : line;
+      let value = colon >= 0 ? line.slice(colon + 1) : "";
+      if (value.startsWith(" ")) value = value.slice(1);
+
+      if (field === "event") {
+        name = value || "message";
+      } else if (field === "data") {
+        data.push(value);
+      }
+    }
+
+    if (data.length === 0) return null;
+
+    return { name, data: data.join("\n") };
+  },
+
+  parseData(event) {
+    try {
+      return JSON.parse(event.data);
+    } catch (e) {
+      console.error("Error parsing SSE data:", e);
+      return null;
+    }
+  },
+
+  dispatchEvent(event, turn) {
+    switch (event.name) {
+      case "message": {
+        const data = this.parseData(event);
+        if (data && typeof data.text === "string") {
+          this.ensureBotMessage(turn);
+          turn.runningText += data.text;
+          this.updateBotMessage(turn.botMessageDiv, turn.runningText);
+        }
+        break;
+      }
+      case "cart-updated":
+        CartUI.handleCartUpdated(this.parseData(event) || {});
+        break;
+      case "done":
+        turn.finished = true;
+        break;
+      case "error":
+        turn.finished = true;
+        this.showError(turn, this.parseData(event) || {});
+        break;
+      default:
+        // products, tool y eventos desconocidos no se muestran (D4).
+        break;
+    }
+  },
+
+  ensureBotMessage(turn) {
+    if (!turn.botMessageDiv) {
+      turn.loadingDiv.remove();
+      turn.botMessageDiv = this.createMessageElement("bot", "");
+      this.elements.chatMessages.appendChild(turn.botMessageDiv);
+    }
+  },
+
+  errorMessage(error) {
+    switch (error.type) {
+      case "llm-quota-exceeded":
+        return Number.isFinite(error.retryAfterSeconds)
+          ? `Our operatives are overloaded, try again in ~${error.retryAfterSeconds} seconds.`
+          : "Our operatives are overloaded, try again in a few moments.";
+      case "session-busy":
+        return "I'm still working on your previous request. Wait for the current answer and try again.";
+      case "invalid-parameter":
+        return "I can't process that message. Keep it under 2000 characters and try again.";
+      case "assistant-unavailable":
+        return "The assistant is unavailable right now. Please try again later.";
+      default:
+        return "Sorry, there was an error processing your message. Please try again.";
+    }
+  },
+
+  // El aviso se agrega debajo del texto ya recibido, sin borrarlo.
+  showError(turn, error) {
+    turn.finished = true;
+    this.ensureBotMessage(turn);
+
+    const errorP = document.createElement("p");
+    errorP.className = "chat-error italic";
+    if (turn.runningText) {
+      errorP.className += " mt-2";
+    }
+    errorP.textContent = this.errorMessage(error);
+
+    const textDiv = turn.botMessageDiv.querySelector(".message-text");
+    textDiv.insertAdjacentElement("afterend", errorP);
+    this.scrollToBottom();
   },
 
   async fetchBotResponse(message) {
@@ -263,6 +391,59 @@ const ChatUI = {
     });
   },
 };
+// Refleja en la página los cambios de carrito hechos desde el chat (D6).
+const CartUI = {
+  refreshTimer: null,
+  refreshDelayMs: 300,
+
+  handleCartUpdated(data) {
+    const count = data.cartItemCount;
+    if (Number.isFinite(count)) {
+      this.setCount(count);
+    }
+    if (!Number.isFinite(count) || document.getElementById("basket")) {
+      this.scheduleRefresh();
+    }
+  },
+
+  setCount(count) {
+    const counter = document.getElementById("cart-count");
+    if (counter) {
+      counter.textContent = count;
+    }
+  },
+
+  scheduleRefresh() {
+    clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => this.refresh(), this.refreshDelayMs);
+  },
+
+  async refresh() {
+    try {
+      const response = await fetch(`${ChatUI.contextPath}cart`, {
+        headers: { Accept: "text/html" },
+      });
+      if (!response.ok) return;
+
+      const html = await response.text();
+      const page = new DOMParser().parseFromString(html, "text/html");
+
+      const basket = document.getElementById("basket");
+      const newBasket = page.getElementById("basket");
+      if (basket && newBasket) {
+        basket.replaceWith(document.importNode(newBasket, true));
+      }
+
+      const newCount = page.getElementById("cart-count");
+      if (newCount) {
+        this.setCount(newCount.textContent.trim());
+      }
+    } catch (error) {
+      console.error("Error refreshing cart:", error);
+    }
+  },
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   ChatUI.init(retailContextPath);
 });
