@@ -537,7 +537,7 @@ data:
   # Chat (add-assistant-chat, D11). Los extra-body de razonamiento se cambian
   # con SPRING_APPLICATION_JSON (ver el README del assistant), por ejemplo:
   # SPRING_APPLICATION_JSON: '{"retail.assistant.chat.reasoning.on-extra-body":{"chat_template_kwargs":{"thinking":true}}}'
-  RETAIL_ASSISTANT_REWRITE_TIMEOUT: 5s
+  RETAIL_ASSISTANT_REWRITE_TIMEOUT: 12s
   RETAIL_ASSISTANT_REWRITE_HISTORY_TURNS: "3"
   RETAIL_ASSISTANT_CHAT_RETRIEVAL_K: "5"
   RETAIL_ASSISTANT_CHAT_MIN_SCORE: "0"

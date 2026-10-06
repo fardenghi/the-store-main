@@ -40,7 +40,7 @@ con variables de entorno (en el cluster, desde el ConfigMap `assistant`).
 | `RETAIL_ASSISTANT_SEARCH_DEFAULT_K` / `_MAX_K`        | Resultados de la búsqueda (default / máximo)         | `5` / `20`                              |
 | `RETAIL_ASSISTANT_SEARCH_SIMILAR_DEFAULT_K` / `_SIMILAR_MAX_K` | Similares (default / máximo)                | `4` / `12`                              |
 | `RETAIL_ASSISTANT_SEARCH_QUERY_CACHE_SIZE`            | Entradas del caché de embeddings de consultas        | `256`                                   |
-| `RETAIL_ASSISTANT_REWRITE_TIMEOUT`                    | Tiempo límite de la reescritura; si se excede, se usa el mensaje crudo | `5s`                  |
+| `RETAIL_ASSISTANT_REWRITE_TIMEOUT`                    | Tiempo límite de la reescritura; si se excede, se usa el mensaje crudo | `12s`                 |
 | `RETAIL_ASSISTANT_REWRITE_HISTORY_TURNS`              | Turnos de la sesión que recibe la reescritura        | `3`                                     |
 | `RETAIL_ASSISTANT_CHAT_RETRIEVAL_K`                   | Productos que recibe el modelo principal (1 a 20)    | `5`                                     |
 | `RETAIL_ASSISTANT_CHAT_MIN_SCORE`                     | Umbral de score de la búsqueda (0 lo desactiva)      | `0`                                     |
@@ -110,8 +110,9 @@ Al quedar listo, el servicio sincroniza en segundo plano la colección
    lectura del catálogo fue completa).
 
 El texto embebido es el nombre, los `displayName` de los tags y la descripción
-(plantilla versión 2). El primer arranque gasta 1 request a Gemini; los
-reinicios sin cambios, 0. Ante un 429 o un 5xx de Gemini reintenta hasta 5
+(plantilla versión 2). El primer arranque hace 1 request HTTP a Gemini
+(`batchEmbedContents`), pero la cuota cuenta cada texto del lote: son 80 de
+las 1.000 requests diarias. Los reinicios sin cambios gastan 0. Ante un 429 o un 5xx de Gemini reintenta hasta 5
 veces por lote; con la clave inválida o sin configurar no reintenta y la
 sincronización queda fallida (no se reintenta sola: corregir la causa y
 reiniciar).
@@ -251,8 +252,17 @@ Tipos del evento `error`:
 | `llm-provider-unauthorized`  | Clave de NVIDIA sin configurar o inválida (401/403)                    |
 | `llm-provider-unavailable`   | NVIDIA respondió 5xx, no hubo red, o se excedió un tiempo límite (20 s al primer fragmento, 60 s con razonamiento, 120 s por turno) |
 
-Si la reescritura falla o tarda más de 5 s, el turno sigue con el mensaje
-crudo como consulta. Si el índice o los embeddings no están disponibles, el
+Si la reescritura falla o tarda más de 12 s, el turno sigue con el mensaje
+crudo como consulta. El tiempo límite era de 5 s en el diseño (D4) y se subió
+porque la latencia de `nemotron-3.5-lightning-30b-a3b` es bimodal: el
+2026-10-06 cinco llamadas directas con un prompt mínimo tardaron 9,8 / 1,6 /
+8,9 / 1,7 / 1,7 s, y en el e2e 8 de 15 reescrituras superaron los 5 s. Con
+5 s, la mitad de los turnos perdía la reescritura, y con ella los filtros de
+"cheaper" y la intención `other` de los saludos. El costo es que un turno con
+la reescritura lenta tarda unos 10 s hasta el evento `products`. En la línea
+`assistant.turn`, `rewrite=ok|fallback` y `rewriteMs` muestran si la
+reescritura cayó al fallback y cuánto tardó, para ajustar
+`RETAIL_ASSISTANT_REWRITE_TIMEOUT`. Si el índice o los embeddings no están disponibles, el
 turno sigue sin productos y el asistente dice que no puede consultar el
 catálogo. Ninguna de esas fallas afecta la readiness.
 
@@ -265,7 +275,7 @@ proveedor):
 | `409`  | `session-busy`      | La sesión ya tiene un turno en curso                                     |
 
 ```bash
-curl -N -H 'X-Session-ID: demo' -H 'Content-Type: application/json' \
+curl -sN -H 'X-Session-ID: demo' -H 'Content-Type: application/json' \
   -d '{"message":"I need a lamp for my desk"}' localhost:8080/assistant/chat
 ```
 
@@ -282,6 +292,11 @@ data:{"text":", requesting illumination for your desk?"}
 event:done
 data:{}
 ```
+
+Verificado el 2026-10-06 tal como está escrito, contra un `assistant` local
+(`./mvnw spring-boot:run` con Qdrant en Docker, `catalog` en el puerto 8081 y
+claves válidas; ver "Running"): 5 lámparas en `products`, la respuesta en
+fragmentos y `done`, con 2 requests a NVIDIA y la primera respuesta a ≈2,3 s.
 
 Pendiente para `integrate-ui-assistant`: hoy `chat.js` de la `ui` toma como
 texto cualquier línea `data:`. Tiene que distinguir los eventos con nombre
@@ -364,8 +379,19 @@ reintentan ante un 429:
   consulta da vectores distintos, y la clave placeholder da `UNAUTHORIZED`
   (2 requests a Gemini y 1 rechazada).
 - `SearchQualitySmokeIT`: indexa el catálogo real en un Qdrant de
-  Testcontainers y mide los criterios de calidad de la búsqueda (5 requests a
-  Gemini: 1 para indexar y 4 consultas).
+  Testcontainers y mide los criterios de calidad de la búsqueda (84 requests a
+  Gemini: 80 para indexar, porque la cuota cuenta cada texto del lote, y 4
+  consultas).
+- `ModelSpikeSmokeIT`: spike de los modelos de chat (15 requests a NVIDIA, ver
+  abajo).
+- `RewriteEvalSmokeIT`: evaluación de la reescritura (10 requests a NVIDIA; en
+  Gemini, 80 para indexar y unas 20 búsquedas, ver abajo).
+- `ChatEndToEndSmokeIT`: los escenarios de la spec `assistant-chat` de punta a
+  punta por `POST /assistant/chat` (unas 28 requests a NVIDIA; en Gemini, 80
+  para indexar y 1 por turno con búsqueda). Con `-Dsmoke.qdrant.host`,
+  `-Dsmoke.qdrant.port` y `-Dsmoke.qdrant.collection` reutiliza una colección
+  ya indexada (por ejemplo, la del `assistant` local) y no gasta las 80 de la
+  indexación.
 
 Para correr uno solo:
 `./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=SearchQualitySmokeIT`.
@@ -423,7 +449,28 @@ Los dos cumplen el criterio de D12, así que los defaults no cambian. Como el
 razonamiento nunca llega dentro del texto, el `ThinkTagFilter` queda
 desactivado por defecto (`retail.assistant.chat.reasoning.strip-think-tags`).
 
-<!-- PLAN-B -->
+#### Plan B
+
+Los modelos del plan B no se pudieron verificar con la cuenta del grupo. Se
+probaron dos veces el 2026-10-06 (de madrugada con el spike completo y, al
+mediodía, con un único request mínimo de `max_tokens` 32 a cada uno):
+
+| Modelo | Uso | Streaming | Thinking on/off por request | Tool calling en streaming | Latencia |
+| --- | --- | --- | --- | --- | --- |
+| `nvidia/nemotron-3-super-120b-a12b` | Principal | OK | OK (`enable_thinking`) | OK | Primer fragmento a 1,3 s (2,5 s con razonamiento) |
+| `nvidia/nemotron-3.5-lightning-30b-a3b` | Reescritura | — | Off OK (`enable_thinking: false`) | — | Mediana 1,5 s |
+| `deepseek-ai/deepseek-v4.1-flash` | Plan B principal | Sin verificar | Sin verificar | Sin verificar | Sin respuesta: el request no devolvió ni un byte en 100 s (spike) ni en 90 s (reintento) |
+| `google/gemma-3-12b-it` | Plan B reescritura | Sin verificar | Sin verificar | Sin verificar | `404` "Function '…': Not found for account" en 0,5 s: el modelo figura en `/v1/models` pero la cuenta no tiene acceso |
+
+Los `extra-body` del ejemplo de arriba (`chat_template_kwargs.thinking` para
+DeepSeek y `{}` para Gemma, que no tiene modo de razonamiento) son los de sus
+chat templates, sin verificar. Como los modelos principales cumplen D12, los
+defaults no cambian. El plan B de hoy no es usable con esta cuenta; candidatos
+que la cuenta lista en `/v1/models` (solo leídos, sin llamarlos):
+`google/gemma-4-31b-it`, `google/gemma-3-4b-it`, `openai/gpt-oss-20b`,
+`nvidia/nemotron-nano-3-30b-a3b` y `nvidia/nemotron-3-ultra-550b-a55b`.
+Elegir el reemplazo es una decisión del grupo; para probar uno alcanza con
+`ModelSpikeSmokeIT` y las propiedades `-Dspike.*`.
 
 ### Modelos probados
 
@@ -432,3 +479,100 @@ desactivado por defecto (`retail.assistant.chat.reasoning.strip-think-tags`).
 | 2026-10-06 | Principal   | `nvidia/nemotron-3-super-120b-a12b`     | OK, responde con thinking apagado  |
 | 2026-10-06 | Reescritura | `nvidia/nemotron-3.5-lightning-30b-a3b` | OK, responde con thinking apagado  |
 | 2026-10-06 | Embeddings  | `gemini-embedding-001`                  | OK, vector de 768 dimensiones      |
+
+### Evaluación de la reescritura (`RewriteEvalSmokeIT`)
+
+`src/test/resources/rewrite-eval.json` tiene 10 consultas (conversacionales,
+con muletillas, con errores de tipeo, con referencia a un turno previo simulado
+y en español) y, para cada una, el predicado que cumplen los productos
+esperados (tags y precio). El test busca cada consulta cruda y reescrita y
+cuenta los productos esperados en el top-5. Resultado de la última corrida
+(2026-10-06):
+
+| Consulta | Tipo | Mensaje | Consulta reescrita | Top-5 crudo | Top-5 reescrito |
+| --- | --- | --- | --- | --- | --- |
+| conversational-reading-corner | conversacional con muletillas | `hey, so my reading corner is kinda sad, got anything comfy to sink into?` | `comfy reading chair` | 5 | 5 |
+| filler-desk-lamp | muletillas | `ummm i guess i need like a lamp or something for my desk lol` | (fallback: el mensaje crudo) | 5 | 5 |
+| typos-velvet-armchair | errores de tipeo | `lookin for a mid sentury velvit armchiar` | `mid-century velvet armchair` | 5 | 5 |
+| previous-turn-leather | referencia a un turno previo | `something similar but in leather` | `leather armchair` | 5 | 4 |
+| previous-turn-cheaper | referencia a un turno previo | `too pricey, anything cheaper?` | `sofa`, `maxPrice=988` | 1 | 5 |
+| previous-turn-not-a-lamp | referencia a un turno previo | `nah, not a lamp. what else could make it cozier?` | `cozy home decor seating tables storage rugs beds`, excluye `lighting` | 3 | 5 |
+| spanish-rug | en español | `busco una alfombra para el living` | `rug for living room` | 5 | 5 |
+| spanish-desk | en español | `necesito un escritorio para trabajar desde casa` | `home office desk` | 5 | 5 |
+| filler-bookshelf | muletillas y abreviaturas | `smth to put my books on, like a shelf i guess` | `bookshelf` | 4 | 4 |
+| conversational-bed | conversacional | `ok so where do I even sleep in this lair? need something big enough for two` | `bed for two people` | 4 | 4 |
+| **Total** | | | | **42** | **47** |
+
+En tres corridas la reescrita acertó 45, 43 y 47 contra 42 de la cruda. La
+ganancia está en las referencias al turno anterior ("cheaper", "not a lamp"),
+que sin reescritura no tienen de dónde sacar el precio ni la exclusión; con
+consultas autocontenidas, los embeddings de `gemini-embedding-001` ya toleran
+muletillas, errores de tipeo y español, y las dos dan lo mismo. La única
+pérdida es `previous-turn-leather` (5 → 4).
+
+### Escenarios de punta a punta (`ChatEndToEndSmokeIT`)
+
+Recorre los escenarios de la spec `assistant-chat` contra el `assistant`
+completo, con NVIDIA y Gemini reales:
+
+```bash
+./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dit.test=ChatEndToEndSmokeIT \
+  -Dsmoke.qdrant.host=localhost -Dsmoke.qdrant.port=6334 -Dsmoke.qdrant.collection=products
+```
+
+Resultado del 2026-10-06, reutilizando la colección del `assistant` local (la
+sincronización dio 80 sin cambios y 0 requests a Gemini): 10 de 10, con 30
+requests a NVIDIA (15 turnos de 2) y un embedding por turno con búsqueda.
+
+| Escenario | Resultado | Intentos |
+| --- | --- | --- |
+| Saludo sin búsqueda ni embeddings | OK (`intent=other`) | 3: la primera corrida reveló que el prompt de reescritura clasificaba los saludos como búsquedas (se corrigió pasando el mensaje como user); la segunda falló porque la reescritura superó los 5 s y cayó al fallback |
+| Recomendación con productos reales (cada nombre y precio está en `products`) | OK | 1 |
+| "a gaming laptop": sin productos inventados | OK | 1 |
+| "cheaper": todos los productos del segundo turno más baratos | OK (`maxPrice=128` sobre un recomendado de $139) | 2: en la segunda corrida la reescritura cayó al fallback por el tiempo límite de 5 s |
+| "not a lamp": ningún `lighting` | OK (`excludeTags=[lighting]`) | 1 |
+| "which of those is the cheapest?" y sesiones aisladas | OK | 1 |
+| Comparación con precios, diferencia, dos atributos y recomendación condicionada | OK (`intent=compare`, `reasoning=on`, sin razonamiento en el stream) | 1 |
+| Búsqueda simple sin razonamiento (2 requests a NVIDIA) | OK | 1 |
+| Respuesta en español | OK | 1 |
+| Intento de revelar el system prompt | OK (`intent=other`, no filtra el prompt) | 1 |
+
+Por la latencia bimodal de la reescritura (ver `POST /assistant/chat`), en la corrida que pasó 2 de las 15 reescrituras igual
+superaron los 12 s y usaron el mensaje crudo ("a gaming laptop" y la sesión
+aislada); ninguno de esos dos escenarios depende de los filtros.
+
+
+### Verificación en el cluster
+
+Verificado el 2026-10-06 en kind (`./local.sh reload-images` y
+`dist/kubernetes.yaml`):
+
+1. **Sin reindexar:** se subió al Qdrant del cluster un snapshot de la
+   colección ya indexada en local (`POST /collections/products/snapshots/upload`,
+   con el `contentHash` en el payload). Al arrancar con las claves, la
+   sincronización dio `80 sin cambios, 0 requests al proveedor de embeddings`.
+2. **Conversación de tres turnos** desde el pod de la `ui`, con la misma
+   sesión:
+
+   ```bash
+   kubectl exec -n the-store deploy/ui -- curl -sN -H 'X-Session-ID: cluster-demo' \
+     -H 'Content-Type: application/json' -d '{"message":"I'"'"'m looking for a velvet armchair"}' \
+     http://assistant/assistant/chat
+   ```
+
+   | Turno | Reescritura | Resultado |
+   | --- | --- | --- |
+   | "I'm looking for a velvet armchair" | `velvet armchair` | Recomienda el Aiden Mid-Century Velvet Armchair ($139). Top-k reescrito y crudo con solapamiento 4 |
+   | "cheaper" | `velvet armchair`, `maxPrice=128` | Todos los productos por debajo de $139; recomienda la Allie Velvet Dining Chair ($109). Solapamiento 0: la consulta cruda "cheaper" trae alfombras y macetas |
+   | "compare the first two" | `intent=compare`, `reasoning=on` (3.045 caracteres de razonamiento, fuera del stream) | Compara los dos primeros del turno anterior con precios y diferencia ($90), recomendación condicionada. Primer fragmento a 18 s |
+
+   Cada turno dejó su línea `assistant.turn` en `kubectl logs deploy/assistant`
+   con `topk` y `rawTopk`.
+3. **No expuesto:** `POST http://localhost/assistant/chat` (por el ingress)
+   responde el `404` de la `ui` y no llega al `assistant`.
+4. **Sin clave de NVIDIA** (`./local.sh update-secrets` sin `NVIDIA_API_KEY`):
+   el turno manda `products` y termina con
+   `event:error` / `{"type":"llm-provider-unauthorized",…}`; el pod sigue
+   `1/1 Running` y `/actuator/health/readiness` en `UP`. Después se restauró la
+   clave con `./local.sh update-secrets`.

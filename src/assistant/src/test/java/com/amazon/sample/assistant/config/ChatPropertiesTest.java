@@ -31,7 +31,7 @@ class ChatPropertiesTest {
     runner.run(context -> {
       ChatProperties properties = context.getBean(ChatProperties.class);
 
-      assertThat(properties.rewrite().timeout()).isEqualTo(Duration.ofSeconds(5));
+      assertThat(properties.rewrite().timeout()).isEqualTo(Duration.ofSeconds(12));
       assertThat(properties.rewrite().historyTurns()).isEqualTo(3);
       ChatProperties.Chat chat = properties.chat();
       assertThat(chat.retrievalK()).isEqualTo(5);
