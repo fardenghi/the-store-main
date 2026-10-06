@@ -1,0 +1,77 @@
+[
+  {
+    "id": "conversational-reading-corner",
+    "kind": "conversacional con muletillas",
+    "message": "hey, so my reading corner is kinda sad, got anything comfy to sink into?",
+    "expected": {"all": ["seating"], "any": ["living-room", "bedroom"]}
+  },
+  {
+    "id": "filler-desk-lamp",
+    "kind": "muletillas",
+    "message": "ummm i guess i need like a lamp or something for my desk lol",
+    "expected": {"all": ["lighting"]}
+  },
+  {
+    "id": "typos-velvet-armchair",
+    "kind": "errores de tipeo",
+    "message": "lookin for a mid sentury velvit armchiar",
+    "expected": {"all": ["seating", "velvet"]}
+  },
+  {
+    "id": "previous-turn-leather",
+    "kind": "referencia a un turno previo",
+    "history": {
+      "user": "a velvet armchair for my living room",
+      "assistant": "Field report, Operative: the Aiden Mid-Century Velvet Armchair ($139) is your best low-profile perch, and the Cliff Round Velvet Pouf ($129) works as a footrest.",
+      "products": ["Aiden Mid-Century Velvet Armchair", "Cliff Round Velvet Pouf", "Alonzo Velvet Loveseat"]
+    },
+    "message": "something similar but in leather",
+    "expected": {"all": ["seating", "leather"]}
+  },
+  {
+    "id": "previous-turn-cheaper",
+    "kind": "referencia a un turno previo",
+    "history": {
+      "user": "a sofa for the living room",
+      "assistant": "Intel suggests the Westview Extra-Deep Leather Sofa ($989), deep enough to hide a whole stakeout team.",
+      "products": ["Westview Extra-Deep Leather Sofa", "Thomas Leather Sofa", "Bradbury Chesterfield Sofa"]
+    },
+    "message": "too pricey, anything cheaper?",
+    "expected": {"all": ["seating"], "maxPrice": 988}
+  },
+  {
+    "id": "previous-turn-not-a-lamp",
+    "kind": "referencia a un turno previo",
+    "history": {
+      "user": "something to light up my reading nook",
+      "assistant": "For covert reading ops: the Torchiere Floor Lamp with Reading Light ($139) or the Mid-Century Standing Floor Lamp ($139).",
+      "products": ["Torchiere Floor Lamp with Reading Light", "Mid-Century Standing Floor Lamp", "Vintage 3-Joint Floor Lamp"]
+    },
+    "message": "nah, not a lamp. what else could make it cozier?",
+    "expected": {"none": ["lighting"], "any": ["seating", "storage", "rugs", "decor"]}
+  },
+  {
+    "id": "spanish-rug",
+    "kind": "en español",
+    "message": "busco una alfombra para el living",
+    "expected": {"all": ["rugs"]}
+  },
+  {
+    "id": "spanish-desk",
+    "kind": "en español",
+    "message": "necesito un escritorio para trabajar desde casa",
+    "expected": {"all": ["tables", "office"]}
+  },
+  {
+    "id": "filler-bookshelf",
+    "kind": "muletillas y abreviaturas",
+    "message": "smth to put my books on, like a shelf i guess",
+    "expected": {"all": ["storage"]}
+  },
+  {
+    "id": "conversational-bed",
+    "kind": "conversacional",
+    "message": "ok so where do I even sleep in this lair? need something big enough for two",
+    "expected": {"all": ["beds"]}
+  }
+]

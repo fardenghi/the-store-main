@@ -211,3 +211,14 @@ Agregados que no contradicen la pre-entrega: el evento `products` del SSE (D1) y
 ## Open Questions
 
 - Los `extra-body` exactos de razonamiento de los modelos del plan B (`deepseek-ai/deepseek-v4.1-flash` y `google/gemma-3-12b-it`) los define el spike (D12). Solo cambian valores de configuración, no el diseño.
+
+## Resultados del apply (2026-10-06)
+
+- **Spike (D12):** `nemotron-3-super` cumple streaming, thinking on/off por request y tool calling en streaming; el razonamiento llega en `reasoning_content`, fuera del texto, así que `ThinkTagFilter` queda apagado por defecto (`reasoning.strip-think-tags=false`). `nemotron-3.5-lightning`: mediana 1,5 s, 1 de 10 inválido. Defaults sin cambios. Plan B no verificable: `deepseek-ai/deepseek-v4.1-flash` no respondió en 100 s y `google/gemma-3-12b-it` devuelve 404 "Function not found for account". Pendiente del grupo revisar el plan B (en `/v1/models` aparecen, sin probar, `google/gemma-4-31b-it` y `google/gemma-3-4b-it`); cambiarlo es una decisión cerrada de CLAUDE.md.
+- **Opciones por request:** `.options()` del `ChatClient` reemplaza los `defaultOptions` del cliente, así que `ReasoningPolicy` arma una copia de las opciones base con el `extraBody` y `maxTokens` del turno (no hizo falta crear dos clientes principales).
+- **`extra-body`:** los defaults viven en `ChatProperties` y no en el YAML, porque Spring combina las claves de un mapa definido en varias fuentes y un `SPRING_APPLICATION_JSON` no podría reemplazarlo. Un mapa vacío explícito manda el request sin campos extra.
+- **Reescritura:** las instrucciones van como system y el mensaje como user; con el mensaje embebido en el prompt, el modelo clasificaba los saludos como búsquedas. Si la lista de tags no está disponible, los `excludeTags` no se pueden validar y se ignoran. La latencia del modelo compacto tiene cola larga (≈1 de 10 llamadas supera los 5 s de D4 y cae al fallback).
+- **Tiempos límite y keepalive** configurables en `retail.assistant.chat.timeouts` (defaults de D10/D1).
+- **Smoke tests** con sufijo `SmokeIT` (convención del servicio: los corre failsafe solo con `-Psmoke`). El catálogo de los smoke se sirve con un `HttpServer` del JDK y no con `MockRestServiceServer`, porque el `RestClient.Builder` autoconfigurado también lo usa el cliente de NVIDIA.
+- **Cuota de Gemini:** `batchEmbedContents` cuenta **cada texto** como una request, tanto para el RPM como para el límite diario (`EmbedContentRequestsPerDayPerUserPerProjectPerModel-FreeTier`, 1.000): una reindexación completa son 80 requests. El 2026-10-06 se agotó la cuota diaria durante la verificación. Recomendación: que los smoke/e2e reutilicen una colección ya indexada (`ChatEndToEndSmokeIT` acepta `-Dsmoke.qdrant.host/port/collection`) y corran con `compare-raw-retrieval=false`.
+- **Evaluación (9.2):** tres corridas, reescrita 45 / 43 / 47 contra cruda 42 aciertos en el top-5.

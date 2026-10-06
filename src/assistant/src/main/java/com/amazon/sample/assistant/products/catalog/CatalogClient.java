@@ -32,6 +32,9 @@ public class CatalogClient {
   private static final ParameterizedTypeReference<List<CatalogProduct>> PRODUCTS =
       new ParameterizedTypeReference<>() { };
 
+  private static final ParameterizedTypeReference<List<CatalogProduct.Tag>> TAGS =
+      new ParameterizedTypeReference<>() { };
+
   private final RestClient restClient;
   private final int pageSize;
   private final Backoff backoff;
@@ -63,6 +66,22 @@ public class CatalogClient {
         throw new CatalogReadException("Error al leer el catálogo: " + e.getMessage(), e);
       }
     }
+  }
+
+  /**
+   * Devuelve los tags del catálogo ({@code GET /catalog/tags}) en una sola
+   * llamada, sin reintentos: la usa la reescritura de consulta, que ante un
+   * error sigue sin la lista y la vuelve a pedir en el turno siguiente (D4 de
+   * {@code add-assistant-chat}).
+   *
+   * @throws RestClientException si {@code catalog} no responde o responde un error
+   */
+  public List<CatalogProduct.Tag> fetchTags() {
+    List<CatalogProduct.Tag> tags = restClient.get()
+        .uri("/catalog/tags")
+        .retrieve()
+        .body(TAGS);
+    return tags == null ? List.of() : List.copyOf(tags);
   }
 
   private List<CatalogProduct> readAllPages() {

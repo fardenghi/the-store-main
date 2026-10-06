@@ -63,6 +63,11 @@
       <groupId>org.springframework.ai</groupId>
       <artifactId>spring-ai-starter-model-google-genai-embedding</artifactId>
     </dependency>
+    <!-- Memoria de las sesiones de chat (versión del BOM de Spring Boot) -->
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
     <!-- Vector store: Qdrant por gRPC -->
     <dependency>
       <groupId>org.springframework.ai</groupId>
@@ -72,6 +77,11 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-test</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- Qdrant real en los tests de integración (requiere Docker) -->
