@@ -6,28 +6,27 @@ Con los 6 changes implementados, el punto débil del asistente pasó a ser el mo
 
 ## What Changes
 
-- **Benchmark reproducible de modelos** sobre los smoke que ya existen en `src/assistant`: `ModelSpikeSmokeIT`, `RewriteEvalSmokeIT`, `ToolsEndToEndSmokeIT`, `ChatEndToEndSmokeIT` y `MultiTurnCartSmokeIT`. Se parametrizan por modelo (principal y de reescritura, con su `extra-body`) y se corren N veces por candidato, reutilizando la colección de Qdrant ya indexada (0 embeddings de indexación).
-- **Métricas por candidato:**
+- **Evaluación secuencial, de a un candidato:** se evalúa un candidato por vez y se frena en el primero que cumpla el criterio de aceptación. No se corre una comparación de todos contra todos. El primer candidato es `meta/muse-glimmer-30b`, para los dos roles (principal y reescritura). Si pasa, se adopta y no se prueban otros modelos.
+- **Benchmark reproducible** sobre los smoke que ya existen en `src/assistant`: `ModelSpikeSmokeIT`, `RewriteEvalSmokeIT`, `ToolsEndToEndSmokeIT`, `ChatEndToEndSmokeIT` y `MultiTurnCartSmokeIT`. Se parametrizan por modelo (principal y de reescritura, con su `extra-body`) y se corren N veces, reutilizando la colección de Qdrant ya indexada (0 embeddings de indexación). La línea base (`nemotron-3-super` + `nemotron-3.5-lightning`) se toma de las mediciones ya registradas en los changes archivados y en el README del `assistant`, y solo se vuelve a correr si hace falta comparar algo que no esté medido.
+- **Métricas:**
   - **Modelo principal:** soporte de streaming, tool calling y thinking por request; tasa de escenarios correctos; tool call correcto en el turno de agregado; producto equivocado; confirmaciones descartadas por la salvaguarda (`claimGuard`); vueltas correctivas; preguntar ante un pedido ambiguo; latencia al primer fragmento (p50/p95) y requests de NVIDIA por turno.
   - **Modelo de reescritura:** JSON válido, latencia p50/p95, tasa de fallback con el timeout vigente y el top-5 de `RewriteEvalSmokeIT`.
-- **Candidatos iniciales,** todos en `integrate.api.nvidia.com`; la lista final se confirma leyendo `/v1/models` y descartando los que den 404 para la cuenta:
-  - **Principal:** `nvidia/nemotron-3-super-120b-a12b` (línea base), `z-ai/glm-5.3`, `moonshotai/kimi-k3`, `meta/muse-glimmer-30b`, `nvidia/nemotron-3-ultra-550b-a55b`, `openai/gpt-oss-20b`, `google/gemma-4-31b-it` y un reintento de `deepseek-ai/deepseek-v4.1-flash`.
-  - **Reescritura:** `nvidia/nemotron-3.5-lightning-30b-a3b` (línea base), `z-ai/glm-5.3-flash`, `meta/muse-glimmer-30b`, `nvidia/nemotron-nano-3-30b-a3b`, `google/gemma-3-4b-it` y `openai/gpt-oss-20b`.
-  - **Prioridad:** los propuestos por el grupo (`glm-5.3`, `glm-5.3-flash`, `kimi-k3` y `muse-glimmer-30b`) se evalúan primero, junto con la línea base.
+- **Criterio de aceptación por rol:** se define con umbrales en el design. El flujo de carrito tiene que ser al menos tan correcto como la línea base y sin confirmaciones falsas; el candidato no puede introducir regresiones en los escenarios que hoy pasan; y la latencia tiene que ser aceptable para la demo. Un candidato puede pasar en un rol y no en el otro: en ese caso se adopta solo en ese rol.
+- **Si `muse-glimmer-30b` no pasa** en un rol, el siguiente candidato para ese rol lo elige el grupo, a partir de esta lista: `moonshotai/kimi-k3`, `z-ai/glm-5.3` y `z-ai/glm-5.3-flash` (los propuestos por el grupo), y después `nvidia/nemotron-3-ultra-550b-a55b`, `openai/gpt-oss-20b`, `google/gemma-4-31b-it`, `nvidia/nemotron-nano-3-30b-a3b` y `google/gemma-3-4b-it`.
   - **Sondeo previo** (2026-10-06, un request por modelo, a modo de referencia):
     - `muse-glimmer-30b` respondió en 1,1 s.
     - `kimi-k3` respondió "OK" en 30 s.
     - `glm-5.3` tardó 88 s y devolvió solo razonamiento, porque el thinking viene prendido por defecto.
     - `glm-5.3-flash` no respondió en 120 s.
-  - **Parámetros:** el benchmark tiene que descubrir para cada modelo cómo apagar el thinking, y aplicar un timeout de descarte para los que no respondan.
-- **Decisión documentada:** una tabla comparativa con un criterio de elección explícito. La corrección del flujo de carrito pesa más que la latencia, y la latencia más que el costo en requests. Se elige un modelo principal y uno de reescritura, más un plan B verificado para cada uno.
-- **Nuevos defaults:** se actualizan el `application.yml`, el ConfigMap de `dist/kubernetes.yaml`, el README del `assistant` y las decisiones cerradas de CLAUDE.md con los modelos elegidos y el plan B. Si gana la línea base, solo se actualiza el plan B.
+  - **Parámetros:** para cada candidato hay que descubrir cómo se apaga el thinking, y aplicar un timeout de descarte si no responde.
+- **Plan B:** el modelo que se reemplaza en cada rol queda como plan B, y ya está verificado (por ejemplo, `nemotron-3-super` si gana `muse-glimmer-30b` como principal). Así se reemplaza el plan B actual de CLAUDE.md, que no funciona con la cuenta.
+- **Nuevos defaults:** se actualizan el `application.yml`, el ConfigMap de `dist/kubernetes.yaml`, el README del `assistant` y las decisiones cerradas de CLAUDE.md con los modelos elegidos y el plan B.
 - **Desvío respecto de la pre-entrega:** ninguno nuevo. El proveedor sigue siendo NVIDIA, autorizado por la cátedra; solo cambian los identificadores de modelo dentro de la misma API.
 
 ## Capabilities
 
 ### New Capabilities
-- `assistant-model-evaluation`: benchmark reproducible de modelos de chat del `assistant` (candidatos, métricas, cantidad de corridas, consumo de cuota acotado) y registro de la decisión con su evidencia.
+- `assistant-model-evaluation`: evaluación secuencial y reproducible de modelos de chat del `assistant`: un candidato por vez, métricas, criterio de aceptación por rol, cantidad de corridas, consumo de cuota acotado y registro de la decisión con su evidencia.
 
 ### Modified Capabilities
 - `assistant-service`: cambian los escenarios "Valores por defecto" y "Cambio de modelo principal al plan B" del requirement "Configuración de proveedores sin reconstruir la imagen", para reflejar los modelos elegidos y un plan B verificado.
