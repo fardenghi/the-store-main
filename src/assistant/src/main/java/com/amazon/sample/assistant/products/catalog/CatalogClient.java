@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,7 +164,8 @@ public class CatalogClient {
     for (int attempt = 1; ; attempt++) {
       try {
         return call.get();
-      } catch (ResourceAccessException | HttpServerErrorException e) {
+      } catch (ResourceAccessException | HttpServerErrorException | CancellationException e) {
+        // El cliente HTTP del JDK a veces informa el read-timeout como CancellationException.
         if (attempt >= 2) {
           throw new CatalogUnavailableException(
               operation + " falló después del reintento: " + e.getMessage(), e);
