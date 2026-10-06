@@ -150,3 +150,44 @@ Justificación: el reemplazo del catálogo es necesario para que los casos de us
 ## Open Questions
 
 - Las frases nuevas de D9 se validan contra el asistente real cuando estén `add-product-indexing` y `add-assistant-chat`. Si alguna no cumple el criterio, se ajusta la frase o se agrega un producto a la curación, sin cambiar este diseño.
+
+## Notas de implementación
+
+Resultados de los spikes y decisiones menores tomadas al implementar. Ninguna cambia las decisiones D1–D9 ni el spec.
+
+### Spikes
+
+- **`images/original` por HTTPS (task 1.4):** funciona. `https://amazon-berkeley-objects.s3.amazonaws.com/images/original/<path>` responde `200 image/jpeg` sin autenticación, así que no hizo falta el fallback de Risks.
+- **Metadatos de ABO:** los 16 `listings_<0-f>.json.gz` más `images.csv.gz` pesan ~90 MB y se descargan una sola vez a `.cache/`; una segunda ejecución no descarga nada.
+- **Reproducibilidad:** con `Pillow==12.3.0` fijo, dos ejecuciones de `build` dan los mismos bytes en los 6 JSON y las 160 imágenes.
+
+### Decisiones menores
+
+- **Validaciones extra en `build`**, además de las de D7: `item_id` y nombres sin repetir (dos productos con el mismo nombre volverían ambiguo el orden por nombre de la paginación), `group` válido, ítem existente en ABO y con imagen, y descripción sin la marca. Todos los errores se juntan y se muestran juntos.
+- **`html.unescape` de los bullets:** ABO trae entidades HTML como `&amp;` en algunos textos.
+- **`candidates`:** las palabras clave se buscan en nombre, estilo, material y color, y tienen que aparecer todas (AND). Se agregaron `--with-image`, `--min-bullets` y `--limit` para curar más rápido.
+- **`build --root <dir>`:** escribe los destinos debajo de otro directorio. Se usó para verificar en un directorio temporal sin tocar el repo (tasks 2.5 y 2.6).
+- **Ejes de la taxonomía:** `tags.json` del script tiene el mismo formato que el de salida (`name` y `displayName`). El eje tipo se deriva del mapeo de grupos del script; `data_test.go` declara los tres ejes de forma explícita.
+- **Precio en el piso del rango:** cuando el redondeo de D4 cae por debajo del mínimo, el precio queda en el mínimo (por ejemplo una mesa a $80), sin terminar en 9. Es lo que dice D4 ("con piso en `min`").
+- **Placeholders de imagen en ABO:** algunos ítems tienen como imagen principal un "Image Coming Soon". Las validaciones no lo detectan, así que se revisaron las 80 imágenes a ojo y se reemplazó el único caso (Raven Media Console → Bowlyn Mid-Century Media Stand). El how-to lo menciona como motivo para cambiar un ítem.
+- **Router de los tests de `catalog`:** `test/main_test.go` registraba `""` y `/product/:id`, que no son las rutas de `main.go`. Se alineó con `/products` y `/products/:id`, además de corregir `controller_test.go` (task 4.2).
+- **Base de los tests de integración:** los tests de `test/` corren contra MySQL 8.0 con testcontainers, igual que los que ya existían (la task dice MariaDB). El filtro OR y el conteo se probaron también a mano contra MariaDB 10.9 con el `docker-compose.yml` de `catalog` (`/catalog/size` = 80, 18 tags, `tags=velvet,leather` = 18).
+- **E2E:** además de `cart.cy.js` y `catalog.cy.js` se actualizó `checkout.cy.js`, que también usaba ids del catálogo spy. Los totales esperados son subtotal + $5 de impuesto + $10 de envío, fijos en `checkout`.
+- **Productos de las pruebas:** `cart` y `checkout` usan "Aiden Mid-Century Velvet Armchair" ($139) y "Round Wood Dining Table" ($619), con precios sin separador de miles. El primer producto en orden alfabético es "5-Tier Ladder Bookshelf".
+- **README:** la sección del catálogo y la atribución se escribieron en inglés, como el resto del `README.md`. El detalle está en `docs/how-to.md`, en español.
+
+### Verificación en el cluster
+
+La verificación de las tasks 5.2 y 7.1 se hizo con un cluster kind local (kind v0.33.0, instalado con Homebrew porque no estaba en la máquina), con `./local.sh rebuild-cluster`, que construye las imágenes, despliega `dist/kubernetes.yaml` y corre los e2e:
+
+- `GET /catalog/size` = 80, `GET /catalog/tags` con los 18 tags, y por tipo: `seating` 28, `tables` 15, `storage` 10, `lighting` 9, `beds` 7, `rugs` 6, `decor` 5. El id del "Temporal Tickstopper" da `404`.
+- La UI sirve `/assets/img/products/<id>.jpg` con `200 image/jpeg` para los 80 ids (640×640).
+- `./local.sh e2e-test`: 13/13 tests pasan (`cart`, `catalog`, `checkout`, `home`).
+- También se verificaron `./local.sh reload-images` y `kubectl rollout restart deployment -n the-store` tal como figuran en el how-to.
+
+El cluster se borró al terminar.
+
+### Para `integrate-ui-assistant`
+
+- La paginación de 14 páginas entra bien en `catalog.html` en desktop (1280 px).
+- En modo mock, la lista de categorías de la UI no sale ordenada (`MockCatalogService` guarda los tags en un `HashMap`); contra el servicio real sale ordenada por `displayName`. Es cosmético.

@@ -1,86 +1,947 @@
 [
   {
-    "id": "cc789f85-1476-452a-8100-9e74502198e0",
-    "name": "Temporal Tickstopper",
-    "description": "Stop time for 30 seconds with this vintage-styled pocket watch. Features mechanical wind-up power reserve and temporal disruption failsafe. Includes leather carrying pouch and temporal paradox insurance.",
-    "price": 250,
-    "tags": ["accessories"]
+    "id": "3600929b-2826-5a98-908f-82a1d50bcf2b",
+    "name": "Eva Tufted Velvet Sofa",
+    "description": "Bring stunning, Mid-century elegance to your living room with this hand-tufted sofa featuring luxurious velvet upholstery. The plush down-filled bench cushion is removable and reversible and is held in place by clips at the corners. 87\"W x 35.25''D x 30.25''H. Durable polyester velvet on hardwood frame and brushed brass legs. Modern elegant style with reversible cushion to extend the life of the piece.",
+    "price": 1769,
+    "tags": [
+      "seating",
+      "living-room",
+      "mid-century",
+      "velvet"
+    ]
   },
   {
-    "id": "87e89b11-d319-446d-b9be-50adcca5224a",
-    "name": "Up & Away Parasol",
-    "description": "This innocent-looking umbrella conceals a powerful grappling hook system with 50-meter range. Features weather-resistant fabric, built-in compass, and automatic hook retraction. Includes spare hooks and basic parkour instructions.",
-    "price": 125,
-    "tags": ["clothing"]
+    "id": "c104454c-d70b-5e39-ae01-6374b1bf5d23",
+    "name": "Frederick Channel-Tufted Velvet Sofa",
+    "description": "The rectangular shape and channeled upholstery are unmistakably mid-century, while velvet fabric and shiny metal legs bring glamour to this sofa. This piece is a stunning style statement and a conversation starter for your modern-style room. 77.5\"W x 34.6\"D x 31.4\"H; Seat Height: 17.7\"H; Seat Depth: 23.2\"D; Seat Back Height: 22.2\"H; Arm Height: 31.4\"H; Leg Height: 9.3\"H. Velvet fabric on sturdy wood frame; aluminum legs with brass finish. Mid-century modern meets glam in this statement piece.",
+    "price": 1519,
+    "tags": [
+      "seating",
+      "living-room",
+      "mid-century",
+      "velvet"
+    ]
   },
   {
-    "id": "4f18544b-70a5-4352-8e19-0d070f46745d",
-    "name": "Levitator Oxfords",
-    "description": "Classic Oxford-style shoes concealing cutting-edge anti-gravity technology. Features wall-walking capability, ceiling-escape mode, and auto-stabilization. Available in black or brown. Not recommended for formal dances.",
-    "price": 210,
-    "tags": ["clothing"]
+    "id": "e340a893-20dc-51ea-8e03-ee430eed6b7e",
+    "name": "Alonzo Velvet Loveseat",
+    "description": "A single bench cushion brings visual unity and gently sloping armrests give it a sleek, comfortable style. With a solid-wood frame and strong brass legs, this love seat offers durability and elegance. Overall: 63.8\"W x 37.8\"D x 35.4\"H. Seat Height: 18.11\"H; Seat Depth: 22\"D; Seat Back Height: 17.3\"H; Arm Height: 23.6\"H; Leg Height: 7.1\"H. Solid-wood frame with brass metal legs and velvet upholstery. Bench seat cushion with removable back cushions.",
+    "price": 1339,
+    "tags": [
+      "seating",
+      "living-room",
+      "modern",
+      "velvet"
+    ]
   },
   {
-    "id": "79bce3f3-935f-4912-8c62-0d2f3e059405",
-    "name": "Facechanger Formal Wear",
-    "description": "Transform your appearance instantly with this high-tech bowtie. Features 100 pre-loaded faces, custom face scanning capability, and voice modulation. Battery lasts up to 8 hours on a single charge.",
-    "price": 70,
-    "tags": ["clothing"]
+    "id": "e9e02355-2cd6-5a1d-856f-9072fe0b5513",
+    "name": "Westview Extra-Deep Leather Sofa",
+    "description": "This couch, with its deep cushions and sturdy frame, will help you add maximum comfort and style to any living space in your home. Never believe that you have to sacrifice comfort for style—this couch has it both in spades. 89\"W x 42.1\"D x 31.5\"H. Solid wood frame and block legs with 100% top-grain leather and down-filled cushions. Seat and back cushions are filled with luxurious down.",
+    "price": 989,
+    "tags": [
+      "seating",
+      "living-room",
+      "modern",
+      "leather"
+    ]
   },
   {
-    "id": "d27cf49f-b689-4a75-a249-d373e0330bb5",
-    "name": "The Quiet Quill",
-    "description": "Control sound waves with this sophisticated pen. Create silence bubbles or emit targeted sonic blasts with simple clicks. Includes premium ink cartridge and electromagnetic interference shield. Actually writes quite smoothly.",
-    "price": 150,
-    "tags": ["accessories"]
+    "id": "f6359f7a-7510-5ad8-a0bd-e3d5af60f69d",
+    "name": "Thomas Leather Sofa",
+    "description": "This top-grain leather sofa can bring natural warmth to your living room. The simple, angular design has air of modernity to it, and the solid-wood frame ensures that this sofa will last for years to come. Overall: 81.5\"W x 40.9\"D x 26.8\"H; Seat Height: 16.1\"H; Seat Depth: 28\"D; Seat Back Height: 25.6\"H; Arm Height: 26.8\"H; Leg Height: 1.2\"H. Solid-wood frame and legs with full top-grain leather upholstery. The seat cushions ensure durability and comfort.",
+    "price": 1469,
+    "tags": [
+      "seating",
+      "living-room",
+      "modern",
+      "leather"
+    ]
   },
   {
-    "id": "1ca35e86-4b4c-4124-b6b5-076ba4134d0d",
-    "name": "The Forgetter MK-II",
-    "description": "These stylish shades pack a powerful amnesia-inducing flash that erases the last 60 seconds of memory from anyone in view. Includes UV protection and auto-darkening lenses. Not recommended for use during important meetings.",
-    "price": 225,
-    "tags": ["accessories"]
+    "id": "fad3214a-b0f1-53fc-9d14-c5963ad4eda2",
+    "name": "Sloane Tufted Leather Loveseat",
+    "description": "This modern loveseat sports a tufted back, a strong profile, and tapered wooden legs, giving it a minimalist yet retro feel that makes it instantly appealing. The leather upholstery and solid-wood frame make this piece both cozy and reliable. 64.2\"W x 35.8\"D x 33.1\"H. Solid wood frame and legs; leather upholstery. A solid wood frame and leather upholstery make this loveseat as practical as it is stylish.",
+    "price": 869,
+    "tags": [
+      "seating",
+      "living-room",
+      "mid-century",
+      "leather"
+    ]
   },
   {
-    "id": "631a3db5-ac07-492c-a994-8cd56923c112",
-    "name": "The Morning Teleporter",
-    "description": "Create instant portals to pre-programmed locations with this ceramic marvel. Perfect for quick escapes or coffee runs. Features thermal insulation and spill-proof portal containment. Dishwasher safe on low heat.",
-    "price": 40,
-    "tags": ["accessories"]
+    "id": "c5cdbc7e-acfe-5408-aad3-f1177e8231fa",
+    "name": "Fischer Queen Sleeper Sofa",
+    "description": "A classic look updated for modern tastes and a pull-out bed make this queen-sized sleeper sofa a perfect blend of style and functionality. The solid hardwood frame keeps this sofa sturdy through years of use, and the reversible seat cushions ensure durability and extend this sofa’s life. Overall: 79\"W x 35\"D x 34\"H; Seat Height: 20\"H; Seat Depth 23\"D; Seat Back Height: 34\"H; Arm Height: 25\"H; Leg Height: 2.75\"H. Sturdy wood frame with rich top-grain leather upholstery. Clean lines and rich color make this piece a perfect accent for transitional-style home decor.",
+    "price": 1639,
+    "tags": [
+      "seating",
+      "living-room",
+      "bedroom",
+      "leather"
+    ]
   },
   {
-    "id": "8757729a-c518-4356-8694-9e795a9b3237",
-    "name": "Forget-Me-Pop",
-    "description": "This innovative bubblegum creates localized amnesia in your target for 5 minutes per piece. Features three brain-tingling flavors: Forgotten Fruit, Mindwipe Mint, and Blank-Berry. Includes warning label: Do not accidentally pop bubble on yourself.",
-    "price": 20,
-    "tags": ["food"]
+    "id": "6be97fab-8ec3-5440-9a99-67a1f29d937d",
+    "name": "Hillman Sofa with Wood Base",
+    "description": "Wide, comfortable cushions are a hallmark of this mid-century inspired sofa. Easy-care gray upholstery and reversible back cushions help keep this piece looking fresh. A hardwood frame connects to tapered wood legs and lends structure to the foam-padded cushions. High arms give additional support. 78\"W x 38\"D x 33\"H; seat height: 18\"H; seat depth: 21\"D; seat back height: 18\"H; arm height: 26\"H; leg height: 8\"H. Solid hardwood frame, tapered wood legs, and 85% polyester and 15% acrylic performance fabric. Removable and reversible back and throw cushions.",
+    "price": 1679,
+    "tags": [
+      "seating",
+      "living-room",
+      "mid-century",
+      "wood"
+    ]
   },
   {
-    "id": "d4edfedb-dbe9-4dd9-aae8-009489394955",
-    "name": "Audio-Illusion Spinner",
-    "description": "Professional-grade sonic illusion generator disguised as a simple yo-yo. Creates realistic sound effects from footsteps to full orchestras. Includes comprehensive training manual and anti-tangle technology.",
-    "price": 190,
-    "tags": ["accessories"]
+    "id": "9ae6b1cc-0c3b-518c-a447-eb1ed254429e",
+    "name": "Bradbury Chesterfield Sofa",
+    "description": "An updated twist on a classic Chesterfield, this handsome tufted sofa is as comfortable as it is eye-catching. Its sturdy design and high performance upholstery will bring enduring style and durability to your home. Dimensions: 92.9''W x 39”D x 30.3”H. Solid and engineered hardwoods; polyester/nylon fabric. Timeless and functional.",
+    "price": 1559,
+    "tags": [
+      "seating",
+      "living-room",
+      "modern"
+    ]
   },
   {
-    "id": "a1258cd2-176c-4507-ade6-746dab5ad625",
-    "name": "Aqua Ace GT",
-    "description": "Transform your luxury sports car into a high-speed submarine with the push of a button. Features hydro-jet propulsion, underwater navigation, and oxygen recycling system for up to 8 hours. Includes coral-proof paint coating.",
-    "price": 10000,
-    "tags": ["vehicles"]
+    "id": "03bf4002-31f4-5617-9994-f74d9aa8718c",
+    "name": "Brandeberry Farmhouse Sofa",
+    "description": "The classic English roll arm gives this cozy sofa a look ideal for a cottage or farmhouse décor. Sturdy construction, durable fabric and reversible cushions allow this piece to withstand years of fun with friends, family and pets. 82\"W x 43\"D x 39\"H; Seat Height: 21\"H; Seat Depth: 22\"D; Seat Back Height: 37\"H; Arm Height: 27\"H; Front legs: 5.25\"H; Back legs: 4\"H. Stain-resistant polyester fabric on hardwood pine frame. English roll arms combine with modern lines to blend with transitional or farmhouse décor.",
+    "price": 1799,
+    "tags": [
+      "seating",
+      "living-room",
+      "rustic"
+    ]
   },
   {
-    "id": "d3104128-1d14-4465-99d3-8ab9267c687b",
-    "name": "SkyCycle X-1000",
-    "description": "Switch from road to air travel instantly with this cutting-edge motorcycle. Features vertical takeoff capability, stealth mode, and auto-stabilization system. Includes emergency parachute and cloud-navigation GPS.",
-    "price": 9000,
-    "tags": ["vehicles"]
+    "id": "bff46bca-ec50-582f-9cde-6d843c1de176",
+    "name": "Aiden Mid-Century Velvet Armchair",
+    "description": "This sleek, mid-century inspired velvet chair is designed to impress. A deep seat cushion, back cushion, tapered wood legs, and smooth bolster pillows provide just the right mix of sophistication with a contemporary edge. 35.4”W x 36.2”D x 30.3”H. 100% polyester; solid hardwood frame; tapered wood legs. Removable and reversible back cushion for easy cleaning.",
+    "price": 139,
+    "tags": [
+      "seating",
+      "living-room",
+      "mid-century",
+      "velvet"
+    ]
   },
   {
-    "id": "d77f9ae6-e9a8-4a3e-86bd-b72af75cbc49",
-    "name": "Phantom Pursuit",
-    "description": "Create perfect duplicates of your vehicle to confuse pursuers. Features multi-angle projection, realistic physics simulation, and remote control capability. Includes tactical evasion manual.",
-    "price": 15000,
-    "tags": ["vehicles"]
+    "id": "c0fe4c99-af31-5924-acb9-253adf39315c",
+    "name": "Lauren Oversized Down-Filled Armchair",
+    "description": "Dimensions: 46\"W x 45\"D x 37\"H. Soft down-filled cushions on a frame of solid hardwood mean this armchair offers plush support and security. Neutral pearl-colored upholstery allows this piece to blend into your existing color scheme with ease. Solid hardwood frame with moisture-repellent, stain-resistant fabric made of 98% polyester, 2% nylon; down-filled seat and back cushions. Removable and reversible seat cushion.",
+    "price": 229,
+    "tags": [
+      "seating",
+      "living-room",
+      "bedroom",
+      "modern"
+    ]
+  },
+  {
+    "id": "8c215b43-9f6f-5f0e-ae47-bbc408b7d740",
+    "name": "Classic Tufted Chaise Lounge",
+    "description": "26.38\"W x 58.3\"D x 33.46\" H. Wood; foam; polyester. Elegant upholstered chaise lounge features a dramatic rolled chesterfield back and button tufting along the back and side for an upscale look and feel. Plush cushioning and soft fabric over a sturdy wooden frame.",
+    "price": 479,
+    "tags": [
+      "seating",
+      "living-room",
+      "bedroom"
+    ]
+  },
+  {
+    "id": "dda3eae9-50d0-5239-b6c3-4a8828c2d510",
+    "name": "Edmunds Leather Recliner",
+    "description": "Straight lines and narrow arms combine modern touches with classic leather, making this chair an ideal transitional style -- AND it's a recliner that doesn't look like a recliner. This piece will last through years of movies and afternoon naps. 30\"W x 36\"D x 41\"H; Seat Height: 21\"H; Seat Depth: 23\"D; Seat Back Height: 41\"H; Arm Height: 23\"H; Front legs: 4.5\"H; Back legs: 4.125\"H. Top-grain leather on seat and inside back arms and footrest; split leather on sides and back. Streamlined silhouette combines modern style with classic leather for a transitional look.",
+    "price": 169,
+    "tags": [
+      "seating",
+      "living-room",
+      "leather"
+    ]
+  },
+  {
+    "id": "29c62a67-79f0-54c1-85ed-52fb6018392f",
+    "name": "Hardwood Rocking Chair",
+    "description": "This rocking chair’s solid wood frame and legs create a stable structure, and their natural finish complements light-gray cushions. Cushions are removable and reversible and feature easy-care upholstery, which will help make this rocker a long-lasting feature in any room that needs seating. 24.5\"W x 33.75\"D x 31.125\"H; seat height: 17.75\"H; seat depth: 18.75\"W; seat back height: 25.5\"H; arm height: 22.75\"H; leg height: 11\"H. Durable fabric on wood frame and solid wood legs with a natural finish. The tight, fixed back and removable and reversible cushions ensure durability and comfort.",
+    "price": 549,
+    "tags": [
+      "seating",
+      "living-room",
+      "modern",
+      "wood"
+    ]
+  },
+  {
+    "id": "efa779a8-7351-59dc-ab26-46e755b02bea",
+    "name": "Villain Leather Lounge Chair",
+    "description": "Sturdy hardwood frame with soft leather and steel. Sturdy construction and padded foam seat cushion. No assembly required. Vacuum or wipe with a soft dry cloth. Lounge in complete comfort in this mid-century inspired oversized accent chair. The 100% leather upholstery has a unique pleated back. An exposed black metal frame and legs exude a bold design with hints of modern and industrial style.",
+    "price": 479,
+    "tags": [
+      "seating",
+      "living-room",
+      "mid-century",
+      "leather",
+      "metal"
+    ]
+  },
+  {
+    "id": "cc19949c-d2b1-51b6-8516-92b89c818612",
+    "name": "Bertha Velvet Swivel Office Chair",
+    "description": "This olive-green velvet chair has an unusual, squared-off silhouette that will add a stylish mid-century flair to any workplace or home office. Its adjustable height, casters, and smooth swivel mechanism make it as flexible as it is attractive. 25.25\"W x 25\"D x 32.75\"–35.75\"H; seat height: 19.75\"–22.75\". Generously padded cushions are upholstered in a soft olive-green velvet that adds a touch of luxury to a workday necessity. This chair has a 360-degree swivel mechanism with height and tension adjustments to accommodate your work style.",
+    "price": 439,
+    "tags": [
+      "seating",
+      "office",
+      "mid-century",
+      "velvet"
+    ]
+  },
+  {
+    "id": "53d86c30-f379-52cd-9bbf-6ca51a2da300",
+    "name": "Contemporary Leather Office Chair",
+    "description": "A classic black leather office chair has received modern functional updates. The 3-panel back keeps you comfortable as you work at your desk, and rolling casters make it easy to move. The seat swivels 360 degrees and also adjusts for height and tilt. 24.8\"W x 27.6\"D x 31.1\"-34.1\"H. Top grain leather is strong and durable; metal base, arms, and casters. Assembly in 15 minutes or less; simply insert casters onto base.",
+    "price": 509,
+    "tags": [
+      "seating",
+      "office",
+      "modern",
+      "leather"
+    ]
+  },
+  {
+    "id": "b7fb0252-c877-5c1b-a7c3-eba3f6853f06",
+    "name": "Curved-Back Dining Chairs (Set of 2)",
+    "description": "Designed to cradle your back, the curved shape of this dining chair is as comfortable as it is attractive. The grey, upholstered seat paired with the Mid-century silhouette allows this chair to blend well with your existing decor in any room needing extra seating. 18\"W x 22.5\"D x 33\"H. Hardwood back and legs with upholstered seat cushion. Natural color variations in wood create unique and beautiful pieces.",
+    "price": 119,
+    "tags": [
+      "seating",
+      "dining",
+      "mid-century",
+      "wood"
+    ]
+  },
+  {
+    "id": "e7283b49-2b2c-57e5-a656-d849aa2b7fbe",
+    "name": "Classic Wishbone Dining Chair",
+    "description": "This dining chair combines Mid-Century modern and Scandinavian-inspired styles for beautiful form, function and comfort. With a woven rattan seat, solid beech wood frame and partially open-back this piece works for the dining room or anywhere you need extra seating. 22.4\"W x 22.8\"D x 28.75\"H. Seat height: 18\". Solid beech wood frame with a woven paper rattan seat. This versatile, transitional chair blends well with traditional and modern styles.",
+    "price": 119,
+    "tags": [
+      "seating",
+      "dining",
+      "modern",
+      "wood"
+    ]
+  },
+  {
+    "id": "bb870438-ad37-5ed0-82f5-282078ca8e40",
+    "name": "Allie Velvet Dining Chair",
+    "description": "Clean lines and one-piece arm-and-leg frames on each side make for a very modern look, while soft velvet gives it a touch of glam. The compact design helps you fit more guests around the table. Quality construction is ready for wear and tear. Overall: 22\"W x 24.4\"D x 33.4\"H; Seat Height: 19.2\"H; Seat Depth: 17.7\"D; Seat Back: 14\"H; Arm: 25.9\"H. Metal frame with matte black finish; channel-tufted velvet upholstery. Contemporary design with luxe velvet upholstery.",
+    "price": 109,
+    "tags": [
+      "seating",
+      "dining",
+      "velvet",
+      "metal"
+    ]
+  },
+  {
+    "id": "15ee17fc-70bd-5cd6-977b-0e18e814664a",
+    "name": "Channel-Back Dining Chairs (Set of 2)",
+    "description": "This channel-back chair is a modern addition to any dining space. Its ivory upholstery will complement any number of color schemes, and its simple, understated design allows it to work in nearly any space. A solid wood frame and easy-care fabric give this chair plenty of durability. 19\"W x 24\"D x 35\"H; seat height: 19\"H; seat depth: 17\"D; seat back height: 16\"H. Set of 2. 85% polyester, 15% acrylic fabric on a solid hardwood frame.",
+    "price": 409,
+    "tags": [
+      "seating",
+      "dining",
+      "modern"
+    ]
+  },
+  {
+    "id": "5a8bafe0-d37c-51b2-93f7-207c112b2b89",
+    "name": "Cliff Round Velvet Pouf",
+    "description": "After a long day, your tired legs and feet will look forward to this plush velvet ottoman. It's also a handy extra seat for guests and a place to rest a tray of snacks. Tufting gives it a mid-century modern flair, while the fabric adds a bit of glam. 39.3\"W x 39.3\"D x 15.7\"H. Velvet fabric on wood frame. Mid-century modern meets glam in this statement piece.",
+    "price": 129,
+    "tags": [
+      "seating",
+      "living-room",
+      "mid-century",
+      "velvet"
+    ]
+  },
+  {
+    "id": "ddd85d34-c1ca-5cd3-a565-1172a2c76dcc",
+    "name": "Norah Round Leather Ottoman",
+    "description": "This simple but stylish round ottoman is designed to blend with most any decor. The wood frame has a light oak finish for a rustic touch, with a smooth top-grain leather upholstered top. Use as a foot stool or extra seat for guests. 39.5'' Diameter x 17.25''H. 100% top-grain leather on wood frame. Use as a resting place for tired feet, a snack tray, or an extra guest.",
+    "price": 139,
+    "tags": [
+      "seating",
+      "living-room",
+      "leather",
+      "wood"
+    ]
+  },
+  {
+    "id": "35e6330b-5b11-5f4a-9753-7fb7bb2821d9",
+    "name": "Lauren Oversized Ottoman",
+    "description": "Dimensions: 46\"W x 46\"D x 19\"H. Soft down-filled cushions on a frame of solid hardwood mean this ottoman offers plush support and security. Neutral chocolate-colored upholstery allows this piece to blend into your existing color scheme with ease. Solid hardwood frame with moisture-repellent, stain-resistant fabric made of 98% polyester, 2% nylon; down-filled seat and back cushions. Wide surface provides a comfortable space for rest or extra seating.",
+    "price": 209,
+    "tags": [
+      "seating",
+      "living-room",
+      "bedroom"
+    ]
+  },
+  {
+    "id": "6fbecfcd-cb9f-5488-9ebb-9b9ae8e1c720",
+    "name": "Haraden Button-Tufted Bench",
+    "description": "This charming, sophisticated-looking bench would be equally at home at the foot of your bed or under a spacious window. The navy-blue button-tufted upholstery makes this as classy as it is comfortable. 44\"W x 16\"D x 17\"H. Durable polyester fabric over wood frame; solid wood legs in a walnut finish. Contemporary design with wood frame upholstered in navy-colored fabric; solid wood legs.",
+    "price": 89,
+    "tags": [
+      "seating",
+      "bedroom",
+      "modern"
+    ]
+  },
+  {
+    "id": "4895f814-b28f-5e05-b6b8-a80ddba120a5",
+    "name": "Malida Swivel Counter Stool",
+    "description": "Dimensions: 22\"W x 21\"D x 37\"H | Seat height is 26\". Durable polyester fabric on wood frame, solid hardwood base. Foam padding and elastic suspension system keep back and seat firm and springy. This counter stool's substantial arms, back and padded seat, and swivel seat make it easy to settle comfortably in the perfect spot. The unique shape of the seat back makes this a Mid-century style statement piece in your home.",
+    "price": 119,
+    "tags": [
+      "seating",
+      "dining",
+      "mid-century"
+    ]
+  },
+  {
+    "id": "e86b022e-5533-5b78-a6d9-e599ac6356a2",
+    "name": "Burke Wood Counter Stool",
+    "description": "22.1\"W x 16.5\"D x 40\"H. Seat height is 26\". Solid wood legs and performance fabric. Foam padding and elastic suspension system keeps upholstery firm and resilient. No assembly required. Vacuum and wipe with soft dry cloth.",
+    "price": 79,
+    "tags": [
+      "seating",
+      "dining",
+      "modern",
+      "wood"
+    ]
+  },
+  {
+    "id": "fc45a80a-7199-54d3-b1d0-4f9bb65ac852",
+    "name": "Larson Wood and Metal Coffee Table",
+    "description": "This coffee table with a solid pine wood top and shelf has a natural distressed finish, while the metal legs and trim have a darker brown matte finish. The lower shelf provides ever-important space to store magazines, books, and remotes. 50\"W x 23.5\"D x 18.5\"H. Solid pine wood tops and shelves with walnut finish; metal legs. Industrial and rustic touches allow this table to blend with many styles.",
+    "price": 80,
+    "tags": [
+      "tables",
+      "living-room",
+      "rustic",
+      "wood",
+      "metal"
+    ]
+  },
+  {
+    "id": "b006a5df-e71e-555d-90e8-9c20d09ab0c0",
+    "name": "Industrial Round Coffee Table",
+    "description": "This stunning industrial-style coffee table will be the highlight of your room. Constructed from solid mango with a French onyx finish and supported with sturdy steel legs, this table pairs perfectly with a variety of décor themes, and its parquetry surface makes it a work of art in itself. 48\"W x 48\"D x 18\"H. Solid mango top with a French onyx finish. The multistep finish leaves subtle dark highlights in the wood's medium-brown tones. The metal base has a dark-gunmetal powder-coated finish. The styling is modern industrial, but the natural wood parquetry top gives it a rich casual look.",
+    "price": 99,
+    "tags": [
+      "tables",
+      "living-room",
+      "wood",
+      "metal"
+    ]
+  },
+  {
+    "id": "7b70afe9-e517-5578-bece-19f959016bf7",
+    "name": "Lift-Top Storage Coffee Table",
+    "description": "Coffee table with top that lifts to create a sturdy, raised work surface; ideal for a living room, family room, or office. Hidden storage space beneath the lift-up top—plenty of room for a throw blanket, remote controls, board games, and more. Made of sturdy wood with a Natural finish; finished on all sides, which allows for versatile placement. Open shelves below offer added storage and display space.",
+    "price": 419,
+    "tags": [
+      "tables",
+      "living-room",
+      "modern",
+      "wood"
+    ]
+  },
+  {
+    "id": "b53e1361-d805-51df-a0f0-398adc4dc244",
+    "name": "Bristol Natural Edge Side Table",
+    "description": "With a wood top and metal 3-legged stand, this table is modern yet classic. The wood top is a \"natural edge\" cut. No two tables are exactly alike; allow for some height variation. This table is a handy landing spot for keys, phones and small table lamps. 18.9\"L x 18.9\"W x 18.2\"H. Engineered wood with walnut veneer; metal stand bottom. Modern yet classic.",
+    "price": 619,
+    "tags": [
+      "tables",
+      "living-room",
+      "rustic",
+      "wood",
+      "metal"
+    ]
+  },
+  {
+    "id": "4630fdae-bac3-512e-b540-6a8ce9f7a7bb",
+    "name": "Hourglass Marble Side Table",
+    "description": "The vintage marble-top table receives a dramatic modern refresh in this side table. The top is supported by two metal frames with silver finish that join in a shape reminiscent of an hourglass. The compact diameter allows it to fit in tight spaces. 17.9\"L x 17\"W x 17.9\"H. Sleek modern frame with silver finish; white marble top. A modern design with classic marble top and glam finish.",
+    "price": 899,
+    "tags": [
+      "tables",
+      "living-room",
+      "bedroom",
+      "modern",
+      "metal"
+    ]
+  },
+  {
+    "id": "0add1409-3982-5fb8-afa0-fb86537a7587",
+    "name": "Curved Hairpin Nightstand",
+    "description": "24\"W x 17\"D x 24\"H; LegHeight: 6\". Two storage drawers. No assembly required. This mid-century influenced nightstand will bring a fun, eclectic flair to your room. The white finish and geometric patterns on the two drawers makes this piece pop, while brass hairpin legs and hardware give it a vintage feel.",
+    "price": 829,
+    "tags": [
+      "tables",
+      "bedroom",
+      "mid-century"
+    ]
+  },
+  {
+    "id": "2c5a89d4-9ce2-5d70-9058-aaef9514d5e7",
+    "name": "Round Wood Dining Table",
+    "description": "Beautiful in its simplicity and clean lines, this dining table is Mid-century minimalist design at its best. With a simple 42\" round top, it can easily fit in small kitchens while providing ample tabletop space. 42\"Diameter x 30\"H. Natural color variations in wood create unique and beautiful pieces. Assemble in 15-30 minutes. Wipe with soft dry cloth.",
+    "price": 619,
+    "tags": [
+      "tables",
+      "dining",
+      "mid-century",
+      "wood"
+    ]
+  },
+  {
+    "id": "dc0d747f-8589-5bec-b3d8-9158b848d0d1",
+    "name": "Hughes Farmhouse Dining Table",
+    "description": "With warm wood tones and two crossed-leg metal pedestals, this head-turning dining table has touches of rustic, modern and industrial. High quality materials and construction techniques ensure it will last through years of family memories. 39\"D x 60-80\"L x 30\"H. Hardwood top with acacia veneer; iron base. A casual transitional table with elements of many styles.",
+    "price": 889,
+    "tags": [
+      "tables",
+      "dining",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "6cbeb883-d7e6-59bf-9b42-7144fb7cffaf",
+    "name": "Boundary Reclaimed Fir Dining Table",
+    "description": "Reclaimed fir wood has been fashioned into a dining table that defines simple rustic beauty. Beautiful natural wood tones make your space warm and inviting, while sturdy construction will make this piece last through many game nights. 66\"L x 38\"D x 29.9\"H. Made of hardwood comprised of 100% reclaimed fir. A simple, natural style that works with modern farmhouse décor.",
+    "price": 89,
+    "tags": [
+      "tables",
+      "dining",
+      "modern",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "fa43ff4b-72fe-555e-b7d1-01eff88ffa9f",
+    "name": "Mid-Century Writing Desk",
+    "description": "This warm brown wooden desk brings a mission-inspired mid-century flair to your home office or living space. It combines generous writing space and elegant storage drawers so you can keep necessary supplies close at hand. 42\"W x 26\"D x 29.7\"H. Chinese ash wood, MDF and Chinese ash veneer; black metal handles. The mid-century design of this wooden desk will fit perfectly in your home office or living space. It features ample writing space and 2 drawers with ball-bearing slides and black metal handles.",
+    "price": 259,
+    "tags": [
+      "tables",
+      "office",
+      "mid-century",
+      "wood"
+    ]
+  },
+  {
+    "id": "3adc09bf-9b63-5bb9-b43c-eb884b7d702d",
+    "name": "Avery Industrial Writing Desk",
+    "description": "Industrial style meets contemporary functionality in this sturdy, streamlined desk. This versatile piece makes a home office or workplace style statement while also standing up to daily use. A single slim drawer offers handy storage without spoiling the elegantly sparse lines of the desk. 40\"W x 18\"D x 30\"H. Durable MDF with chestnut-finished hardwood veneer and an antique bronze-finished metal base. A wide top offers ample workspace for writers, artists, or busy professionals. The single drawer slides easily.",
+    "price": 159,
+    "tags": [
+      "tables",
+      "office",
+      "rustic",
+      "metal"
+    ]
+  },
+  {
+    "id": "f114c57e-b599-5948-af71-34c5f985e601",
+    "name": "Casual Wood Computer Desk",
+    "description": "This desk has a classic vintage look that will certainly be the eye-catching centerpiece to your office. The ample work surface will help you stay organized and focused, and a large drawer with a flip-down front panel can serve as a keyboard tray. 60\"L x 30\"W x 30\"H. Solid hardwoods; birch veneer; magnetic closure. Farmhouse style with simple lines that will complement most any décor.",
+    "price": 279,
+    "tags": [
+      "tables",
+      "office",
+      "wood"
+    ]
+  },
+  {
+    "id": "8fed237d-c098-5fe0-b589-2f6e299a9ea0",
+    "name": "Retro Hairpin Compact Desk",
+    "description": "Mid-century modern-inspired desk for offices, studios, bedrooms, or anywhere desk space is needed. Hairpin-style powder-coated metal legs add style and stability. Ideal for computer work, writing, as a vanity, console table, and more. Slim, minimal design saves space while offering an ample work area.",
+    "price": 399,
+    "tags": [
+      "tables",
+      "office",
+      "modern",
+      "metal"
+    ]
+  },
+  {
+    "id": "0098a7bb-afcd-5aeb-b0e9-e08ba8ead0bd",
+    "name": "Anne French Farmhouse Desk",
+    "description": "Bring a breezy French cottage look to your office with this desk. The washed navy finish gives it a vintage look, while the three drawers provide room for a tablet computer, pens and paper. Antiqued brass knobs add the perfect finishing touch. 28\"L x 62\"W x 30\"H. Solid poplar and engineered hardwoods; metal knobs with antique finish. A French country look that will add a nice vibe to your traditional or farmhouse décor.",
+    "price": 559,
+    "tags": [
+      "tables",
+      "office",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "dd7b53ee-aafd-504d-bdfe-7af9bb1c7553",
+    "name": "Springdale Modern Desk",
+    "description": "47''W x 20''D x 30''H. Solid pine and MDF. This desk features ample writing space and 2 storage drawers. The simple yet stylish design of this modern white desk gives practicality a distinctive flair. It is light and suitable for any room.",
+    "price": 639,
+    "tags": [
+      "tables",
+      "office",
+      "bedroom",
+      "modern"
+    ]
+  },
+  {
+    "id": "e224d232-0d4c-593f-9f20-a836b5061b3f",
+    "name": "Gwyneth Velvet King Bed",
+    "description": "This bed's sumptuous upholstery will have you feeling like royalty. Both headboard and footboard have channel tufting, while the plush velvet fabric exudes glamour. Wooden legs with warm dark finish complete this mid-century modern look. 92.1\"L x 81.7\"W x 49\"H. Velvet upholstery; wood legs. Mid-century modern style with glam detailing and fabric.",
+    "price": 979,
+    "tags": [
+      "beds",
+      "bedroom",
+      "mid-century",
+      "velvet"
+    ]
+  },
+  {
+    "id": "a62a5970-2862-5720-8d8b-4135c4d7d919",
+    "name": "Fisher Rustic Wood King Bed",
+    "description": "79.25\"W x 86\"D x 51\"H. Raise rails to use under-bed storage drawers without boxspring, or lower to use boxspring. Assemble in 30 minutes-1 hour with two people. Beautiful multi-toned wood planks on the headboard and footboard resemble rustic, reclaimed wood and could also blend with a coastal-theme decor. Side rails can be adjusted to accommodate optional under-bed storage drawers.",
+    "price": 319,
+    "tags": [
+      "beds",
+      "bedroom",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "55f85eef-2e09-5f2b-b1f4-08840aed22e7",
+    "name": "Industry French Metal Queen Bed",
+    "description": "85\"L x 63.5\"W x 56\"H. Sturdy steel construction. Assemble in 30 minutes-1 hour with two people. Create a romantic retreat with this French country-inspired queen bed. This metal bed frame with brushed black pewter finish features a unique scroll design. Add fluffy, cozy bedding and pillows to create an inviting focal point in your room.",
+    "price": 709,
+    "tags": [
+      "beds",
+      "bedroom",
+      "metal"
+    ]
+  },
+  {
+    "id": "df6df29e-f7f6-50c8-b461-c194374d9268",
+    "name": "York Platform Queen Bed",
+    "description": "Mid-century modern meets comfy in this platform bed. Clean lines, tapered wood feet and a low profile footboard are combined with sides that extend beyond the mattress for a very contemporary effect. Silver grey fabric adds extra appeal. 90.2\"L x 72\"W x 42.3\"H. Upholstered with 100% polyester herringbone fabric. Tapered wood legs. Mid-century modern headboard curves up and back for distinctive side silhouette.",
+    "price": 569,
+    "tags": [
+      "beds",
+      "bedroom",
+      "modern"
+    ]
+  },
+  {
+    "id": "9805cb65-f76c-5126-9513-be79fa8fad37",
+    "name": "Rylee Acacia Wood King Bed",
+    "description": "Add a modern flair to your home with this beautiful king bed. Made from solid acacia with a subtle distressed gray-washed finish, this bed frame perfectly complements most home-décor styles. Elegant wood legs provide stability, and cross rails provide ample support for a mattress. 83.27\"W x 84.65\"D x 43.31\"H; Leg Height: 11\"H. Solid acacia and acacia veneer. Subtle gray-washed distressed finish and clean lines create an attractive modern look.",
+    "price": 479,
+    "tags": [
+      "beds",
+      "bedroom",
+      "modern",
+      "wood"
+    ]
+  },
+  {
+    "id": "1c922b13-a797-5f3a-8534-8231bc96831c",
+    "name": "Curved Upholstered Headboard",
+    "description": "The softly curved silhouette of this simple yet striking headboard invites thoughts of cozy nights and restful hours of deep sleep. The gray upholstery and adjustable height mean the headboard easily fits in with your existing furnishings. 60\"W x 3.5\"D x 47.5\"–55.5\"H. The well-constructed wood frame is padded with polyurethane foam for added comfort. The legs of this headboard adjust to 3 different heights, allowing it to attach to any standard bed frame.",
+    "price": 1089,
+    "tags": [
+      "beds",
+      "bedroom",
+      "modern"
+    ]
+  },
+  {
+    "id": "6c6e56c0-d09a-5cc4-8e29-16b902d70a95",
+    "name": "Farmhouse Solid Wood Headboard",
+    "description": "This solid pine headboard has a charcoal gray finish that accentuates the beauty of the natural wood grain. Made from recycled pine, this rustic headboard will complement your bedroom and blend seamlessly with farmhouse or contemporary decor. 64\"W x 3\"D x 45\"H. Recycled pine. Predrilled holes allow for easy connection to most metal bed frames.",
+    "price": 429,
+    "tags": [
+      "beds",
+      "bedroom",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "c2fb7b9b-ab3c-52f1-bf56-708a7ff82281",
+    "name": "Barrett Reclaimed Wood Bookcase",
+    "description": "40\"W x 15\"D x 74”H. Solid, recycled pine wood with natural imperfections for rustic touch. Five wide shelves provide generous display and storage space. Display your prized family photos or works by your favorite authors on this rustic bookshelf. Influenced by early Americana style, it's made of recycled and reclaimed wood in a white and weathered sandstone finish that adds old world charm.",
+    "price": 159,
+    "tags": [
+      "storage",
+      "living-room",
+      "office",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "204520c4-7aba-5ddc-96b0-5c1f2e5954dd",
+    "name": "5-Tier Ladder Bookshelf",
+    "description": "5-tier ladder-style bookcase for placing keepsakes, decor, books, awards, and more. Descending design with shelf widths widening at the bottom. Straight back allows you to place bookcase neatly against a wall; angled front saves space. Solid rubber wood frame; each shelf holds 25 pounds.",
+    "price": 579,
+    "tags": [
+      "storage",
+      "living-room",
+      "office",
+      "modern",
+      "wood"
+    ]
+  },
+  {
+    "id": "89819253-1a22-57f3-a703-617f8ae53350",
+    "name": "Larson Wood and Metal Bookcase",
+    "description": "34\"L x 14\"W x 39.25\"H. Solid pine wood shelves and top; metal legs. Industrial and rustic touches allow this bookshelf to blend with many styles. Two fixed distressed wood shelves with a walnut finish.",
+    "price": 219,
+    "tags": [
+      "storage",
+      "office",
+      "rustic",
+      "wood",
+      "metal"
+    ]
+  },
+  {
+    "id": "9b406825-c8d5-5d9b-8d87-08118b7e9aaa",
+    "name": "Jonathan Mid-Century Dresser",
+    "description": "This classic mid-century modern dresser will have you reveling in retro style as you get dressed each morning. Six drawers with brass-toned hardware rest on a base of four slanted legs. An optional mirror (sold separately) can be mounted on the top. 58\"W x 19\"D x 35\"H; LegHeight: 7.5\". Hardwood frame and drawers with a walnut veneer and brass hardware. A classic example of mid-century modern design.",
+    "price": 399,
+    "tags": [
+      "storage",
+      "bedroom",
+      "mid-century",
+      "wood"
+    ]
+  },
+  {
+    "id": "41ab7326-6607-5fa6-945e-ac6aae8feada",
+    "name": "Eastport Industrial 7-Drawer Dresser",
+    "description": "This simply-designed solid pine dresser finished with an oak veneer will be a perfect addition to your master suite or any bedroom. You'll enjoy modern industrial design with plenty of storage space in seven drawers. Durable solid wood is built to last and sustainably sourced. 49.2\"W x 17.7\"D x 32.8\"H. Handcrafted from solid wood. Modern industrial design of natural pine to blend with modern and rustic styles.",
+    "price": 519,
+    "tags": [
+      "storage",
+      "bedroom",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "8c220a2c-eb1e-531a-a837-e553e26bda04",
+    "name": "Parson 6-Drawer Dresser",
+    "description": "This is modern farmhouse at its best. Oak veneer gives a distinctive grain to the body and drawers of this dresser, and metal pulls complete the simple design. The natural beauty of this piece provides a relaxing tone to your bedroom. 60\"W x 19\"D x 35\"H. Solid hardwood with hand-selected oak veneer. This rustic dresser has the look of natural reclaimed wood with distressed finish.",
+    "price": 149,
+    "tags": [
+      "storage",
+      "bedroom",
+      "wood"
+    ]
+  },
+  {
+    "id": "7d67b25b-9143-57bc-bfe4-325b6401e2be",
+    "name": "Bowlyn Mid-Century Media Stand",
+    "description": "The minimalist brass drawer pulls and curved metal legs make this media console a mid-century modern showpiece. Four drawers give you ample room for storing electronics, while open cubbies accommodate gaming consoles, cords and wires. 18\"L x 64\"W x 24\"H. Hardwoods made of rubberwood and poplar; walnut finish; metal hardware. Assembly in 30 minutes or less; bolt on legs.",
+    "price": 99,
+    "tags": [
+      "storage",
+      "living-room",
+      "mid-century",
+      "wood"
+    ]
+  },
+  {
+    "id": "1edfe9d0-ae68-5c84-8ec7-b88be567215f",
+    "name": "Fulton Rustic Media Cabinet",
+    "description": "This Scandinavian-inspired, contemporary media console has a sleek yet rustic feel with angled patterns created from acacia slats and modern legs. Cable management holes help reduce tangles, while 2 cabinets create additional storage space. Neutral tones make this a great choice for any home. 63\"W x 18\"D x 19\"H. 74% MDF, 18% acacia, 8% plywood. This console, inspired by Scandinavian designs, creates a sleek and minimalist look for a contemporary style in any home.",
+    "price": 229,
+    "tags": [
+      "storage",
+      "living-room",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "68e51b3b-06ee-5459-b52f-b5a4c0e078c6",
+    "name": "Federal Sideboard Buffet",
+    "description": "This mid-century modern buffet will add stylish storage to your dining room but can be used in other rooms as well. Four drawers and adjustable shelves are flexible for silverware and dishes -- or other treasured items in a living area or hallway. 19\"L x 62\"W x 36\"H. Sturdy construction and durable hardwoods. Mid-century modern retro style.",
+    "price": 109,
+    "tags": [
+      "storage",
+      "dining",
+      "mid-century",
+      "wood"
+    ]
+  },
+  {
+    "id": "b6b87035-e909-5216-bb45-f1ca9d8c8b4a",
+    "name": "Mid-Century 2-Drawer File Cabinet",
+    "description": "Add a touch of mid-century design inspiration to your home office or workspace with this 2-drawer file cabinet. A deeper bottom drawer and elegantly shaped legs make this piece as stylish as it is useful. 21.7\"W x 15.4\"D x 23.4\"H. Durable MDF wood with natural-finished pine veneer and antique bronze handles. The 2 generously sized sliding drawers offer stylish storage of files, supplies, and more.",
+    "price": 379,
+    "tags": [
+      "storage",
+      "office",
+      "mid-century"
+    ]
+  },
+  {
+    "id": "0043cb7c-2143-5c37-8898-bf8881c86ac8",
+    "name": "Mid-Century Standing Floor Lamp",
+    "description": "Complete your home décor with this captivating modern-style floor lamp. A unique repeating bow-tie shape forms this lamp’s base, and its matte-black and antique-brass finish and clean white drum shade pair well with most home-décor styles. Assembled Dimensions: 15\"W x 15\"D x 58.25\"H. Metal with 2-toned matte-black and satin-brass finish. Mid-century-modern-inspired metal floor lamp finished with matte black and satin brass and paired with a white linen drum-shaped shade.",
+    "price": 139,
+    "tags": [
+      "lighting",
+      "living-room",
+      "mid-century",
+      "metal"
+    ]
+  },
+  {
+    "id": "5ae32a72-5360-5b3f-be9e-0bff2eadcda6",
+    "name": "Torchiere Floor Lamp with Reading Light",
+    "description": "11\"W x 16.45\"D x 72\"H. Gracefully shaped white shades for both torchiere and reading light complement metal upright. Easy-to-use rotary switch and an adjustable reading light make this lamp equally useful in bedroom or living room. Uses 2 60-watt incandescent or LED-equivalent bulbs. Energy-efficient 9-watt warm-white LED bulbs are included.",
+    "price": 139,
+    "tags": [
+      "lighting",
+      "living-room",
+      "bedroom",
+      "metal"
+    ]
+  },
+  {
+    "id": "f65310d9-f11a-577e-9367-f2408f7d5f72",
+    "name": "Vintage 3-Joint Floor Lamp",
+    "description": "This floor lamp’s sleek body and sturdy rectangular base enable it to fit in any space, and its brushed-steel color will give any room a vintage touch. A 3-jointed design means you can easily control the brightness; aim it directly when you need more light, or point it away for a subtle glow. 9.5\"W x 16.5\"D x 56\"H. The simple brushed-steel finish allows it to blend with classic or modern rooms. This floor task lamp is a classic example of vintage modern style. Both arm and hood adjust, allowing you to direct light where you need it.",
+    "price": 229,
+    "tags": [
+      "lighting",
+      "living-room",
+      "office",
+      "rustic",
+      "metal"
+    ]
+  },
+  {
+    "id": "f9ca56a8-8677-5c6f-a4a8-5feecfae8439",
+    "name": "Farmhouse Wood Base Floor Lamp",
+    "description": "The floor lamp offers convenience with design and can be adjusted to fit your needs. Made of durable real wood and black metal, the adjustable floor lamp can be modified to fit your height needs and blends with your décor. 16\" W x 16\" D x 66.25“H. Real cedar wood base with black metal topped by a pagoda shaped white linen shade. Adjust the height to fit your design needs, on/off rotary switch on socket, perfect for an office, living room, or bedroom.",
+    "price": 79,
+    "tags": [
+      "lighting",
+      "living-room",
+      "rustic",
+      "wood"
+    ]
+  },
+  {
+    "id": "2d0690a7-24a4-57f0-9801-ed97cbeaf85a",
+    "name": "Scandinavian Blond-Wood Table Lamp",
+    "description": "This lovely lamp is crafted from sustainably harvested real wood in a natural blond finish with a marble base. The drum shade in off-white linen casts ambient light in any living or bedroom space in your home. With its spare, clean lines, it is perfect for any modern or contemporary interior decor. 9\"W x 9\"D x 18.5\"H. Off-white linen drum shade, marble base. A pleasing contrast between base and stem make this lamp aesthetically pleasing as well as a welcome source of light.",
+    "price": 79,
+    "tags": [
+      "lighting",
+      "bedroom",
+      "modern",
+      "wood"
+    ]
+  },
+  {
+    "id": "da9e13ca-87cb-553c-a590-cc873fc68a62",
+    "name": "Art Deco Brass Table Lamp",
+    "description": "Add a touch of ultimate retro style to your room with this head-turning lamp. The 1920s Art Deco-inspired design features metal \"pipes\" of varying heights against a clear base, ready to shine when the light is cast from above. 6\"W x 6\"D x 24\"H. Bulb included. Assemble in 15 minutes or less.",
+    "price": 239,
+    "tags": [
+      "lighting",
+      "bedroom",
+      "living-room",
+      "modern",
+      "metal"
+    ]
+  },
+  {
+    "id": "7c931d3b-2776-521b-9bd1-a04c1f2b95c9",
+    "name": "Curved Brass and Walnut Desk Lamp",
+    "description": "14.3\" Diameter x 21.7''H. Base is made of walnut; brass pole and fabric shade. This lamp will stand out in a modern, mid-century or industrial style hallways or living areas. LED bulb included.",
+    "price": 149,
+    "tags": [
+      "lighting",
+      "office",
+      "mid-century",
+      "metal"
+    ]
+  },
+  {
+    "id": "621188c6-c6f6-5532-be0a-f4fc3d87567a",
+    "name": "Adjustable Pharmacy Desk Lamp",
+    "description": "A modern edgy update to the traditional pharmacy lamp. Metal table lamp with brushed nickel finish. LED bulb included. Dimensions: 7.50\"W x 22.25\"D x 29.75(Max)\"H.",
+    "price": 219,
+    "tags": [
+      "lighting",
+      "office",
+      "metal"
+    ]
+  },
+  {
+    "id": "84677bb1-a318-585a-b01c-565b4463cc4b",
+    "name": "Tinted Glass Pendant Light",
+    "description": "This mid-century pendant light features a tinted glass dome to softly distribute light around the clean directional ring in the bottom end. Black details complete the vintage motif. 22\"W x 22\"D x 60\"H. Glass shade with metal accents and fabric hanging cord. A clean simple design makes this pendant stand out anywhere you place it. Matte black accents and a black cloth cord finish this mid-century modern design to take you on a journey through time. Perfect for hanging over your dining room table or in a living room for a stunning statement piece.",
+    "price": 89,
+    "tags": [
+      "lighting",
+      "dining",
+      "mid-century"
+    ]
+  },
+  {
+    "id": "1077927c-2c13-557a-a0a7-377d1ccef04a",
+    "name": "Geometric Wool Area Rug",
+    "description": "This vibrant chevron rug will liven up any room and impress your guests. Geometric designs in black, grey, brown and ivory will look handsome in a modern or industrial décor. You'll enjoy showing off this dynamic focal point to your room. 4' x 6'. Medium pile is easy to clean. Pair with rug pad (sold separately).",
+    "price": 59,
+    "tags": [
+      "rugs",
+      "living-room",
+      "modern"
+    ]
+  },
+  {
+    "id": "38907885-34e5-51a6-99a6-1cf4cc83c54d",
+    "name": "Blooming Medallion Rug",
+    "description": "Pile: 100% Polypropylene, Backing: 100% Jute. Imported. This dark grey blooming medallion rug adds cool, contemporary style to your transitional spaces. It's a modern remake of a classic oriental pattern made of stain resistant fiber that is a smart option for active households. Highly durable update of a classic design.",
+    "price": 89,
+    "tags": [
+      "rugs",
+      "living-room",
+      "mid-century"
+    ]
+  },
+  {
+    "id": "51f255cd-cd78-5528-a3cb-8f4b188ac06d",
+    "name": "Striated Jute Area Rug",
+    "description": "Imagine this rug in any classic, modern or transitional room that needs a bit of texture. Handwoven in a soft-ridged pile, its subtly striated rows of contrasting colors make it distinctive and ideal for tying a room together. 5' 9\" x 3' 9\". Flat-woven medium pile is easy to clean. Pair with rug pad (sold separately).",
+    "price": 269,
+    "tags": [
+      "rugs",
+      "living-room",
+      "rustic"
+    ]
+  },
+  {
+    "id": "d2378d68-055a-5e39-9d0b-dd9b1c1ccc2a",
+    "name": "Cooper Farmhouse Wool Rug",
+    "description": "80% Wool 20% Cotton. Imported. This soft wool rug with vintage-inspired motifs in cool shades, finished with tassels, will elegantly anchor any room or entryway. 4' x 6'.",
+    "price": 229,
+    "tags": [
+      "rugs",
+      "bedroom",
+      "rustic"
+    ]
+  },
+  {
+    "id": "3194c47d-fb36-590d-a0e6-04e6917a96ee",
+    "name": "Hand-Tufted Cotton and Wool Rug",
+    "description": "The distressed look of this cotton-and-wool handtufted rug will add a modern accent to your space, but the bright blue-and-ivory coloring is flexible enough to work with any decor. A semiplush pile will soften and brighten bare areas while bringing warmth and comfort. 8'W x 10'L. 80% wool, 20% cotton. Handtufted with a distressed pattern.",
+    "price": 309,
+    "tags": [
+      "rugs",
+      "bedroom",
+      "modern"
+    ]
+  },
+  {
+    "id": "d6478b58-62b3-5c3b-9b81-3c157b10821e",
+    "name": "Leather and Metallic Lines Rug",
+    "description": "Pile: 90% Leather, 10% Cotton, No Backing. Imported. A soft-yet-durable blend of leather and cotton adds rugged texture to this otherwise simple, multicolored stripe rug. Hand-woven in India, this rectangular rug is the perfect addition to a modern room. Area rug features a textured stripe pattern.",
+    "price": 59,
+    "tags": [
+      "rugs",
+      "living-room",
+      "modern",
+      "leather"
+    ]
+  },
+  {
+    "id": "a7585cf5-96ac-5e8c-a95b-991c61ba3e5c",
+    "name": "Velvet Texture Throw Pillow",
+    "description": "A classic look with modern updates, this luxurious velvet pillow has subtle grooves running throughout. The bright color freshens up your décor, while the understated pattern allows for easy mixing and matching with other pillows. Soft velvet texture and subtle pattern for modern and classic touches. Sewn in U.S. of durable polyester fabric. Pillow Cover: 100% Polyester. Insert Shell: 100% Cotton. Stuffing: 100% Polyester.",
+    "price": 19,
+    "tags": [
+      "decor",
+      "living-room",
+      "bedroom",
+      "velvet"
+    ]
+  },
+  {
+    "id": "bba6c007-8a05-53e8-9d3d-6cf28f64fbea",
+    "name": "Buffalo Check Throw Pillow",
+    "description": "Traditional plaid gets a modern refresh in this casual pillow. Neutral shades of grey will bring the perfect bit of texture to a modern or farmhouse-style bedroom. For a different look, flip it over to the reverse solid grey side. Pillow cover features hidden bottom zipper. 20\"L x 20\"W, Pillow cover dimensions are measured from seam to seam when cover is laid flat. Removable plush fiber-filled insert included.",
+    "price": 29,
+    "tags": [
+      "decor",
+      "bedroom",
+      "rustic"
+    ]
+  },
+  {
+    "id": "1b36695b-8c09-5415-8f8a-4697600763b8",
+    "name": "Two-Toned Stoneware Planter",
+    "description": "The reactive Indigo glaze used on this 100% stoneware planter makeseach item unique. Placed inside or outside, this modern pot looks fantastic holding anything from succulents to budding flowers. The patterned base is topped by a strong band of color that makes this planter stand out. 10.43\" diameter x 10.53\"H. 100% stoneware. This mid-century stoneware planter comes with a drainage hole on the bottom.",
+    "price": 99,
+    "tags": [
+      "decor",
+      "living-room",
+      "mid-century"
+    ]
+  },
+  {
+    "id": "7946d4f2-3b27-59e3-8f1a-715c2f53744e",
+    "name": "Rustic Textured Planter",
+    "description": "Planter is 100% stoneware with dark grey colored crosshatch textured look. 8.66'' diameter x 7.87'' high. Durable stoneware pot great for display or holding a plant. Clean, simple design and neutral colors will blend anywhere. Wipes clean with soft, dry cloth. Pot includes a drainage hole.",
+    "price": 29,
+    "tags": [
+      "decor",
+      "living-room",
+      "rustic"
+    ]
+  },
+  {
+    "id": "f5bc14e7-a7e2-575b-bc2c-31fa90a98b39",
+    "name": "Abstract Topographic Print",
+    "description": "The once unsettled wilderness of the Wild West is depicted in this artistic treatment of the United States map. Various browns and greens bring a bit of nature and an antique feel to this piece, which is housed in a weathered-look white wood frame. Modern treatment of antique-look map. Printed on wood with satin finish; weathered-look white wood frame. 30\" x 30\".",
+    "price": 89,
+    "tags": [
+      "decor",
+      "office",
+      "modern",
+      "wood"
+    ]
   }
 ]

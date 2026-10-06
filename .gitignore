@@ -33,3 +33,10 @@ devenv.local.nix
 
 .agents
 .claude
+
+# Secrets locales (NVIDIA_API_KEY, GOOGLE_API_KEY)
+.env
+
+# Descargas de Amazon Berkeley Objects para generar el catálogo
+scripts/catalog-data/.cache/
+__pycache__/

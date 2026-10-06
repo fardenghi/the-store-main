@@ -1,0 +1,20 @@
+[
+  { "name": "seating", "displayName": "Seating" },
+  { "name": "tables", "displayName": "Tables" },
+  { "name": "storage", "displayName": "Storage" },
+  { "name": "lighting", "displayName": "Lighting" },
+  { "name": "rugs", "displayName": "Rugs" },
+  { "name": "decor", "displayName": "Decor" },
+  { "name": "beds", "displayName": "Beds" },
+  { "name": "living-room", "displayName": "Living Room" },
+  { "name": "bedroom", "displayName": "Bedroom" },
+  { "name": "office", "displayName": "Office" },
+  { "name": "dining", "displayName": "Dining" },
+  { "name": "mid-century", "displayName": "Mid-Century" },
+  { "name": "modern", "displayName": "Modern" },
+  { "name": "rustic", "displayName": "Rustic" },
+  { "name": "velvet", "displayName": "Velvet" },
+  { "name": "leather", "displayName": "Leather" },
+  { "name": "wood", "displayName": "Wood" },
+  { "name": "metal", "displayName": "Metal" }
+]

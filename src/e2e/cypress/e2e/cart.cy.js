@@ -2,7 +2,7 @@ import Cart from "../pages/Cart";
 import Product from "../pages/Product";
 
 const cart = new Cart();
-const product = new Product("d27cf49f-b689-4a75-a249-d373e0330bb5");
+const product = new Product("bff46bca-ec50-582f-9cde-6d843c1de176");
 
 describe("testing cart", () => {
   beforeEach(() => {
@@ -21,9 +21,9 @@ describe("testing cart", () => {
       .items()
       .first()
       .find(".item-name")
-      .should("contain.text", "The Quiet Quill");
+      .should("contain.text", "Aiden Mid-Century Velvet Armchair");
 
-    cart.subtotal().should("contain.text", "$150");
+    cart.subtotal().should("contain.text", "$139");
   });
 
   it("should open checkout", () => {

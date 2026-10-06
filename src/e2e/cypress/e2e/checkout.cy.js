@@ -6,8 +6,8 @@ import Product from "../pages/Product";
 const cart = new Cart();
 const checkout = new CheckoutAddress();
 const checkoutOrder = new CheckoutOrder();
-const product1 = new Product("d27cf49f-b689-4a75-a249-d373e0330bb5");
-const product2 = new Product("4f18544b-70a5-4352-8e19-0d070f46745d");
+const product1 = new Product("bff46bca-ec50-582f-9cde-6d843c1de176");
+const product2 = new Product("2c5a89d4-9ce2-5d70-9058-aaef9514d5e7");
 
 describe("testing checkout", () => {
   describe("single product", () => {
@@ -32,8 +32,8 @@ describe("testing checkout", () => {
 
       checkoutOrder.shipping().should("contain.text", "$10");
       checkoutOrder.tax().should("contain.text", "$5");
-      checkoutOrder.subtotal().should("contain.text", "$150");
-      checkoutOrder.total().should("contain.text", "$165");
+      checkoutOrder.subtotal().should("contain.text", "$139");
+      checkoutOrder.total().should("contain.text", "$154");
     });
   });
 
@@ -61,8 +61,8 @@ describe("testing checkout", () => {
 
       checkoutOrder.shipping().should("contain.text", "$10");
       checkoutOrder.tax().should("contain.text", "$5");
-      checkoutOrder.subtotal().should("contain.text", "$360");
-      checkoutOrder.total().should("contain.text", "$375");
+      checkoutOrder.subtotal().should("contain.text", "$758");
+      checkoutOrder.total().should("contain.text", "$773");
     });
   });
 });

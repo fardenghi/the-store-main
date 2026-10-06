@@ -82,11 +82,11 @@ func router() *gin.Engine {
 
 	catalog := router.Group("/catalog")
 
-	catalog.GET("", c.GetProducts)
+	catalog.GET("/products", c.GetProducts)
 
 	catalog.GET("/size", c.CatalogSize)
 	catalog.GET("/tags", c.ListTags)
-	catalog.GET("/product/:id", c.GetProduct)
+	catalog.GET("/products/:id", c.GetProduct)
 
 	return router
 }

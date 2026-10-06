@@ -85,6 +85,12 @@ Run load generator tests to validate system performance:
 
 The load generator will run performance tests against your local cluster for 10 minutes (or until manually stopped) to validate system behavior under load.
 
+## 🛋️ Product Catalog
+
+The catalog (~80 home and furniture products) is generated from a curated list with `scripts/catalog-data/generate.py`. See [docs/how-to.md](./docs/how-to.md#catálogo-de-productos) for how to curate and regenerate it.
+
+Product data and images are derived from the [Amazon Berkeley Objects (ABO)](https://amazon-berkeley-objects.s3.amazonaws.com/index.html) dataset by Amazon.com, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Names, descriptions and prices were adapted, and images were resized ([attribution details](./docs/how-to.md#atribución)).
+
 ---
 
 **The Store** - Built with ❤️ for modern e-commerce

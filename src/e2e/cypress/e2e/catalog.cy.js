@@ -15,7 +15,7 @@ describe("testing catalog", () => {
       .cards()
       .first()
       .find(".product-name")
-      .should("contain.text", "Aqua Ace GT");
+      .should("contain.text", "5-Tier Ladder Bookshelf");
     catalog.cards().its("length").should("eq", 6);
   });
 
