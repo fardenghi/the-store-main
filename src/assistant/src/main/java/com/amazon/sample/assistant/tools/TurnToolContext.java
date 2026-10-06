@@ -84,6 +84,11 @@ public class TurnToolContext {
     added.add(productId);
   }
 
+  /** Si en el turno ya hubo un {@code addToCart} correcto. */
+  public boolean hasAdded() {
+    return !added.isEmpty();
+  }
+
   /** Suma productos devueltos por una tool, sin repetidos y en orden de aparición. */
   public synchronized void addShown(List<ShownProduct> products) {
     products.forEach(product -> shown.putIfAbsent(product.id(), product));

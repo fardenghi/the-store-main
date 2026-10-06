@@ -85,7 +85,7 @@ La tool `addToCart` SHALL recibir `productId` y `quantity` (por defecto 1), cons
 - **THEN** el carrito de cualquier otra sesión no cambia, aunque el mensaje del usuario mencione otro identificador de cliente
 
 ### Requirement: Confirmación fiel de las acciones
-El asistente MUST NOT afirmar que agregó un producto al carrito si `addToCart` no terminó correctamente en ese turno. Si el servicio `carts` o el `catalog` fallan, la tool SHALL devolver un error, el turno SHALL terminar normalmente (con `done`) y la respuesta SHALL informar que no se pudo agregar el producto. El asistente SHALL llamar a `addToCart` solo cuando el usuario pide explícitamente agregar un producto; si el pedido es ambiguo respecto de qué producto agregar, SHALL preguntar en lugar de elegir uno.
+El asistente MUST NOT afirmar que agregó un producto al carrito si `addToCart` no terminó correctamente en ese turno. Esta garantía SHALL cumplirse en el servidor y no depender solo de las instrucciones del modelo: una oración de la respuesta que afirma un agregado sin un `addToCart` correcto en el turno MUST NOT llegar al usuario, y en ese caso la respuesta SHALL decir que no se agregó nada. Las acciones ejecutadas con tools en un turno (cada tool call con un resultado resumido) SHALL quedar en la memoria de la sesión junto con la respuesta final, para que en los turnos siguientes el modelo distinga lo que se ejecutó de lo que solo se dijo. Si el servicio `carts` o el `catalog` fallan, la tool SHALL devolver un error, el turno SHALL terminar normalmente (con `done`) y la respuesta SHALL informar que no se pudo agregar el producto. El asistente SHALL llamar a `addToCart` solo cuando el usuario pide explícitamente agregar un producto; si el pedido es ambiguo respecto de qué producto agregar, SHALL preguntar en lugar de elegir uno.
 
 #### Scenario: Servicio de carrito caído
 - **WHEN** el servicio `carts` responde con error al `POST /carts/{customerId}/items` y el usuario había pedido agregar un producto
@@ -94,6 +94,18 @@ El asistente MUST NOT afirmar que agregó un producto al carrito si `addToCart` 
 #### Scenario: Pedido ambiguo
 - **WHEN** el asistente mostró tres lámparas y el usuario escribe "add the lamp to my cart"
 - **THEN** el asistente pregunta cuál de las lámparas agregar y el carrito no cambia
+
+#### Scenario: Agregado al final de una conversación larga
+- **WHEN** en la misma sesión el usuario busca una lámpara, un sillón, pide algo más barato, descarta las lámparas, compara dos sofás, pregunta el precio actual de un sillón y escribe "add two of the first one to my cart"
+- **THEN** se ejecuta `addToCart` con cantidad 2, el stream contiene `cart-updated` y el carrito de la sesión tiene el producto, y ninguna respuesta de la conversación nombra productos ni precios que no estén en el catálogo
+
+#### Scenario: Segundo agregado en la sesión
+- **WHEN** un turno anterior de la sesión agregó un producto con `addToCart` y el usuario pide agregar otro producto
+- **THEN** el turno nuevo vuelve a ejecutar `addToCart` y emite su propio `cart-updated`
+
+#### Scenario: Afirmación de un agregado sin la tool
+- **WHEN** el texto del modelo afirma que agregó un producto al carrito y en ese turno no hubo un `addToCart` correcto
+- **THEN** esa afirmación no aparece en el stream, no se emite `cart-updated` y la respuesta dice que no se agregó nada al carrito
 
 ### Requirement: Eventos SSE de tools y de carrito
 Durante un turno, el stream de `POST /assistant/chat` SHALL incluir, además de los eventos que define el chat:

@@ -24,6 +24,7 @@ import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
 import com.amazon.sample.assistant.chat.rewrite.Rewrite;
 import com.amazon.sample.assistant.chat.session.SessionStore;
 import com.amazon.sample.assistant.chat.session.ShownProduct;
+import com.amazon.sample.assistant.chat.session.ToolRound;
 import com.amazon.sample.assistant.chat.session.Turn;
 import com.amazon.sample.assistant.config.ChatProperties;
 import com.amazon.sample.assistant.products.catalog.CatalogClient;
@@ -48,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -333,28 +335,48 @@ class ToolCallingLoopTest {
   // 6.4 Memoria y línea del turno
 
   @Test
-  void productsFromToolsAreRememberedAndToolMessagesAreNotStored() {
+  void productsFromToolsAreRememberedAndToolCallsAreStoredCompact() {
     ContextRetriever realRetriever = new ContextRetriever(search, 5, 0);
     ChatTurnService service = ChatTestSupport.service(sessions, rewriter, realRetriever, chat,
         ChatTestSupport.loop(chatModel, chat, limiter, tools));
-    model(() -> Flux.just(toolCall("searchProducts", "{\"tags\":[\"lighting\"]}")),
+    ChatResponse search = toolCall("searchProducts", "{\"tags\":[\"lighting\"]}");
+    String callId = search.getResult().getOutput().getToolCalls().get(0).id();
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("Checking the lamps. "), search),
         () -> Flux.just(ChatTurnServiceTest.fragment("Try the Ceramic Table Lamp ($45).")),
         () -> Flux.just(ChatTurnServiceTest.fragment("Still $45.")));
 
     service.open("s1", "lamps please").blockLast(Duration.ofSeconds(10));
     service.open("s1", "is it still available?").blockLast(Duration.ofSeconds(10));
 
+    String compact = "{\"products\":[{\"id\":\"" + LAMP.id()
+        + "\",\"name\":\"Ceramic Table Lamp\",\"price\":45}]}";
     assertThat(sessions.get("s1").turns()).containsExactly(
-        new Turn("lamps please", "Try the Ceramic Table Lamp ($45)."),
+        new Turn("lamps please", "Checking the lamps. Try the Ceramic Table Lamp ($45).",
+            List.of(new ToolRound("Checking the lamps. ", List.of(new ToolRound.Call(callId,
+                "searchProducts", "{\"tags\":[\"lighting\"]}", compact))))),
         new Turn("is it still available?", "Still $45."));
+    // El historial del turno siguiente muestra el tool call y su resultado compacto.
     Prompt second = prompts.get(2);
     assertThat(second.getInstructions()).extracting(m -> m.getMessageType())
         .containsExactly(MessageType.SYSTEM, MessageType.USER, MessageType.ASSISTANT,
-            MessageType.USER);
+            MessageType.TOOL, MessageType.ASSISTANT, MessageType.USER);
+    AssistantMessage withCalls = (AssistantMessage) second.getInstructions().get(2);
+    assertThat(withCalls.getText()).isEqualTo("Checking the lamps. ");
+    assertThat(withCalls.getToolCalls()).singleElement().satisfies(call -> {
+      assertThat(call.id()).isEqualTo(callId);
+      assertThat(call.name()).isEqualTo("searchProducts");
+    });
+    ToolResponseMessage responses = (ToolResponseMessage) second.getInstructions().get(3);
+    assertThat(responses.getResponses()).singleElement().satisfies(response -> {
+      assertThat(response.id()).isEqualTo(callId);
+      assertThat(response.responseData()).isEqualTo(compact);
+    });
+    assertThat(second.getInstructions().get(4).getText())
+        .isEqualTo("Try the Ceramic Table Lamp ($45).");
     assertThat(second.getInstructions().get(0).getText())
         .contains("Previously shown products")
         .contains("[" + LAMP.id() + "] Ceramic Table Lamp | $45");
-    verify(search, never()).search(any(), anyList(), any(), any(), any());
+    verify(this.search, never()).search(any(), anyList(), any(), any(), any());
     verify(catalog).listProducts(List.of("lighting"), null, 1, 50);
   }
 
@@ -400,5 +422,232 @@ class ToolCallingLoopTest {
 
     assertThat(turnLine()).contains("nvidiaRequests=2", "modelCalls=1", "tools=-");
     verify(catalog, never()).listProducts(anyList(), isNull(), anyInt(), anyInt());
+  }
+
+  // Correcciones posteriores: confirmación fiel de los agregados al carrito
+
+  private static String texts(List<ServerSentEvent<?>> events) {
+    StringBuilder text = new StringBuilder();
+    events.stream().filter(ToolCallingLoopTest::isText)
+        .forEach(event -> text.append(((Map<?, ?>) event.data()).get("text")));
+    return text.toString();
+  }
+
+  @Test
+  void falseAddClaimIsDroppedAndTheCorrectiveRoundCallsAddToCart() {
+    when(carts.getCart("s1")).thenReturn(new CartsClient.Cart("s1",
+        List.of(new CartsClient.Item(LAMP.id(), 2, 45))));
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("Right away, Operative. "),
+            ChatTurnServiceTest.fragment("Two Ceramic Table Lamps have been added to your cart.")),
+        () -> Flux.just(toolCall("addToCart",
+            "{\"productId\":\"" + LAMP.id() + "\",\"quantity\":2}")),
+        () -> Flux.just(ChatTurnServiceTest.fragment(" Done: two lamps added to your cart.")));
+
+    List<ServerSentEvent<?>> events = service().open("s1", "add two lamps to my cart")
+        .collectList().block(Duration.ofSeconds(10));
+
+    assertThat(texts(events)).isEqualTo("Right away, Operative. Done: two lamps added to your "
+        + "cart.");
+    assertThat(events).filteredOn(event -> isEvent(event, "cart-updated")).hasSize(1);
+    verify(carts).addItem("s1", LAMP.id(), 2, 45);
+    // La vuelta correctiva lleva lo que dijo el modelo y el aviso de la tienda.
+    assertThat(prompts).hasSize(3);
+    List<org.springframework.ai.chat.messages.Message> corrective =
+        prompts.get(1).getInstructions();
+    assertThat(corrective.get(corrective.size() - 2).getText())
+        .contains("have been added to your cart");
+    assertThat(corrective.get(corrective.size() - 1).getText())
+        .isEqualTo(ToolCallingLoop.CORRECTION_NOTE);
+    // El usuario pidió agregar: la vuelta correctiva obliga a pedir una tool.
+    assertThat(options(prompts.get(1)).getToolChoice()).isEqualTo("required");
+    assertThat(options(prompts.get(2)).getToolChoice()).isNull();
+    assertThat(turnLine()).contains("tools=addToCart:ok", "claimGuard=dropped:1+retry",
+        "corrections=claim+required", "modelCalls=3");
+    // La memoria guarda lo que vio el usuario, con el tool call, y no el aviso.
+    Turn stored = sessions.get("s1").turns().get(0);
+    assertThat(stored.assistant()).doesNotContain("have been added")
+        .doesNotContain("Store system note");
+    assertThat(stored.toolRounds()).singleElement().satisfies(round ->
+        assertThat(round.calls()).extracting(ToolRound.Call::name).containsExactly("addToCart"));
+  }
+
+  @Test
+  void modelThatKeepsClaimingWithoutAddToCartEndsWithTheNotAddedText() {
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("*adds two lamps to cart* "),
+        ChatTurnServiceTest.fragment("Consider it done, Operative.")));
+
+    List<ServerSentEvent<?>> events = service().open("s1", "add two lamps to my cart")
+        .collectList().block(Duration.ofSeconds(10));
+
+    // La acotación no termina en punto: forma una oración con la siguiente y se
+    // descartan juntas, en las dos vueltas.
+    assertThat(texts(events)).isEqualTo(ToolCallingLoop.NOT_ADDED_TEXT);
+    assertThat(events).filteredOn(event -> isEvent(event, "cart-updated")).isEmpty();
+    assertThat(events.get(events.size() - 1).event()).isEqualTo("done");
+    verify(carts, never()).addItem(any(), any(), anyInt(), anyInt());
+    // Dos vueltas correctivas como máximo por turno.
+    assertThat(prompts).hasSize(1 + ToolCallingLoop.MAX_CORRECTIONS);
+    assertThat(turnLine()).contains("tools=-", "claimGuard=dropped:3+retry+notice",
+        "corrections=claim+required,claim+required");
+    assertThat(sessions.get("s1").turns().get(0).assistant())
+        .endsWith(ToolCallingLoop.NOT_ADDED_TEXT).doesNotContain("adds two lamps");
+  }
+
+  @Test
+  void claimInTheLastPossibleRoundEndsWithTheNoticeWithoutACorrectiveRound() {
+    model(() -> Flux.just(toolCall("getProductDetails", "{\"productId\":\"" + LAMP.id() + "\"}")),
+        () -> Flux.just(toolCall("getProductDetails", "{\"productId\":\"" + LAMP.id() + "\"}")),
+        () -> Flux.just(toolCall("getProductDetails", "{\"productId\":\"" + LAMP.id() + "\"}")),
+        () -> Flux.just(ChatTurnServiceTest.fragment("The lamp has been added to your cart.")));
+
+    List<ServerSentEvent<?>> events = service().open("s1", "add the lamp")
+        .collectList().block(Duration.ofSeconds(10));
+
+    assertThat(prompts).hasSize(4);
+    assertThat(texts(events)).isEqualTo(ToolCallingLoop.NOT_ADDED_TEXT);
+    assertThat(turnLine()).contains("claimGuard=dropped:1+notice");
+  }
+
+  @Test
+  void legitimateCartTextWithoutAddToCartIsNotTouched() {
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("Which lamp should I add to your cart? "),
+        ChatTurnServiceTest.fragment("You can also add it from the product page.")));
+
+    List<ServerSentEvent<?>> events = service().open("s1", "add the lamp")
+        .collectList().block(Duration.ofSeconds(10));
+
+    assertThat(texts(events)).isEqualTo("Which lamp should I add to your cart? You can also add "
+        + "it from the product page.");
+    assertThat(prompts).hasSize(1);
+    assertThat(turnLine()).contains("claimGuard=-", "corrections=-");
+  }
+
+  /**
+   * Regresión de la sesión {@code 9952aae8} del reporte: después de un agregado
+   * correcto, el historial del turno siguiente muestra el tool call
+   * {@code addToCart} y su resultado, no solo el texto "added".
+   */
+  @Test
+  void historyOfASecondAddShowsTheFirstAddToCartCall() {
+    when(carts.getCart("s1")).thenReturn(new CartsClient.Cart("s1",
+        List.of(new CartsClient.Item(LAMP.id(), 2, 45))));
+    model(() -> Flux.just(toolCall("addToCart",
+            "{\"productId\":\"" + LAMP.id() + "\",\"quantity\":2}")),
+        () -> Flux.just(ChatTurnServiceTest.fragment("Two lamps added to your cart.")),
+        () -> Flux.just(ChatTurnServiceTest.fragment("Which one?")));
+
+    service().open("s1", "add two of the first one to my cart").blockLast(Duration.ofSeconds(10));
+    service().open("s1", "add one more lamp too").blockLast(Duration.ofSeconds(10));
+
+    List<org.springframework.ai.chat.messages.Message> history = prompts.get(2).getInstructions();
+    assertThat(history).extracting(m -> m.getMessageType())
+        .containsExactly(MessageType.SYSTEM, MessageType.USER, MessageType.ASSISTANT,
+            MessageType.TOOL, MessageType.ASSISTANT, MessageType.USER);
+    assertThat(((AssistantMessage) history.get(2)).getToolCalls()).singleElement()
+        .satisfies(call -> assertThat(call.name()).isEqualTo("addToCart"));
+    assertThat(((ToolResponseMessage) history.get(3)).getResponses()).singleElement()
+        .satisfies(response -> assertThat(response.responseData()).isEqualTo(
+            "{\"added\":{\"id\":\"" + LAMP.id() + "\",\"name\":\"Ceramic Table Lamp\","
+                + "\"quantity\":2,\"unitPrice\":45},\"cartItemCount\":2}"));
+    assertThat(history.get(4).getText()).isEqualTo("Two lamps added to your cart.");
+  }
+
+  /**
+   * Regresión de la segunda corrida de {@code MultiTurnCartSmokeIT}: la respuesta
+   * termina anunciando la búsqueda ("Let me check our inventory…") sin pedir la
+   * tool. La vuelta correctiva la pide y el turno termina con el agregado.
+   */
+  @Test
+  void replyThatEndsAnnouncingAnActionGetsACorrectiveRound() {
+    when(carts.getCart("s1")).thenReturn(new CartsClient.Cart("s1",
+        List.of(new CartsClient.Item(LAMP.id(), 1, 45))));
+    model(() -> Flux.just(ChatTurnServiceTest.fragment(
+            "I need to check the current details for the Ceramic Table Lamp first.")),
+        () -> Flux.just(toolCall("addToCart", "{\"productId\":\"" + LAMP.id() + "\"}")),
+        () -> Flux.just(ChatTurnServiceTest.fragment("Done: one lamp added to your cart.")));
+
+    List<ServerSentEvent<?>> events = service().open("s1", "add one ceramic lamp too")
+        .collectList().block(Duration.ofSeconds(10));
+
+    assertThat(texts(events)).isEqualTo("I need to check the current details for the Ceramic "
+        + "Table Lamp first. Done: one lamp added to your cart.");
+    assertThat(events).filteredOn(event -> isEvent(event, "cart-updated")).hasSize(1);
+    List<org.springframework.ai.chat.messages.Message> corrective =
+        prompts.get(1).getInstructions();
+    assertThat(corrective.get(corrective.size() - 1).getText())
+        .isEqualTo(ToolCallingLoop.ANNOUNCED_NOTE);
+    assertThat(turnLine()).contains("tools=addToCart:ok", "claimGuard=-",
+        "corrections=announce");
+  }
+
+  /**
+   * Regresión de la quinta corrida de {@code MultiTurnCartSmokeIT}: el modelo
+   * escribió {@code [addToCart: {…}]} como texto, sin tool calls. Se ejecuta como
+   * tool call y el JSON no llega al usuario.
+   */
+  @Test
+  void toolCallWrittenAsTextIsExecutedAndNotShown() {
+    when(carts.getCart("s1")).thenReturn(new CartsClient.Cart("s1",
+        List.of(new CartsClient.Item(LAMP.id(), 2, 45))));
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("On it, Operative.\n"),
+            ChatTurnServiceTest.fragment("[addToCart: {\"productId\": \"" + LAMP.id()
+                + "\", \"quantity\": 2}]")),
+        () -> Flux.just(ChatTurnServiceTest.fragment("Two lamps added to your cart.")));
+
+    List<ServerSentEvent<?>> events = service().open("s1", "add two of the first one")
+        .collectList().block(Duration.ofSeconds(10));
+
+    assertThat(texts(events)).isEqualTo("On it, Operative.\nTwo lamps added to your cart.");
+    assertThat(events).filteredOn(event -> isEvent(event, "cart-updated")).hasSize(1);
+    verify(carts).addItem("s1", LAMP.id(), 2, 45);
+    assertThat(turnLine()).contains("tools=addToCart:ok", "claimGuard=-",
+        "corrections=textual");
+    assertThat(sessions.get("s1").turns().get(0).toolRounds()).singleElement()
+        .satisfies(round -> assertThat(round.calls()).extracting(ToolRound.Call::name)
+            .containsExactly("addToCart"));
+  }
+
+  @Test
+  void correctiveRoundWithoutACartRequestDoesNotForceATool() {
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("Two lamps have been added to your cart.")),
+        () -> Flux.just(ChatTurnServiceTest.fragment("Here are some lamps, Operative.")));
+
+    service().open("s1", "show me some lamps").collectList().block(Duration.ofSeconds(10));
+
+    assertThat(prompts).hasSize(2);
+    assertThat(options(prompts.get(1)).getToolChoice()).isNull();
+    assertThat(turnLine()).contains("corrections=claim ", "claimGuard=dropped:1+retry+notice");
+  }
+
+  @Test
+  void cartRequests() {
+    assertThat(ToolCallingLoop.isCartRequest("add two of the first one to my cart")).isTrue();
+    assertThat(ToolCallingLoop.isCartRequest("Add one Adjustable Pharmacy Desk Lamp to my cart "
+        + "too")).isTrue();
+    assertThat(ToolCallingLoop.isCartRequest("agregá dos lámparas al carrito")).isTrue();
+    assertThat(ToolCallingLoop.isCartRequest("show me some lamps")).isFalse();
+    assertThat(ToolCallingLoop.isCartRequest("what's in my cart?")).isFalse();
+    assertThat(ToolCallingLoop.isCartRequest(null)).isFalse();
+  }
+
+  /**
+   * Regresión de la octava corrida de {@code MultiTurnCartSmokeIT}: el modelo pide
+   * una aclaración y a la vez afirma un agregado. La vuelta correctiva no se fuerza,
+   * para que pueda preguntar en lugar de elegir.
+   */
+  @Test
+  void correctiveRoundIsNotForcedWhenTheModelIsAskingTheUser() {
+    model(() -> Flux.just(ChatTurnServiceTest.fragment("Let me clarify which lamp you mean. "),
+            ChatTurnServiceTest.fragment("Two lamps have been added to your cart.")),
+        () -> Flux.just(ChatTurnServiceTest.fragment("Which of the three lamps do you want?")));
+
+    List<ServerSentEvent<?>> events = service().open("s1", "add two of them to my cart")
+        .collectList().block(Duration.ofSeconds(10));
+
+    assertThat(options(prompts.get(1)).getToolChoice()).isNull();
+    assertThat(texts(events)).startsWith("Let me clarify which lamp you mean. Which of the three")
+        .endsWith(ToolCallingLoop.NOT_ADDED_TEXT);
+    verify(carts, never()).addItem(any(), any(), anyInt(), anyInt());
+    assertThat(turnLine()).contains("corrections=claim ");
   }
 }

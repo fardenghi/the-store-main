@@ -2,6 +2,7 @@ package com.amazon.sample.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -13,6 +14,7 @@ import com.amazon.sample.assistant.chat.rewrite.QueryRewriter;
 import com.amazon.sample.assistant.chat.rewrite.Rewrite;
 import com.amazon.sample.assistant.chat.session.SessionStore;
 import com.amazon.sample.assistant.chat.session.ShownProduct;
+import com.amazon.sample.assistant.chat.session.ToolRound;
 import com.amazon.sample.assistant.chat.session.Turn;
 import com.amazon.sample.assistant.config.ChatProperties;
 import com.amazon.sample.assistant.config.ChatProperties.ReasoningMode;
@@ -164,14 +166,14 @@ class ChatTurnServiceTest {
   @Test
   void cancellationReleasesTheLockAndDoesNotStoreTheTurn() {
     AtomicBoolean modelCancelled = new AtomicBoolean();
-    model(() -> Flux.concat(Flux.just(fragment("Partial")).delayElements(Duration.ofSeconds(1)),
-            Flux.<ChatResponse>never())
+    model(() -> Flux.concat(Flux.just(fragment("Partial answer.")).delayElements(
+                Duration.ofSeconds(1)), Flux.<ChatResponse>never())
         .doOnCancel(() -> modelCancelled.set(true)));
 
     StepVerifier.withVirtualTime(() -> service.open("s1", "a velvet armchair"))
         .expectNextMatches(ChatTurnServiceTest::isProducts)
         .thenAwait(Duration.ofSeconds(1))
-        .expectNextMatches(event -> isText(event, "Partial"))
+        .expectNextMatches(event -> isText(event, "Partial answer."))
         .thenCancel()
         .verify();
 
@@ -190,6 +192,76 @@ class ChatTurnServiceTest {
     assertThatThrownBy(() -> service.open("s1", "second"))
         .isInstanceOf(SessionBusyException.class);
     assertThat(service.open("s2", "other session")).isNotNull();
+  }
+
+  /**
+   * Corrección posterior de D2: con la sesión ocupada, el turno nuevo sondea la
+   * conexión del turno en curso. Acá el cliente del primer turno ya cortó: la
+   * escritura del sondeo lo detecta (el suscriptor cancela al recibirla, como
+   * Spring cuando falla la escritura), el turno libera el lock y el nuevo entra.
+   */
+  @Test
+  void busySessionWhoseClientIsGoneIsReleasedByTheProbe() {
+    AtomicBoolean modelCancelled = new AtomicBoolean();
+    model(() -> Flux.<ChatResponse>never().doOnCancel(() -> modelCancelled.set(true)));
+    service.open("s1", "first").takeUntil(ChatTurnServiceTest::isKeepalive).subscribe();
+    await().atMost(Duration.ofSeconds(5)).until(() -> prompts.size() == 1);
+
+    long start = System.nanoTime();
+    Flux<ServerSentEvent<?>> second = service.open("s1", "second");
+    long millis = (System.nanoTime() - start) / 1_000_000;
+
+    assertThat(second).isNotNull();
+    assertThat(millis).isLessThan(ChatTurnService.PROBE_GAP.plus(ChatTurnService.PROBE_WAIT)
+        .toMillis());
+    assertThat(modelCancelled).isTrue();
+    assertThat(sessions.get("s1").isBusy()).as("el lock es del turno nuevo").isTrue();
+    assertThat(sessions.get("s1").turns()).isEmpty();
+  }
+
+  @Test
+  void busySessionWhoseClientIsStillConnectedIsRejectedAfterTheProbe() {
+    model(() -> Flux.never());
+    List<ServerSentEvent<?>> received = new CopyOnWriteArrayList<>();
+    service.open("s1", "first").subscribe(received::add);
+    await().atMost(Duration.ofSeconds(5)).until(() -> prompts.size() == 1);
+
+    assertThatThrownBy(() -> service.open("s1", "second"))
+        .isInstanceOf(SessionBusyException.class);
+    // El cliente conectado recibió los dos comentarios del sondeo, que ignora.
+    assertThat(received).filteredOn(ChatTurnServiceTest::isKeepalive).hasSize(2);
+  }
+
+  @Test
+  void historyReplaysToolRoundsWithTheirIdsBeforeTheFinalAnswer() {
+    ToolRound round = new ToolRound("Checking. ", List.of(new ToolRound.Call("call-1",
+        "addToCart", "{\"productId\":\"a1\",\"quantity\":2}",
+        "{\"added\":{\"id\":\"a1\",\"quantity\":2}}")));
+
+    List<org.springframework.ai.chat.messages.Message> withTools = ChatTurnService.history(
+        new Turn("add two", "Checking. Two added.", List.of(round)));
+    List<org.springframework.ai.chat.messages.Message> withoutFinalText = ChatTurnService.history(
+        new Turn("add two", "Checking. ", List.of(round)));
+
+    assertThat(withTools).extracting(m -> m.getMessageType()).containsExactly(MessageType.USER,
+        MessageType.ASSISTANT, MessageType.TOOL, MessageType.ASSISTANT);
+    AssistantMessage calls = (AssistantMessage) withTools.get(1);
+    assertThat(calls.getText()).isEqualTo("Checking. ");
+    assertThat(calls.getToolCalls()).singleElement().satisfies(call -> {
+      assertThat(call.id()).isEqualTo("call-1");
+      assertThat(call.arguments()).isEqualTo("{\"productId\":\"a1\",\"quantity\":2}");
+    });
+    assertThat(((org.springframework.ai.chat.messages.ToolResponseMessage) withTools.get(2))
+        .getResponses()).singleElement().satisfies(response -> {
+          assertThat(response.id()).isEqualTo("call-1");
+          assertThat(response.name()).isEqualTo("addToCart");
+        });
+    assertThat(withTools.get(3).getText()).isEqualTo("Two added.");
+    assertThat(withoutFinalText).extracting(m -> m.getMessageType())
+        .containsExactly(MessageType.USER, MessageType.ASSISTANT, MessageType.TOOL);
+    assertThat(ChatTurnService.history(new Turn("hi", "hello")))
+        .extracting(m -> m.getMessageType())
+        .containsExactly(MessageType.USER, MessageType.ASSISTANT);
   }
 
   @Test

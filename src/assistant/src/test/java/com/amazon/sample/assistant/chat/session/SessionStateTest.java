@@ -19,7 +19,8 @@ class SessionStateTest {
   void onlyOneOfTwoConcurrentAcquiresOnTheSameSessionWins() throws Exception {
     SessionState session = new SessionState(10);
 
-    List<Boolean> results = race(session::tryAcquire, session::tryAcquire);
+    List<Boolean> results = race(() -> session.tryAcquire(new Object()),
+        () -> session.tryAcquire(new Object()));
 
     assertThat(results).containsExactlyInAnyOrder(true, false);
   }
@@ -29,7 +30,8 @@ class SessionStateTest {
     SessionState s1 = new SessionState(10);
     SessionState s2 = new SessionState(10);
 
-    List<Boolean> results = race(s1::tryAcquire, s2::tryAcquire);
+    List<Boolean> results = race(() -> s1.tryAcquire(new Object()),
+        () -> s2.tryAcquire(new Object()));
 
     assertThat(results).containsExactly(true, true);
   }
@@ -37,19 +39,40 @@ class SessionStateTest {
   @Test
   void releaseAllowsTheNextTurn() {
     SessionState session = new SessionState(10);
-    assertThat(session.tryAcquire()).isTrue();
-    assertThat(session.tryAcquire()).isFalse();
+    Object first = new Object();
+    assertThat(session.tryAcquire(first)).isTrue();
+    assertThat(session.tryAcquire(new Object())).isFalse();
 
-    session.release();
+    session.release(first);
 
-    assertThat(session.tryAcquire()).isTrue();
+    assertThat(session.tryAcquire(new Object())).isTrue();
+  }
+
+  @Test
+  void aTurnThatNoLongerOwnsTheLockCannotReleaseItNorCommit() {
+    SessionState session = new SessionState(10);
+    Object cancelled = new Object();
+    Object next = new Object();
+    session.tryAcquire(cancelled);
+    session.release(cancelled);
+    session.tryAcquire(next);
+
+    session.release(cancelled);
+    boolean stored = session.commitIfOwner(cancelled, new Turn("old", "late answer"), null);
+
+    assertThat(stored).isFalse();
+    assertThat(session.isBusy()).as("el lock sigue siendo del turno nuevo").isTrue();
+    assertThat(session.turns()).isEmpty();
+    assertThat(session.commitIfOwner(next, new Turn("new", "answer"), null)).isTrue();
+    assertThat(session.turns()).containsExactly(new Turn("new", "answer"));
   }
 
   @Test
   void nothingIsStoredWithoutCommit() {
     SessionState session = new SessionState(10);
-    session.tryAcquire();
-    session.release();
+    Object turn = new Object();
+    session.tryAcquire(turn);
+    session.release(turn);
 
     assertThat(session.turns()).isEmpty();
 

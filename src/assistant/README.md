@@ -241,10 +241,22 @@ en inglés, filtros de precio y tags a excluir, intención), busca en Qdrant (si
 la intención no es `other`), arma el contexto con los productos encontrados y
 los del turno anterior, y responde con el modelo principal en streaming, con el
 razonamiento activado solo en las comparaciones. La memoria guarda los últimos
-10 turnos (mensaje y respuesta final, sin razonamiento ni contexto) y los
-productos del último turno con búsqueda; se olvida a los 30 minutos sin uso y
-se pierde al reiniciar el pod. Un turno que termina con error o que el cliente
-corta no se guarda.
+10 turnos (mensaje, respuesta final y, si el turno usó tools, cada tool call
+con un resultado compacto; sin razonamiento ni contexto) y los productos del
+último turno con búsqueda; se olvida a los 30 minutos sin uso y se pierde al
+reiniciar el pod. Un turno que termina con error o que el cliente corta no se
+guarda.
+
+Los tool calls se reenvían en el historial de los turnos siguientes (un
+mensaje del asistente con los tool calls y otro con los resultados, con los
+mismos ids), para que el modelo vea qué acciones se ejecutaron de verdad. El
+resultado compacto deja solo ids, nombres, precios, cantidades o el tipo de
+error: unos 145 tokens por una búsqueda de 5 productos y unos 55 por un
+`addToCart`.
+
+El texto sale **por oración**: cada oración se retiene hasta que termina, para
+que la salvaguarda de agregados al carrito (ver "Tools") pueda descartarla
+antes de enviarla.
 
 | Evento                  | `data`                                       | Cuándo                                                        |
 | ----------------------- | -------------------------------------------- | ------------------------------------------------------------- |
@@ -284,7 +296,16 @@ proveedor):
 | Status | `type`              | Cuándo                                                                   |
 | ------ | ------------------- | ------------------------------------------------------------------------ |
 | `400`  | `invalid-parameter` | Falta `X-Session-ID` o es inválido, o `message` falta, está vacío o supera 2000 caracteres. Indica el campo en `parameter` |
-| `409`  | `session-busy`      | La sesión ya tiene un turno en curso                                     |
+| `409`  | `session-busy`      | La sesión ya tiene un turno en curso y su cliente sigue conectado        |
+
+Mientras el modelo razona no se escribe nada en la conexión, así que el corte
+de un cliente recién se nota al escribir. Por eso, si llega un turno para una
+sesión ocupada, el `assistant` escribe dos comentarios `:keepalive` en la
+conexión del turno en curso (con 100 ms entre ambos) y espera hasta 500 ms: si
+ese cliente ya se fue, la escritura falla, el turno se cancela, libera la
+sesión y el turno nuevo entra; si sigue conectado, el nuevo recibe `409`. Un
+turno cancelado no puede guardar nada en la memoria aunque su llamada al
+modelo termine después.
 
 ```bash
 curl -sN -H 'X-Session-ID: demo' -H 'Content-Type: application/json' \
@@ -326,12 +347,15 @@ ids del top-k con la consulta reescrita y con la cruda (calculado después de
 cerrar el stream; se apaga con `RETAIL_ASSISTANT_CHAT_COMPARE_RAW_RETRIEVAL`),
 el solapamiento, las requests a NVIDIA y las latencias. Con las tools suma
 `modelCalls` (vueltas del modelo principal), `tools` (cada tool con su
-resultado), `limiterWaitMs` y `retries429`; `nvidiaRequests` cuenta la
+resultado), `claimGuard` (la salvaguarda de agregados: `-`, o
+`dropped:<oraciones>` con `+retry` si hubo vuelta correctiva y `+notice` si se
+agregó el aviso), `corrections` (`-` o los motivos de las correcciones:
+`claim`, `announce`, `textual`; ver "Tools"), `limiterWaitMs` y `retries429`; `nvidiaRequests` cuenta la
 reescritura más todas las vueltas, y `rewrite=rate-limited` indica que el
 limitador no tenía lugar y la reescritura se salteó:
 
 ```
-session=demo-rea outcome=done intent=other rewrite=ok raw="add the Tinted Glass Pendant Light to my cart" query="" minPrice=- maxPrice=- excludeTags=[] searched=false catalog=ok reasoning=off reasoningChars=0 topk=[] rawTopk=- overlap=- nvidiaRequests=3 modelCalls=2 tools=addToCart:ok limiterWaitMs=0 retries429=0 rewriteMs=5679 retrievalMs=0 firstFragmentMs=7964 totalMs=8987
+session=demo-rea outcome=done intent=other rewrite=ok raw="add the Tinted Glass Pendant Light to my cart" query="" minPrice=- maxPrice=- excludeTags=[] searched=false catalog=ok reasoning=off reasoningChars=0 topk=[] rawTopk=- overlap=- nvidiaRequests=3 modelCalls=2 tools=addToCart:ok claimGuard=- corrections=- limiterWaitMs=0 retries429=0 rewriteMs=5679 retrievalMs=0 firstFragmentMs=7964 totalMs=8987
 ```
 
 ## Tools
@@ -372,6 +396,33 @@ NVIDIA.
 - Las lecturas al `catalog` tienen tiempos límite de 2 s (conexión) y 5 s
   (lectura) y se reintentan una vez ante 5xx, timeout o error de red. El
   `POST` al carrito no se reintenta, para no duplicar la línea.
+
+**Limitación conocida.** Con la memoria que reenvía los tool calls, ante un
+pedido ambiguo ("add the lamp to my cart" después de mostrar tres lámparas) el
+modelo agrega la primera en lugar de preguntar en alrededor de 1 de cada 5
+intentos (0 de 5 sin esa memoria). El agregado se ve en `cart-updated`. Las
+mediciones están en el `design.md` de `add-assistant-tools` ("Correcciones
+posteriores").
+
+**Salvaguarda de agregados al carrito.** El texto del modelo pasa por un
+filtro por oración (`CartClaimFilter`): si una oración afirma que algo se
+agregó al carrito ("have been added to your cart", "*adds two lamps to cart*",
+"agregué … al carrito") y en el turno no hubo un `addToCart` correcto, no se
+envía. Las preguntas, negaciones, condiciones y ofrecimientos ("want me to add
+it?", "I didn't add anything", "you can add it from the product page") pasan.
+Si la vuelta que cierra el turno tuvo una afirmación descartada, el
+`assistant` hace una vuelta correctiva con un aviso al modelo: si el usuario
+pidió agregar, el modelo llama a `addToCart`; si no, corrige sin afirmar nada.
+Lo mismo pasa si la respuesta termina anunciando una acción que no hizo ("Let
+me check our inventory…", "*getting current price*"), con un aviso que le pide
+llamar a la tool. Como máximo hay dos vueltas correctivas por turno, si quedan
+vueltas. Si el usuario pidió agregar al carrito y el modelo no le estaba
+preguntando nada, la vuelta correctiva va con `tool_choice: required`. Si igual no hubo agregado, la respuesta termina con "Heads-up,
+Operative: nothing was added to your cart in this turn…". Y si el modelo
+escribe un tool call como texto (`[addToCart: {"productId": "…"}]`) en lugar
+de pedirlo, ese texto no se muestra y se ejecuta como tool call. La memoria
+guarda lo que vio el usuario, sin las afirmaciones descartadas ni los avisos al
+modelo. Cada oración descartada queda en el log.
 
 Los argumentos se validan en el servidor antes de llamar a cualquier servicio,
 y los errores vuelven al modelo como resultado, para que los explique:
@@ -543,6 +594,13 @@ reintentan ante un 429:
   `-Dsmoke.qdrant.port` y `-Dsmoke.qdrant.collection` reutiliza una colección
   ya indexada (por ejemplo, la del `assistant` local) y no gasta las 80 de la
   indexación.
+- `MultiTurnCartSmokeIT`: las tres sesiones largas del reporte de
+  `integrate-ui-assistant` en las que el modelo confirmaba agregados sin llamar
+  a `addToCart` (14 turnos, unas 35 requests a NVIDIA). Exige el `addToCart`, el
+  `cart-updated` y el ítem en el carrito al final de cada sesión, revisa que
+  ninguna respuesta afirme un agregado sin la tool ni nombre precios que no
+  sean del catálogo, e imprime la memoria con los caracteres de los tool calls
+  de cada turno. Acepta las mismas propiedades `-Dsmoke.qdrant.*`.
 
 Para correr uno solo:
 `./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=SearchQualitySmokeIT`.

@@ -169,7 +169,8 @@ class ChatControllerTest {
 
   @Test
   void busySessionIs409() throws Exception {
-    sessions.get("busy").tryAcquire();
+    Object otherTurn = new Object();
+    sessions.get("busy").tryAcquire(otherTurn);
     try {
       mvc.perform(chat("busy", "{\"message\":\"hi\"}"))
           .andExpect(status().isConflict())
@@ -177,7 +178,7 @@ class ChatControllerTest {
           .andExpect(jsonPath("$.type").value("session-busy"));
       assertNoProviderWasCalled();
     } finally {
-      sessions.get("busy").release();
+      sessions.get("busy").release(otherTurn);
     }
   }
 

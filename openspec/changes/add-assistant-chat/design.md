@@ -61,7 +61,7 @@ validar ─► tomar lock de la sesión ─► leer SessionState
 
 Lo orquesta un `ChatTurnService` que expone un `Sinks.Many<ServerSentEvent<?>>` por turno. Así, el stream del modelo y cualquier evento que agreguen las tools salen por el mismo canal y en orden. La reescritura y la búsqueda son bloqueantes y corren en `Schedulers.boundedElastic()` antes de suscribirse al stream del modelo.
 
-El lock es un `AtomicBoolean` en el `SessionState`. Si ya está tomado, la respuesta es `409 session-busy` (spec). Si el cliente corta la conexión, la cancelación del `Flux` cancela la llamada al modelo y libera el lock sin guardar el turno.
+El lock es un `AtomicBoolean` en el `SessionState`. Si ya está tomado, la respuesta es `409 session-busy` (spec). Si el cliente corta la conexión, la cancelación del `Flux` cancela la llamada al modelo y libera el lock sin guardar el turno. **Corrección posterior (ver al final):** el lock pasa a tener dueño (el turno), y una sesión ocupada sondea la conexión del turno en curso antes de responder `409`, porque el corte solo se detecta al escribir.
 
 ### D3. Dos `ChatClient` sobre el mismo `OpenAiChatModel`
 
@@ -110,7 +110,7 @@ Si la llamada tarda más de `retail.assistant.rewrite.timeout` (5 s; 12 s despu�
 ### D6. Memoria por sesión en memoria del proceso
 
 `SessionStore` sobre un caché Caffeine (versión gestionada por Spring Boot) con `expireAfterAccess = retail.assistant.chat.memory.idle-ttl` (30 min) y `maximumSize = retail.assistant.chat.memory.max-sessions` (10.000). Cada `SessionState` guarda:
-- una ventana de los últimos `retail.assistant.chat.memory.max-turns` (10) turnos, cada uno con el mensaje del usuario y la respuesta final del asistente (sin el razonamiento ni el contexto RAG);
+- una ventana de los últimos `retail.assistant.chat.memory.max-turns` (10) turnos, cada uno con el mensaje del usuario y la respuesta final del asistente (sin el razonamiento ni el contexto RAG); desde la corrección posterior de D7 de `add-assistant-tools`, también las vueltas con tool calls del turno, con un resultado compacto de cada tool, que el historial reenvía como `AssistantMessage` con tool calls más `ToolResponseMessage`;
 - los productos recuperados en el último turno con búsqueda (snapshot de id, nombre, descripción, precio y tags);
 - el lock del turno (D2).
 
@@ -223,3 +223,25 @@ Agregados que no contradicen la pre-entrega: el evento `products` del SSE (D1) y
 - **Cuota de Gemini:** `batchEmbedContents` cuenta **cada texto** como una request, tanto para el RPM como para el límite diario (`EmbedContentRequestsPerDayPerUserPerProjectPerModel-FreeTier`, 1.000): una reindexación completa son 80 requests. El 2026-10-06 se agotó la cuota diaria durante la verificación. Recomendación: que los smoke/e2e reutilicen una colección ya indexada (`ChatEndToEndSmokeIT` acepta `-Dsmoke.qdrant.host/port/collection`) y corran con `compare-raw-retrieval=false`.
 - **Evaluación (9.2):** tres corridas, reescrita 45 / 43 / 47 contra cruda 42 aciertos en el top-5.
 - **Desvío de D4: tiempo límite de la reescritura de 5 s a 12 s** (decisión del coordinador del apply, opción B). El 2026-10-06 la latencia de `nemotron-3.5-lightning-30b-a3b` fue bimodal: 5 llamadas directas con un prompt mínimo tardaron 9,8 / 1,6 / 8,9 / 1,7 / 1,7 s, y en el e2e (10.1) 8 de 15 reescrituras superaron los 5 s y cayeron al fallback; fallaron el saludo (se buscó en lugar de `intent=other`) y "cheaper" (sin `maxPrice`), que es un caso de uso multi-turno de la pre-entrega. Se prioriza que la reescritura funcione aunque algunos turnos tarden ~10 s hasta el evento `products`. Es configurable con `RETAIL_ASSISTANT_REWRITE_TIMEOUT`, y la línea `assistant.turn` registra `rewrite=ok|fallback` y `rewriteMs` para ajustarlo. **Pendiente del grupo:** si la latencia sigue bimodal, evaluar un hedged request (una segunda llamada si la primera no respondió en ~3 s) o un modelo de reescritura alternativo.
+
+## Correcciones posteriores (2026-10-06)
+
+### Lock de la sesión liberado tarde después de un corte (D2)
+
+Hallazgo 2 del reporte de `integrate-ui-assistant`: con la pestaña cerrada en medio de una comparación (razonamiento activado), la `ui` cortaba la conexión con el `assistant` en menos de 1 s, pero el `assistant` registraba "Turno cancelado" de 2 a 4,5 s después. Un mensaje desde otra pestaña a los 3 s recibía `409 session-busy`.
+
+**Causa.** El `doFinally` del turno cancela la llamada al modelo y libera el lock apenas recibe la señal `CANCEL`, y eso no cambió. La demora estaba antes: Tomcat solo se entera de que el cliente cerró la conexión cuando intenta escribir en ella. Mientras el modelo razona no se escribe nada (el `:keepalive` es cada 10 s), así que la cancelación llegaba recién con el siguiente fragmento o keepalive. `ChatDisconnectTest` lo reproduce con Tomcat real, un socket que cierra la conexión mientras el proveedor falso "razona" 5 s y un segundo pedido de la misma sesión a los 300 ms: con el código anterior, ese pedido recibía `409`.
+
+**Solución.**
+- **Sondeo con la sesión ocupada.** `ChatTurnService` registra el turno en curso de cada sesión. Si llega otro turno y la sesión está ocupada, escribe dos comentarios `:keepalive` en la conexión del turno en curso, con 100 ms entre ambos (`ChatTurn.probe`), y espera hasta 500 ms a que libere el lock. Si el cliente cerró con FIN, la primera escritura provoca el reset del otro extremo y la segunda falla. Si cerró con datos sin leer, falla la primera. En los dos casos, Spring cancela el stream y el turno libera el lock por el camino normal. Si el cliente sigue conectado, los comentarios se ignoran y el turno nuevo recibe `409`, como pide la spec. El sondeo solo bloquea el request que llegó a una sesión ocupada, como máximo unos 600 ms.
+- **Lock con dueño.** `SessionState.tryAcquire(turn)`, `release(turn)` y `commitIfOwner(turn, …)`: el lock guarda qué turno lo tiene. Un turno cancelado ya no puede liberar el lock del turno siguiente ni guardar nada en la memoria, aunque su llamada al modelo termine después (`commitIfOwner` es atómico respecto de `release`). Así no quedan turnos huérfanos escribiendo en la memoria.
+- **Alternativa descartada: bajar el `keepalive` a 1 s.** Detecta el corte en 1 a 2 s, pero no alcanza para un mensaje a los ~300 ms y escribe en todas las conexiones aunque nadie espere la sesión. El sondeo detecta el corte justo cuando hace falta.
+- **Alternativa descartada: liberar el lock sin sondear** (por ejemplo, aceptar el turno nuevo y cancelar el anterior). Rompería el escenario "Turno concurrente en la misma sesión" de la spec, porque con dos pestañas abiertas la segunda le cortaría la respuesta a la primera.
+
+**Evidencia.** `ChatDisconnectTest` (Tomcat real): con cierre por FIN y por reset, el segundo pedido a los 300 ms del corte recibe `200` con `done`, el log muestra "Turno cancelado por el cliente" y "Sesión … ocupada por un turno cuyo cliente ya cortó: se liberó para el turno nuevo" con 1 a 2 ms de diferencia, y cuando el proveedor termina la respuesta del turno cortado, la memoria tiene solo el turno nuevo. Con el cliente conectado, el segundo pedido sigue recibiendo `409` y el primero termina con `done`. En `ChatTurnServiceTest` hay dos tests unitarios del sondeo, y en `SessionStateTest` está el de un dueño viejo que no puede liberar ni guardar.
+
+**Spec.** El requirement "Un turno a la vez por sesión" aclara que un turno cuyo cliente ya cerró la conexión no cuenta como en curso, y suma el escenario "Cliente que cortó la conexión".
+
+### Memoria con las acciones de las tools (D6)
+
+El requirement "Memoria por sesión" ahora incluye, en cada turno, las acciones ejecutadas con tools, con un resultado resumido. Es la corrección del hallazgo 1, documentada en el design de `add-assistant-tools` (D7 y sus correcciones posteriores): sin esas acciones, el historial mostraba confirmaciones de agregados sin tool call, y el modelo las imitaba en lugar de llamar a `addToCart`. Para la salvaguarda de ese change, el texto del modelo pasa a emitirse por oración. El escenario "Respuesta en streaming" se sigue cumpliendo, porque el primer fragmento llega antes del final de la respuesta. Se ajustaron tres tests de `ChatTurnServiceTest` que esperaban fragmentos sin terminar ("Partial") o fragmento por fragmento.

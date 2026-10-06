@@ -41,11 +41,15 @@ El endpoint SHALL responder `400` con un cuerpo de error, sin llamar a ningún p
 - **THEN** la respuesta es `400` e indica el límite de longitud
 
 ### Requirement: Un turno a la vez por sesión
-Mientras un turno de una sesión está en curso, un nuevo turno de la misma sesión SHALL rechazarse con `409` y un cuerpo de error que indique que la sesión está ocupada. Las sesiones distintas MUST poder conversar en paralelo.
+Mientras un turno de una sesión está en curso, un nuevo turno de la misma sesión SHALL rechazarse con `409` y un cuerpo de error que indique que la sesión está ocupada. Un turno cuyo cliente ya cerró la conexión no cuenta como en curso: aunque el modelo todavía no haya terminado de responder, el `assistant` SHALL cancelarlo y aceptar el turno nuevo, y el turno cancelado MUST NOT quedar guardado en la memoria. Las sesiones distintas MUST poder conversar en paralelo.
 
 #### Scenario: Turno concurrente en la misma sesión
 - **WHEN** la sesión `s1` tiene un turno en curso y llega otro `POST /assistant/chat` con `X-Session-ID: s1`
 - **THEN** el segundo pedido recibe `409` y el primero termina normalmente
+
+#### Scenario: Cliente que cortó la conexión
+- **WHEN** el cliente de un turno de la sesión `s1` cierra la conexión mientras el modelo razona sin haber enviado texto, y menos de un segundo después llega otro `POST /assistant/chat` con `X-Session-ID: s1`
+- **THEN** el segundo pedido recibe `200` con su respuesta en streaming, y la memoria de `s1` guarda solo el segundo turno
 
 #### Scenario: Sesiones distintas en paralelo
 - **WHEN** las sesiones `s1` y `s2` envían un mensaje al mismo tiempo
@@ -100,7 +104,7 @@ Si la búsqueda de productos falla porque el índice no está disponible o porqu
 - **THEN** la respuesta termina con `done`, el evento `products` viene vacío y el texto indica que el catálogo no está disponible por el momento, sin nombrar productos
 
 ### Requirement: Memoria por sesión
-El `assistant` SHALL recordar, por cada `X-Session-ID`, los últimos turnos de la conversación (mensaje del usuario y respuesta final del asistente) y los productos mostrados en ellos, y SHALL usarlos en la reescritura y en la respuesta de los turnos siguientes. La memoria SHALL estar acotada a una ventana de los turnos más recientes y SHALL descartarse después de un período de inactividad configurable. La memoria de una sesión MUST NOT ser visible desde otra sesión. Un turno que termina con error MUST NOT quedar guardado en la memoria.
+El `assistant` SHALL recordar, por cada `X-Session-ID`, los últimos turnos de la conversación (mensaje del usuario, respuesta final del asistente y, si el turno ejecutó acciones con tools, cada acción con un resultado resumido) y los productos mostrados en ellos, y SHALL usarlos en la reescritura y en la respuesta de los turnos siguientes. La memoria SHALL estar acotada a una ventana de los turnos más recientes y SHALL descartarse después de un período de inactividad configurable. La memoria de una sesión MUST NOT ser visible desde otra sesión. Un turno que termina con error MUST NOT quedar guardado en la memoria.
 
 #### Scenario: Referencia al turno anterior
 - **WHEN** el usuario pregunta por sillones, el asistente recomienda algunos, y en el turno siguiente el usuario escribe "which of those is the cheapest?"

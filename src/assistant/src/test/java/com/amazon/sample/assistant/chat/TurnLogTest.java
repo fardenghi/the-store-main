@@ -99,6 +99,7 @@ class TurnLogTest {
         .contains("rawTopk=[b,x,a]")
         .contains("overlap=2")
         .contains("nvidiaRequests=2")
+        .contains("claimGuard=-")
         .contains("rewriteMs=42")
         .contains("retrievalMs=7")
         .containsPattern("firstFragmentMs=\\d+")

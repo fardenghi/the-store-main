@@ -123,7 +123,7 @@ Se agregan dos eventos con nombre al contrato de D1 de `add-assistant-chat`, emi
 
 - `products` dentro de `tool` hace verificable, también con tools, el criterio de "productos reales con su precio" (spec, "Nombres verificables").
 - `cart-updated` es lo que `integrate-ui-assistant` necesita para refrescar el contador y la vista del carrito sin recargar. Lleva `cartItemCount` para que la `ui` pueda actualizar el contador sin otra llamada, aunque puede igual releer `GET /carts/{customerId}`. Queda anotado para ese change que `chat.js` tiene que ignorar o manejar los eventos con nombre.
-- Memoria: al confirmar el turno, el snapshot de productos de `SessionState` (D6 de `add-assistant-chat`) pasa a ser la unión de los productos de las tools del turno (primero) y los del evento `products`, sin repetidos y hasta 10. Así, "add the second one" o "compare those" en el turno siguiente encuentran los ids aunque los productos hayan salido de una tool. Los mensajes intermedios de tool calls **no** se guardan en el historial: se mantiene la regla del chat de guardar solo el mensaje del usuario y la respuesta final.
+- Memoria: al confirmar el turno, el snapshot de productos de `SessionState` (D6 de `add-assistant-chat`) pasa a ser la unión de los productos de las tools del turno (primero) y los del evento `products`, sin repetidos y hasta 10. Así, "add the second one" o "compare those" en el turno siguiente encuentran los ids aunque los productos hayan salido de una tool. ~~Los mensajes intermedios de tool calls **no** se guardan en el historial: se mantiene la regla del chat de guardar solo el mensaje del usuario y la respuesta final.~~ **Modificado en las correcciones posteriores (ver al final):** cada turno guarda también sus vueltas con tool calls, con un resultado compacto de cada tool, y el historial las reenvía al modelo; sin eso, el modelo imitaba confirmaciones de agregados que en el historial no tenían tool call.
 
 ### D8. Limitador de solicitudes hacia NVIDIA
 
@@ -257,3 +257,93 @@ El contexto RAG del chat sigue mostrando el precio del payload (D5 de `add-assis
 - El error `invalid-argument` de `productId` le indica al modelo que busque el producto con `searchProducts` si no tiene el id.
 
 El modelo de reescritura (`nemotron-3.5-lightning`) todavía clasifica a veces como `other` una pregunta por un producto no mostrado; el turno lo resuelve igual con una o dos vueltas más (id inválido y búsqueda), dentro del presupuesto de 4. El tiempo límite de la reescritura sigue en 12 s, como lo dejó `add-assistant-chat` (D8 menciona los 5 s del diseño original).
+
+## Correcciones posteriores (2026-10-06)
+
+Hallazgo 1 del reporte de `integrate-ui-assistant`: desde el segundo o tercer turno de una sesión, `nemotron-3-super` dejaba de llamar a las tools y alucinaba el resultado (por ejemplo, "Two lamps have been added to your cart" con `tools=-` y sin `cart-updated`), inventaba productos y daba precios "actuales" sin `getProductDetails`. Contradice el requirement "Confirmación fiel de las acciones" y el caso de uso de la pre-entrega de agregar al carrito desde el chat.
+
+### Reproducción y causa
+
+`MultiTurnCartSmokeIT` (nuevo, perfil `smoke`) recorre contra NVIDIA real las tres sesiones del reporte, reutilizando la colección de Qdrant ya indexada (`80 sin cambios, 0 requests` a Gemini). Con el código anterior, las 3 sesiones fallaron:
+
+| Sesión del reporte | Último turno | Antes de la corrección |
+|---|---|---|
+| `76afbc10` (7 turnos) | "add two of the first one to my cart" | `tools=-`; tomó "the first one" de la lista de la búsqueda con el mensaje crudo (`rewrite=fallback`): "The first one shown was the Curved-Back Dining Chairs… If so, I'll proceed with adding them" |
+| `3a7e9304` (4 turnos) | "add two of the first lamp you showed me (the Curved Brass and Walnut Desk Lamp)…" | `intent=other`, `modelCalls=1 tools=-`: "*adds two Curved Brass and Walnut Desk Lamps to cart* Confirmed, Operative… have been added to your mission inventory" |
+| `9952aae8` (3 turnos) | "add one Adjustable Pharmacy Desk Lamp to my cart too" | El turno 2 hizo `addToCart:ok`; el 3, `modelCalls=1 tools=-`: "Consider it done, Operative. One Adjustable Pharmacy Desk Lamp ($219) has been added to your mission inventory" |
+
+La memoria impresa por el smoke mostró las causas:
+
+1. **La memoria guardaba solo el texto final.** En `9952aae8`, el turno 2 sí llamó a `addToCart`, pero en el historial quedaba "Mission accomplished… successfully deployed to your cart" sin ningún tool call. Para el modelo, en ese historial "agregar" era responder que se agregó, y en el turno 3 lo imitó.
+2. **La persona narra acciones como acotaciones.** Desde el turno 1, sin historial, el modelo escribía "*searches catalog*", "*searches again with proper filters*" o "*adds two … to cart*" en lugar de llamar a la tool (el ejemplo de estilo de `system.st` usa acotaciones). Esas narraciones quedaban en la memoria y reforzaban la causa 1.
+3. **"the first one" con la reescritura caída.** Con `rewrite=fallback` (la latencia bimodal de la reescritura, 12 s), un pedido de carrito busca con el mensaje crudo y la sección "Products found for this message" trae productos sin relación. La regla 4 del prompt decía "previously shown products, in the order listed in the context", y el modelo tomó el primero de la lista equivocada.
+
+Las corridas siguientes del smoke, ya con la memoria corregida, mostraron otros dos modos de falla del mismo modelo, que también terminan con el turno sin ejecutar la tool:
+
+4. **Anuncia la acción y cierra la vuelta sin tool call.** Por ejemplo: "I need to check the current details for the Adjustable Pharmacy Desk Lamp first.", "Let me check our inventory for that specific item." o la acotación "*getting current price for Aiden armchair*". El turno terminaba ahí sin hacer nada.
+5. **Escribe el tool call como texto.** Por ejemplo `[addToCart: {"productId": "7c93…", "quantity": 2}]` o `[searchProducts: {"tags": ["lighting", "office"], "query": "desk lamp"}]` en el contenido, sin `tool_calls`, incluso en el primer turno de una sesión. El usuario veía el JSON y no se ejecutaba nada.
+
+Hipótesis descartada: que `intent=other` dejara el turno sin tools o sin contexto. Las tools son las `defaultToolCallbacks` del `mainChatClient` y van en todas las vueltas, y con `intent=other` el contexto conserva "Previously shown products". En la misma corrida, el turno 6 de `76afbc10` (`intent=other`) llamó a `getProductDetails`.
+
+### Solución
+
+- **Memoria con las acciones (desvío de D7, opción A del coordinador).** `Turn` suma `toolRounds`: por cada vuelta con tool calls, el texto que el usuario vio antes de pedirlas y cada tool call (id, nombre, argumentos) con un resultado compacto (`CompactToolResult`: `{"products": [{id, name, price}]}`, `{id, name, price}`, `{"added": {id, name, quantity, unitPrice}, "cartItemCount"}` o `{"error": "<tipo>"}`). `ChatTurnService.history` los reenvía en los turnos siguientes como un `AssistantMessage` con los tool calls y un `ToolResponseMessage` con los mismos ids, antes de la respuesta final. La reescritura sigue usando solo el mensaje y el texto.
+  - Tamaño medido en `MultiTurnCartSmokeIT` (caracteres de ids, nombres, argumentos y resultados compactos; ~4 por token): `searchProducts` con 5 productos, 571 a 603 caracteres (~145 tokens); `getProductDetails`, 169 (~42); `addToCart`, 215 a 219 (~55). Un turno sin tools no suma nada. El peor caso teórico (6 tool calls de búsqueda con 10 productos) ronda los 1.800 tokens por turno, pero en la práctica un turno usa una o dos tools.
+  - NVIDIA acepta el historial reenviado: en las corridas del smoke, los turnos posteriores a uno con tools respondieron sin errores, con los ids que había generado el propio NVIDIA.
+- **Prompt (`system.st`).** La regla 4 ahora apunta a la sección "Previously shown products". La regla 8 pide llamar a `addToCart` en el turno en que el usuario pide claramente un producto, aunque en turnos anteriores ya se haya agregado algo, y preguntar si no está claro. Una primera versión ("every new request to add a product needs its own addToCart call") hizo que en una corrida el pedido ambiguo "add the lamp" agregara la primera lámpara, por eso quedó condicionada a que el pedido sea claro. Al final se agregó un recordatorio de idioma. En la sección de tools se agregó: no narrar acciones de tools en el texto ni en acotaciones ("*searches catalog*", "*adds two lamps to cart*"), y en el historial, lo que pasó de verdad aparece como tool call.
+- **Anuncios sin tool call (`ActionAnnouncement`).** Si la vuelta que cierra el turno termina con una oración que anuncia una acción ("let me check…", "I need to search…", "voy a buscar…" o una acotación final del tipo "*getting…*" o "*searches…*") y no pidió tools, se hace una vuelta correctiva con la nota `ANNOUNCED_NOTE`, que le pide al modelo llamar a la tool. No cuentan las preguntas ni los ofrecimientos que esperan al usuario ("let me know which one and I'll add it", "once you confirm…").
+- **Tool calls escritos como texto (`TextualToolCalls`).** Una oración con el formato `[tool: {json}]` o `[tool({json})]`, de una tool que existe y con un JSON válido, se saca del texto (no llega al usuario) y, si la vuelta no pidió tools, se ejecuta como tool call con un id generado (`text-call-…`). Un nombre desconocido o un JSON inválido quedan como texto.
+- **Salvaguarda en el servidor.** El texto de cada vuelta pasa por `CartClaimFilter`, que retiene cada oración hasta que termina y descarta las que afirman un agregado ("have been added", "added to your cart", "*adds … to cart*", "agregué", "ya están en tu carrito") si en el turno no hubo un `addToCart` correcto. No cuentan como afirmación las preguntas, las negaciones, las condiciones ni los ofrecimientos ("want me to add it?", "I didn't add anything", "you can add it to your cart", "¿querés que lo agregue?"); los casos están cubiertos en `CartClaimFilterTest`. Si la vuelta que cierra el turno tuvo una afirmación descartada, `ToolCallingLoop` hace una vuelta correctiva, con lo que dijo el modelo y una nota de la tienda (`CORRECTION_NOTE`): si el usuario pidió agregar, el modelo llama a `addToCart`; si no, sigue sin afirmar nada. Entre afirmaciones y anuncios hay como máximo **dos** vueltas correctivas por turno, y solo si queda presupuesto y la vuelta siguiente no es la última, que va con `tool_choice: none`. Si el mensaje del usuario pide agregar al carrito ("add … to my cart", "agregá … al carrito") y el texto de la vuelta no le estaba preguntando nada ("?", "clarify", "which one", "cuál"), la vuelta correctiva va con `tool_choice: required`, que NVIDIA soporta (se verificó con una request). En las corridas, el modelo a veces insistía con la afirmación aun después del aviso, y con `required` termina llamando a la tool. Sin pedido de carrito, o si el modelo estaba preguntando, la vuelta no se fuerza: en una corrida, forzarla con el modelo pidiendo una aclaración terminó agregando un producto que el usuario no había pedido. Si el turno igual termina con una afirmación descartada y sin agregado, se agrega el texto fijo "Heads-up, Operative: nothing was added to your cart in this turn…". La línea `assistant.turn` suma `claimGuard` (`-` o `dropped:<n>[+retry][+notice]`) y `corrections` (`-` o los motivos: `claim`, `announce`, `textual`). Cada oración descartada se loguea (truncada a 160 caracteres) para revisar falsos positivos. La memoria guarda lo que vio el usuario, sin la afirmación descartada ni la nota.
+
+### Evidencia en `MultiTurnCartSmokeIT` (NVIDIA real, misma colección)
+
+Cada corrida recorre las tres sesiones del reporte. La tabla cuenta en cuántas el último pedido de agregado terminó con `addToCart:ok` y `cart-updated` del producto pedido.
+
+| Corrida | Código | Agregados correctos | Observaciones |
+|---|---|---|---|
+| Antes | `main` | 0/3 | Ver la tabla de reproducción |
+| 1-2 | Memoria + filtro | 3/3 y 3/3 | En la segunda, el IT marcaba "$100" ("under $100") como precio inventado: se corrigió el chequeo del test |
+| 3 | Ídem | 1/3 | Apareció el modo de falla 4 (anuncio sin tool) |
+| 4 | + anuncios | 3/3 | |
+| 5 | Ídem | 2/3 | Apareció el modo de falla 5 (`[addToCart: {…}]` como texto) |
+| 6 | + tool calls como texto | 3/3 | |
+| 7 | Ídem | 2/3 | El modelo insistió con la afirmación en las dos vueltas correctivas: se agregó `tool_choice: required` |
+| 8 | + `required` | 3/3 | En una sesión, la vuelta forzada agregó un producto que el modelo estaba consultando: se dejó de forzar cuando el modelo pregunta |
+| 9 | Versión entregada | 3/3 | Líneas abajo |
+| 10 | Solo `addToCart` en el historial (descartada) | 1/3 | |
+| Final | Versión entregada | 0/3 | `mt-report` cortó en el primer turno con `llm-provider-unavailable` (NVIDIA). En las otras dos, el modelo usó ids equivocados (`addToCart:product-not-found`, `getProductDetails` de otra lámpara) y la salvaguarda evitó confirmar. En esa hora, 22 de 46 reescrituras cayeron al fallback |
+
+En ninguna corrida posterior a la corrección se mostró una confirmación de agregado sin un `addToCart` correcto. Las afirmaciones que llegaron a descartarse quedaron en el log con `claimGuard=dropped:…`. Líneas `assistant.turn` de los turnos de precio y de agregado de la corrida 9:
+
+```
+session=mt-repor outcome=done intent=other rewrite=ok raw="how much is the Aiden Mid-Century Velvet Armchair right now?" … nvidiaRequests=3 modelCalls=2 tools=getProductDetails:ok claimGuard=- corrections=- … totalMs=4849
+session=mt-repor outcome=done intent=other rewrite=ok raw="add two of the first one to my cart" … nvidiaRequests=3 modelCalls=2 tools=addToCart:ok claimGuard=- corrections=- … totalMs=6179
+session=mt-detou outcome=done intent=other rewrite=ok raw="add two of the first lamp you showed me (the Curved Brass and Walnut Desk Lamp) to my cart" … nvidiaRequests=3 modelCalls=2 tools=addToCart:ok claimGuard=- corrections=- … totalMs=3553
+session=mt-secon outcome=done intent=other rewrite=ok raw="add two of the first one to my cart" … nvidiaRequests=3 modelCalls=2 tools=addToCart:ok claimGuard=- corrections=- … totalMs=3975
+session=mt-secon outcome=done intent=other rewrite=ok raw="add one Adjustable Pharmacy Desk Lamp to my cart too" … nvidiaRequests=3 modelCalls=2 tools=addToCart:ok claimGuard=- corrections=- … totalMs=4679
+```
+
+Conclusión: la memoria con tool calls y la salvaguarda corrigen la causa del hallazgo y garantizan, en el servidor, que no se confirme un agregado inexistente. Que el agregado efectivamente se ejecute en una conversación larga sigue dependiendo de que `nemotron-3-super` emita un tool call con el id correcto, y eso varía mucho entre corridas y según la carga de NVIDIA.
+
+### Trade-offs
+
+- **Streaming por oración.** Para poder descartar una oración antes de enviarla, el texto sale de a oraciones y no de a tokens. Un terminador al final de un fragmento ya cierra la oración, así que no espera al fragmento siguiente. Se sigue cumpliendo el escenario "Respuesta en streaming" de `assistant-chat`, porque el primer fragmento llega antes de que termine la respuesta, pero una respuesta de una sola oración llega entera. Ante un error a mitad de la vuelta, el texto retenido igual se juzga y se emite antes del `error`.
+- **Heurística.** El filtro, el detector de anuncios y el de tool calls escritos como texto usan expresiones regulares (inglés y castellano). Con la duda, deja pasar: una afirmación muy indirecta ("Consider it done.") sin verbo de agregado no se detecta, y la cubre la memoria con las acciones. Una vez que hubo un `addToCart` correcto en el turno, las afirmaciones pasan aunque nombren otro producto.
+- **Costo.** La vuelta correctiva suma una solicitud a NVIDIA en los turnos donde el modelo afirmó sin llamar. Sigue dentro del presupuesto de 4 vueltas y del limitador. El texto fijo está en inglés, igual que `NO_ANSWER_TEXT`.
+- **Limitación conocida: pedido ambiguo (decisión del coordinador, opción A).** Con la memoria que reenvía los tool calls, en el escenario "Pedido ambiguo" de `ToolsEndToEndSmokeIT` ("add the lamp to my cart" después de mostrar tres lámparas), el modelo a veces agrega la primera lámpara en lugar de preguntar. El usuario lo ve en el evento `cart-updated` y en el texto. Mediciones (5 corridas de ese escenario por variante, contra NVIDIA real):
+
+  | Variante | Agrega sin preguntar | El test pasa |
+  |---|---|---|
+  | `main` (sin estas correcciones) | 0/5 | 1/5 (falla 4/5 porque la pregunta no lleva "?") |
+  | Memoria con tool calls (la entregada) | 1/5 | 4/5 |
+  | Ídem, con la regla de ambigüedad reforzada en `system.st` | 1/5 | 3/5 |
+  | Ídem, sin ids en el resultado compacto de `searchProducts` | 1/5 | 4/5 |
+  | Memoria de tools apagada (solo para medir) | 0/5 | 4/5 |
+  | Reenviar solo los `addToCart` | 0/5 | 4/5, pero en `MultiTurnCartSmokeIT` una sesión agregó un producto equivocado y otra no agregó |
+
+  El mismo mecanismo que corrige el hallazgo (el modelo ve en el historial que las acciones se hacen con tool calls) lo vuelve más propenso a llamar a `addToCart`. Se priorizó el caso de uso de la pre-entrega (agregar desde el chat en una conversación larga), y la regla de ambigüedad reforzada queda en el prompt. Una regla del servidor para pedidos sin producto explícito se descartó por ahora: es una heurística nueva que podría bloquear agregados legítimos.
+- **Inestabilidades del modelo que no vienen de esta corrección.** En las corridas de `ToolsEndToEndSmokeIT` y `ChatEndToEndSmokeIT` fallaron, de forma intermitente, escenarios que no pasan por la memoria ni por la salvaguarda (`claimGuard=- corrections=-`). Para atribuirlos se corrió el código de `main` sin estos cambios (un worktree aparte, misma colección):
+  - `stalePayloadPriceIsNotShown`: la respuesta da el precio vivo ($149) pero comenta "not the $7…" del contexto. Falla también en la línea base (ya estaba anotado en el README como escenario de dos intentos).
+  - `answersInTheUserLanguage` ("busco una alfombra para el living" respondido en inglés): con 5 corridas de cada uno, la línea base respondió en castellano 1 de 5 y esta versión, 2 de 5.
+  - `cheaper`, `justifiedComparisonWithReasoning`, `greetingDoesNotSearch` y `notALamp` fallaron solo en corridas con `rewrite=fallback`: la reescritura superó los 12 s y el turno siguió con el mensaje crudo, sin `maxPrice`, sin `excludeTags` o sin `intent=compare`. Es la latencia bimodal de `nemotron-3.5-lightning` ya documentada en `add-assistant-chat`, y su tiempo límite no se cambia.
+- **Spec.** Se actualizaron el requirement "Confirmación fiel de las acciones" (garantía en el servidor y acciones en la memoria) y se agregaron tres escenarios: agregado al final de una conversación larga, segundo agregado y afirmación sin la tool. El requirement de memoria de `assistant-chat` se ajustó en ese change.

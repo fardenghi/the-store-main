@@ -4,7 +4,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Estado de una sesión de chat (D6): ventana de los últimos turnos, productos
@@ -13,30 +13,40 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Un turno se guarda solo con {@link #commit}, que el turno llama cuando el
  * stream terminó bien: un turno fallido o cancelado no deja rastro.
+ *
+ * <p>El lock tiene dueño (el turno que lo tomó). Un turno cancelado libera el
+ * lock apenas se detecta el corte, aunque su llamada al modelo siga en vuelo;
+ * con {@link #commitIfOwner} ese turno ya no puede escribir en la memoria ni
+ * liberar el lock del turno siguiente.
  */
 public class SessionState {
 
   private final int maxTurns;
   private final Deque<Turn> turns = new ArrayDeque<>();
   private List<ShownProduct> lastProducts = List.of();
-  private final AtomicBoolean busy = new AtomicBoolean();
+  private final AtomicReference<Object> owner = new AtomicReference<>();
 
   public SessionState(int maxTurns) {
     this.maxTurns = maxTurns;
   }
 
-  /** Toma el lock del turno. Devuelve {@code false} si ya hay un turno en curso. */
-  public boolean tryAcquire() {
-    return busy.compareAndSet(false, true);
+  /**
+   * Toma el lock para un turno.
+   *
+   * @param turn el dueño del lock
+   * @return {@code false} si ya hay un turno en curso
+   */
+  public boolean tryAcquire(Object turn) {
+    return owner.compareAndSet(null, turn);
   }
 
-  /** Libera el lock del turno. */
-  public void release() {
-    busy.set(false);
+  /** Libera el lock si lo tiene ese turno; si ya es de otro, no hace nada. */
+  public synchronized void release(Object turn) {
+    owner.compareAndSet(turn, null);
   }
 
   public boolean isBusy() {
-    return busy.get();
+    return owner.get() != null;
   }
 
   /** Turnos guardados, del más viejo al más nuevo. */
@@ -70,5 +80,21 @@ public class SessionState {
     if (products != null) {
       lastProducts = List.copyOf(products);
     }
+  }
+
+  /**
+   * Igual que {@link #commit}, pero solo si el turno todavía tiene el lock. Es
+   * atómico respecto de {@link #release}: un turno cancelado (que ya lo
+   * liberó) no guarda nada aunque su respuesta termine después.
+   *
+   * @return {@code false} si el turno ya no tiene el lock y no se guardó
+   */
+  public synchronized boolean commitIfOwner(Object owner, Turn turn,
+      List<ShownProduct> products) {
+    if (this.owner.get() != owner) {
+      return false;
+    }
+    commit(turn, products);
+    return true;
   }
 }

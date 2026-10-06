@@ -9,8 +9,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 
 /**
  * Proveedor de chat falso con la API de OpenAI ({@code /v1/chat/completions}),
@@ -28,10 +30,17 @@ public class FakeChatProvider implements AutoCloseable {
   private volatile String retryAfter;
   private volatile String text = "ok";
   private volatile List<String> fragments = List.of("Hello", " there");
+  private volatile Duration streamDelay = Duration.ZERO;
 
   public FakeChatProvider() throws IOException {
     server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
     server.createContext("/", this::handle);
+    // Un hilo por request: una respuesta demorada no frena a las demás.
+    server.setExecutor(Executors.newCachedThreadPool(task -> {
+      Thread thread = new Thread(task, "fake-chat-provider");
+      thread.setDaemon(true);
+      return thread;
+    }));
     server.start();
   }
 
@@ -49,6 +58,7 @@ public class FakeChatProvider implements AutoCloseable {
     retryAfter = null;
     text = "ok";
     fragments = List.of("Hello", " there");
+    streamDelay = Duration.ZERO;
   }
 
   /** Responde con este status de error a todos los requests. */
@@ -67,9 +77,25 @@ public class FakeChatProvider implements AutoCloseable {
     this.fragments = List.copyOf(fragments);
   }
 
+  /**
+   * Demora de las respuestas en streaming antes de mandar algo, como el modelo
+   * cuando razona. Vale para los requests que lleguen después de llamarlo.
+   */
+  public void delayStreams(Duration delay) {
+    this.streamDelay = delay;
+  }
+
   private void handle(HttpExchange exchange) throws IOException {
     JsonNode body = JSON.readTree(exchange.getRequestBody().readAllBytes());
     requests.add(body);
+    Duration delay = streamDelay;
+    if (body.path("stream").asBoolean(false) && !delay.isZero()) {
+      try {
+        Thread.sleep(delay.toMillis());
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
     if (errorStatus != 0) {
       if (retryAfter != null) {
         exchange.getResponseHeaders().add("Retry-After", retryAfter);

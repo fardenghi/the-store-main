@@ -26,6 +26,13 @@ class TurnStats {
   volatile int retries429;
   /** Resultado de cada tool, por ejemplo {@code searchProducts:ok}. */
   volatile List<String> tools = List.of();
+  /**
+   * Salvaguarda de agregados al carrito: {@code -} o las oraciones descartadas
+   * y lo que se hizo, por ejemplo {@code dropped:1+retry+notice}.
+   */
+  volatile String claimGuard = "-";
+  /** Motivos de las vueltas correctivas del turno: {@code claim} o {@code announce}. */
+  volatile List<String> corrections = List.of();
 
   TurnStats(String sessionId, String message) {
     this.sessionId = sessionId;

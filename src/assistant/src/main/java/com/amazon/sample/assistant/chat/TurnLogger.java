@@ -51,6 +51,9 @@ class TurnLogger {
     append(line, "nvidiaRequests", Integer.toString(providerRequests));
     append(line, "modelCalls", Integer.toString(stats.modelCalls));
     append(line, "tools", stats.tools.isEmpty() ? "-" : String.join(",", stats.tools));
+    append(line, "claimGuard", stats.claimGuard);
+    append(line, "corrections", stats.corrections.isEmpty() ? "-"
+        : String.join(",", stats.corrections));
     append(line, "limiterWaitMs", Long.toString(stats.limiterWaitMillis));
     append(line, "retries429", Integer.toString(stats.retries429));
     append(line, "rewriteMs", rewrite == null ? "-" : Long.toString(rewrite.latencyMillis()));

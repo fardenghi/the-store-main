@@ -5,20 +5,29 @@ import com.amazon.sample.assistant.chat.llm.ChatProviderException;
 import com.amazon.sample.assistant.chat.llm.ChatRateLimiter;
 import com.amazon.sample.assistant.chat.llm.ReasoningPolicy.TurnOptions;
 import com.amazon.sample.assistant.chat.llm.ThinkTagFilter;
+import com.amazon.sample.assistant.chat.session.ToolRound;
 import com.amazon.sample.assistant.config.ChatProperties;
 import com.amazon.sample.assistant.config.RateLimitProperties;
 import com.amazon.sample.assistant.config.ToolsProperties;
+import com.amazon.sample.assistant.tools.CompactToolResult;
 import com.amazon.sample.assistant.tools.TurnToolContext;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -50,6 +59,24 @@ import reactor.core.scheduler.Schedulers;
  * lugar; el del turno lo controla {@link ChatTurnService}. Si una vuelta recibe
  * un 429 antes de emitir algo, pausa el limitador por el {@code Retry-After} y
  * la reintenta, hasta {@code max-429-retries} veces (D9).
+ *
+ * <p>Correcciones posteriores (confirmación fiel de las acciones):
+ * <ul>
+ *   <li>El texto de cada vuelta pasa por un {@link CartClaimFilter}: una oración
+ *       que afirma un agregado al carrito sin un {@code addToCart} correcto en el
+ *       turno no se emite. Si la vuelta que cierra el turno tuvo una, o si
+ *       termina anunciando una acción que no hizo ({@link ActionAnnouncement}),
+ *       se agrega una vuelta correctiva con un aviso al modelo (hasta
+ *       {@link #MAX_CORRECTIONS} por turno, si queda presupuesto y la vuelta
+ *       siguiente no es la última). Si el usuario pidió agregar al carrito y el
+ *       modelo no le estaba preguntando nada, esa vuelta va con
+ *       {@code tool_choice: required}. Si el turno igual termina con una afirmación
+ *       descartada y sin agregado, se emite {@link #NOT_ADDED_TEXT}.</li>
+ *   <li>Si una vuelta no pidió tools pero las escribió como texto
+ *       ({@link TextualToolCalls}), se ejecutan como tool calls.</li>
+ *   <li>Las vueltas con tool calls se devuelven con el texto, para guardarlas en
+ *       la memoria de la sesión con un resultado compacto de cada tool.</li>
+ * </ul>
  */
 public class ToolCallingLoop {
 
@@ -59,9 +86,46 @@ public class ToolCallingLoop {
   static final String NO_ANSWER_TEXT = "Mission aborted, Operative: I couldn't complete that "
       + "operation this time. Try asking me again.";
 
+  /** Texto de la persona cuando el modelo afirmó un agregado que no ocurrió (salvaguarda). */
+  static final String NOT_ADDED_TEXT = "Heads-up, Operative: nothing was added to your cart in "
+      + "this turn. If you want something added, tell me which product and how many.";
+
+  /** Aviso al modelo en la vuelta correctiva, como un mensaje del sistema de la tienda. */
+  static final String CORRECTION_NOTE = "[Store system note, not written by the customer] Your "
+      + "last reply said that products were added to the cart, but you did not call addToCart "
+      + "in this turn, so nothing was added and that sentence was not shown to the customer. If "
+      + "the customer explicitly asked to add a product and it is clear which one, call "
+      + "addToCart now with its id and quantity. Otherwise, do not say that anything was added. "
+      + "Continue your reply without repeating what you already said.";
+
+  /** Aviso al modelo cuando su respuesta terminó anunciando una acción que no hizo. */
+  static final String ANNOUNCED_NOTE = "[Store system note, not written by the customer] Your "
+      + "last reply announced an action (checking, searching or adding) but you did not call "
+      + "any tool, so nothing was done. Call the tool now instead of announcing it. If no tool "
+      + "is needed, answer with the information you already have. Do not repeat what you "
+      + "already said.";
+
+  /** Vueltas correctivas por turno (afirmación descartada o anuncio sin tool). */
+  static final int MAX_CORRECTIONS = 2;
+
+  /**
+   * Un pedido de agregar al carrito ("add two of the first one to my cart",
+   * "agregá la lámpara al carrito"). Solo con un pedido así la vuelta correctiva
+   * va con {@code tool_choice: required}.
+   */
+  private static final Pattern CART_REQUEST = Pattern.compile(
+      "\\b(add|put|agreg\\w*|añad\\w*|sum[aá]\\w*|met[eé]\\w*)\\b.*\\b(cart|basket|inventory"
+          + "|carrito|canasta|cesta)\\b",
+      Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
+
+  /** Respuesta del ciclo: el texto que vio el usuario y las vueltas con tool calls. */
+  record Answer(String text, List<ToolRound> toolRounds) {
+  }
+
   private final ChatClient mainChatClient;
   private final ToolCallingManager toolCallingManager;
   private final List<ToolCallback> toolCallbacks;
+  private final Set<String> toolNames;
   private final ChatRateLimiter limiter;
   private final ToolsProperties tools;
   private final RateLimitProperties rateLimit;
@@ -78,6 +142,8 @@ public class ToolCallingLoop {
     this.mainChatClient = mainChatClient;
     this.toolCallingManager = toolCallingManager;
     this.toolCallbacks = List.copyOf(toolCallbacks);
+    this.toolNames = this.toolCallbacks.stream()
+        .map(callback -> callback.getToolDefinition().name()).collect(Collectors.toSet());
     this.limiter = limiter;
     this.tools = tools;
     this.rateLimit = rateLimit;
@@ -85,52 +151,183 @@ public class ToolCallingLoop {
   }
 
   /** Estado de un turno dentro del ciclo. */
-  private record Run(ChatTurn turn, TurnStats stats, TurnOptions options,
-      TurnToolContext toolTurn, long deadline, StringBuilder answer) {
+  private static final class Run {
+    final ChatTurn turn;
+    final TurnStats stats;
+    final TurnOptions options;
+    final TurnToolContext toolTurn;
+    final long deadline;
+    /** Texto que vio el usuario en todo el turno. */
+    final StringBuilder answer = new StringBuilder();
+    /** Texto emitido desde la última vuelta con tool calls. */
+    final StringBuilder pendingText = new StringBuilder();
+    final List<ToolRound> toolRounds = new ArrayList<>();
+    int falseClaims;
+    /**
+     * Correcciones del turno: vueltas correctivas ({@code claim}, {@code announce})
+     * y tool calls escritos como texto que se ejecutaron ({@code textual}).
+     */
+    final List<String> corrections = new ArrayList<>();
+
+    long correctiveRounds() {
+      return corrections.stream().filter(reason -> !"textual".equals(reason)).count();
+    }
+
+    Run(ChatTurn turn, TurnStats stats, TurnOptions options, TurnToolContext toolTurn,
+        long deadline) {
+      this.turn = turn;
+      this.stats = stats;
+      this.options = options;
+      this.toolTurn = toolTurn;
+      this.deadline = deadline;
+    }
+
+    synchronized void append(String text) {
+      answer.append(text);
+      pendingText.append(text);
+    }
+
+    synchronized void recordToolRound(List<ToolRound.Call> calls) {
+      toolRounds.add(new ToolRound(pendingText.toString(), calls));
+      pendingText.setLength(0);
+    }
+
+    /** Si lo último que se emitió en el turno no termina en un espacio. */
+    synchronized boolean endsWithText() {
+      return !answer.isEmpty() && !Character.isWhitespace(answer.charAt(answer.length() - 1));
+    }
+
+    synchronized Answer result() {
+      return new Answer(answer.toString(), List.copyOf(toolRounds));
+    }
   }
 
   /** Lo que devolvió una vuelta: su texto y sus tool calls. */
   private static final class Round {
+    /** Texto que mandó el modelo, incluidas las oraciones que el filtro descartó. */
     final StringBuilder text = new StringBuilder();
+    /** Texto que se emitió al usuario. */
+    final StringBuilder shown = new StringBuilder();
     final List<AssistantMessage.ToolCall> toolCalls = new ArrayList<>();
     /** Si la vuelta ya emitió un fragmento o un tool call: después de eso no se reintenta. */
     volatile boolean emitted;
+    /** Oraciones descartadas por afirmar un agregado sin {@code addToCart}. */
+    volatile int falseClaims;
+    /** Tool calls que el modelo escribió como texto ({@link TextualToolCalls}). */
+    volatile List<AssistantMessage.ToolCall> textualCalls = List.of();
   }
 
   /**
-   * Corre el ciclo del turno y devuelve el texto completo que vio el usuario.
+   * Corre el ciclo del turno y devuelve el texto completo que vio el usuario,
+   * con las vueltas que pidieron tools.
    *
    * @param messages system prompt, historial y mensaje del usuario
    * @param deadline fin del turno (reloj del scheduler de Reactor, en ms)
    */
-  Mono<String> run(ChatTurn turn, TurnStats stats, List<Message> messages, TurnOptions options,
+  Mono<Answer> run(ChatTurn turn, TurnStats stats, List<Message> messages, TurnOptions options,
       TurnToolContext toolTurn, long deadline) {
-    Run run = new Run(turn, stats, options, toolTurn, deadline, new StringBuilder());
-    return round(1, messages, run).then(Mono.fromSupplier(() -> run.answer().toString()));
+    Run run = new Run(turn, stats, options, toolTurn, deadline);
+    return round(1, messages, run, false).then(Mono.fromSupplier(run::result));
   }
 
-  private Mono<Void> round(int n, List<Message> messages, Run run) {
+  /**
+   * El modelo le está preguntando o pidiendo una aclaración al usuario: en ese
+   * caso la vuelta correctiva no se fuerza, para que pueda preguntar en lugar de
+   * elegir un producto (spec "Pedido ambiguo").
+   */
+  private static final Pattern ASKS_USER = Pattern.compile(
+      "\\?|¿|\\b(clarify|which one|which of|specify|confirm|do you mean|cuál|aclar\\w*)\\b",
+      Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
+
+  /** Si el texto de la vuelta le pregunta algo al usuario. */
+  static boolean asksUser(CharSequence text) {
+    return ASKS_USER.matcher(text).find();
+  }
+
+  /** Si el mensaje del usuario pide agregar algo al carrito. */
+  static boolean isCartRequest(String message) {
+    return message != null && CART_REQUEST.matcher(message).find();
+  }
+
+  /**
+   * @param requireTool vuelta correctiva de un pedido de carrito: el modelo ya quiso
+   *     una tool y no la pidió, así que va con {@code tool_choice: required}
+   */
+  private Mono<Void> round(int n, List<Message> messages, Run run, boolean requireTool) {
     boolean last = n >= tools.maxModelCalls();
-    OpenAiChatOptions options = OpenAiChatOptions.fromOptions(run.options().options());
+    OpenAiChatOptions options = OpenAiChatOptions.fromOptions(run.options.options());
     options.setInternalToolExecutionEnabled(false);
     if (last) {
       // Mismas tools, pero sin poder pedirlas: la última vuelta tiene que ser texto.
       options.setToolChoice("none");
+    } else if (requireTool) {
+      options.setToolChoice("required");
     }
     return attempt(messages, options, run, rateLimit.max429Retries())
         .flatMap(round -> {
+          if (round.toolCalls.isEmpty() && !round.textualCalls.isEmpty() && !last) {
+            log.warn("El modelo escribió {} tool calls como texto (sesión {}): se ejecutan",
+                round.textualCalls.size(), abbreviate(run.turn.sessionId()));
+            round.toolCalls.addAll(round.textualCalls);
+            run.corrections.add("textual");
+          }
           if (round.toolCalls.isEmpty() || last) {
             if (!round.toolCalls.isEmpty()) {
               log.warn("La última vuelta pidió {} tool calls con tool_choice none; se ignoran",
                   round.toolCalls.size());
             }
-            if (round.text.isEmpty() && !run.turn().isCancelled()) {
+            boolean falseClaim = round.falseClaims > 0 && !run.toolTurn.hasAdded();
+            boolean announced = round.toolCalls.isEmpty()
+                && ActionAnnouncement.endsWithAnnouncement(round.shown);
+            if (run.turn.isCancelled()) {
+              return Mono.<Void>empty();
+            }
+            if ((falseClaim || announced) && run.correctiveRounds() < MAX_CORRECTIONS
+                && n + 1 < tools.maxModelCalls()) {
+              boolean cartRequest = isCartRequest(run.turn.message())
+                  && !asksUser(round.text);
+              run.corrections.add((falseClaim ? "claim" : "announce")
+                  + (cartRequest ? "+required" : ""));
+              log.warn("{} (sesión {}): se pide una vuelta correctiva{}", falseClaim
+                      ? "El modelo afirmó un agregado al carrito sin llamar a addToCart"
+                      : "La respuesta terminó anunciando una acción sin llamar a una tool",
+                  abbreviate(run.turn.sessionId()),
+                  cartRequest ? " con tool_choice required" : "");
+              return round(n + 1, corrective(messages, round,
+                  falseClaim ? CORRECTION_NOTE : ANNOUNCED_NOTE), run, cartRequest);
+            }
+            boolean notAdded = run.falseClaims > 0 && !run.toolTurn.hasAdded();
+            if (notAdded) {
+              emitText(run, (round.shown.isEmpty() ? "" : "\n\n") + NOT_ADDED_TEXT);
+            } else if (round.shown.isEmpty()) {
               emitText(run, NO_ANSWER_TEXT);
             }
+            if (run.falseClaims > 0) {
+              run.stats.claimGuard = guardSummary(run, notAdded);
+            }
+            run.stats.corrections = List.copyOf(run.corrections);
             return Mono.<Void>empty();
           }
-          return execute(messages, round, run).flatMap(next -> round(n + 1, next, run));
+          return execute(messages, round, run).flatMap(next -> round(n + 1, next, run, false));
         });
+  }
+
+  /**
+   * Historial de la vuelta correctiva: lo que dijo el modelo (con la oración
+   * descartada, si la hubo, para que sepa a qué se refiere el aviso) y el aviso.
+   */
+  private static List<Message> corrective(List<Message> messages, Round round, String note) {
+    List<Message> next = new ArrayList<>(messages);
+    next.add(new AssistantMessage(round.text.toString()));
+    next.add(new UserMessage(note));
+    return next;
+  }
+
+  /** Valor de {@code claimGuard} en la línea del turno, por ejemplo {@code dropped:1+retry}. */
+  private static String guardSummary(Run run, boolean notice) {
+    return "dropped:" + run.falseClaims + (run.corrections.stream().anyMatch(reason -> reason.startsWith("claim"))
+        ? "+retry" : "")
+        + (notice ? "+notice" : "");
   }
 
   /**
@@ -148,7 +345,7 @@ public class ToolCallingLoop {
         return Mono.error(new ChatProviderException(ChatProviderException.Reason.QUOTA,
             reservation.delay(), "Sin lugar en el limitador de solicitudes a NVIDIA", null));
       }
-      run.stats().limiterWaitMillis += reservation.delay().toMillis();
+      run.stats.limiterWaitMillis += reservation.delay().toMillis();
       Round round = new Round();
       Mono<Void> call = Mono.defer(() -> stream(messages, options, run, round));
       Mono<Void> scheduled = reservation.delay().isZero() ? call
@@ -157,11 +354,11 @@ public class ToolCallingLoop {
           .onErrorResume(error -> {
             ChatProviderException translated = ChatProviderErrors.translate(error);
             if (translated.reason() != ChatProviderException.Reason.QUOTA || round.emitted
-                || retriesLeft <= 0 || run.turn().isCancelled()) {
+                || retriesLeft <= 0 || run.turn.isCancelled()) {
               return Mono.error(error);
             }
             Duration pause = limiter.pause(translated);
-            run.stats().retries429++;
+            run.stats.retries429++;
             log.warn("NVIDIA respondió 429 a la vuelta del modelo principal: se pausan las "
                 + "solicitudes por {} ms y se reintenta ({} reintentos restantes)",
                 pause.toMillis(), retriesLeft - 1);
@@ -173,15 +370,15 @@ public class ToolCallingLoop {
   /** Stream de una vuelta: reenvía el texto y junta los tool calls. */
   private Mono<Void> stream(List<Message> messages, OpenAiChatOptions options, Run run,
       Round round) {
-    run.turn().countProviderRequest();
-    run.stats().modelCalls++;
+    run.turn.countProviderRequest();
+    run.stats.modelCalls++;
     Flux<String> text = mainChatClient.prompt()
         .messages(messages)
         .options(options)
         .stream()
         .chatResponse()
         .doOnNext(response -> {
-          run.stats().reasoningChars += reasoningLength(response);
+          run.stats.reasoningChars += reasoningLength(response);
           List<AssistantMessage.ToolCall> calls = toolCalls(response);
           if (!calls.isEmpty()) {
             round.emitted = true;
@@ -193,17 +390,47 @@ public class ToolCallingLoop {
     if (chat.reasoning().stripThinkTags()) {
       text = ThinkTagFilter.apply(text);
     }
-    Duration firstToken = run.options().reasoning()
+    TextualToolCalls textual = new TextualToolCalls(toolNames);
+    CartClaimFilter guard = new CartClaimFilter(run.toolTurn::hasAdded, textual::extract);
+    Duration firstToken = run.options.reasoning()
         ? chat.timeouts().firstTokenReasoning() : chat.timeouts().firstToken();
     return text
-        .timeout(Mono.delay(min(firstToken, remaining(run.deadline()))),
-            fragment -> Mono.delay(remaining(run.deadline())))
+        .timeout(Mono.delay(min(firstToken, remaining(run.deadline))),
+            fragment -> Mono.delay(remaining(run.deadline)))
         .doOnNext(fragment -> {
           round.emitted = true;
           round.text.append(fragment);
-          emitText(run, fragment);
+          show(run, round, guard.accept(fragment));
         })
-        .then();
+        .then(Mono.<Void>fromRunnable(() -> finish(run, round, guard, textual)))
+        // Ante un error a mitad de la vuelta, el texto retenido igual se juzga y se emite.
+        .onErrorResume(error -> Mono.<Void>fromRunnable(() -> finish(run, round, guard, textual))
+            .then(Mono.<Void>error(error)));
+  }
+
+  /** Cierre de la vuelta: emite lo que el filtro retenía y cuenta lo descartado. */
+  private static void finish(Run run, Round round, CartClaimFilter guard,
+      TextualToolCalls textual) {
+    show(run, round, guard.flush());
+    round.falseClaims = guard.dropped();
+    round.textualCalls = textual.calls();
+    run.falseClaims += guard.dropped();
+  }
+
+  /**
+   * Emite el texto que dejó pasar el filtro de la vuelta. La primera vez en una
+   * vuelta que sigue a otra con texto, separa ambas con un espacio si hace falta
+   * ("…first. I need…" y no "…first.I need…").
+   */
+  private static void show(Run run, Round round, String text) {
+    if (text.isEmpty()) {
+      return;
+    }
+    if (round.shown.isEmpty() && run.endsWithText() && !Character.isWhitespace(text.charAt(0))) {
+      text = " " + text;
+    }
+    round.shown.append(text);
+    emitText(run, text);
   }
 
   /**
@@ -216,24 +443,56 @@ public class ToolCallingLoop {
     return Mono.fromCallable(() -> {
       OpenAiChatOptions execution = OpenAiChatOptions.builder()
           .toolCallbacks(toolCallbacks)
-          .toolContext(run.toolTurn().asToolContext())
+          .toolContext(run.toolTurn.asToolContext())
           .internalToolExecutionEnabled(false)
           .build();
+      // Lo que vio el usuario: sin las oraciones descartadas ni los tool calls escritos como texto.
       AssistantMessage request = AssistantMessage.builder()
-          .content(round.text.toString())
+          .content(round.shown.toString())
           .toolCalls(round.toolCalls)
           .build();
-      return toolCallingManager.executeToolCalls(new Prompt(messages, execution),
+      List<Message> history = toolCallingManager.executeToolCalls(new Prompt(messages, execution),
           new ChatResponse(List.of(new Generation(request)))).conversationHistory();
+      run.recordToolRound(memoryCalls(round.toolCalls, history));
+      return history;
     }).subscribeOn(Schedulers.boundedElastic());
   }
 
-  private static void emitText(Run run, String fragment) {
-    if (run.stats().firstFragmentMillis < 0) {
-      run.stats().firstFragmentMillis = run.stats().elapsedMillis();
+  /**
+   * Los tool calls de la vuelta con el resultado compacto de cada uno, para la
+   * memoria de la sesión. El id es el que generó el modelo, el mismo del
+   * {@code ToolResponseMessage}; si vino vacío, se genera uno para que el par
+   * siga siendo consistente al reenviarlo.
+   */
+  static List<ToolRound.Call> memoryCalls(List<AssistantMessage.ToolCall> toolCalls,
+      List<Message> history) {
+    Map<String, String> results = new HashMap<>();
+    if (!history.isEmpty() && history.get(history.size() - 1)
+        instanceof ToolResponseMessage responses) {
+      responses.getResponses().forEach(response ->
+          results.putIfAbsent(response.id(), response.responseData()));
     }
-    run.answer().append(fragment);
-    run.turn().emit(ServerSentEvent.builder(Map.of("text", fragment)).build());
+    List<ToolRound.Call> calls = new ArrayList<>();
+    for (AssistantMessage.ToolCall call : toolCalls) {
+      String id = call.id() == null || call.id().isBlank()
+          ? "call-" + UUID.randomUUID() : call.id();
+      calls.add(new ToolRound.Call(id, call.name(),
+          call.arguments() == null ? "{}" : call.arguments(),
+          CompactToolResult.of(results.get(call.id()))));
+    }
+    return calls;
+  }
+
+  private static void emitText(Run run, String fragment) {
+    if (run.stats.firstFragmentMillis < 0) {
+      run.stats.firstFragmentMillis = run.stats.elapsedMillis();
+    }
+    run.append(fragment);
+    run.turn.emit(ServerSentEvent.builder(Map.of("text", fragment)).build());
+  }
+
+  private static String abbreviate(String sessionId) {
+    return sessionId.length() <= 8 ? sessionId : sessionId.substring(0, 8);
   }
 
   private static List<AssistantMessage.ToolCall> toolCalls(ChatResponse response) {
