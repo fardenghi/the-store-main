@@ -125,6 +125,12 @@ Run load generator tests to validate system performance:
 
 The load generator will run performance tests against your local cluster for 10 minutes (or until manually stopped) to validate system behavior under load.
 
+## Assistant demo video
+
+The editable Remotion video lives in [`assistant-demo/`](./assistant-demo/README.md).
+Its README covers setup, preview, scene editing, and MP4 export. It runs independently
+of the store and does not require the cluster or API keys.
+
 ## 🛋️ Product Catalog
 
 The catalog (~80 home and furniture products) is generated from a curated list with `scripts/catalog-data/generate.py`. See [docs/how-to.md](./docs/how-to.md#catálogo-de-productos) for how to curate and regenerate it.
