@@ -14,7 +14,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="TheStore-Assistant"
         component={Demo}
-        durationInFrames={2400}
+        durationInFrames={1680}
         fps={30}
         width={1920}
         height={1080}
@@ -23,7 +23,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Apertura"
           component={Opening}
-          durationInFrames={180}
+          durationInFrames={120}
           fps={30}
           width={1920}
           height={1080}
@@ -31,7 +31,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Indexacion"
           component={Indexing}
-          durationInFrames={420}
+          durationInFrames={330}
           fps={30}
           width={1920}
           height={1080}
@@ -39,7 +39,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Reescritura"
           component={Rewriting}
-          durationInFrames={420}
+          durationInFrames={270}
           fps={30}
           width={1920}
           height={1080}
@@ -47,7 +47,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Busqueda"
           component={Retrieval}
-          durationInFrames={480}
+          durationInFrames={330}
           fps={30}
           width={1920}
           height={1080}
@@ -55,7 +55,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Contexto"
           component={Context}
-          durationInFrames={360}
+          durationInFrames={270}
           fps={30}
           width={1920}
           height={1080}
@@ -63,7 +63,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Respuesta"
           component={Response}
-          durationInFrames={240}
+          durationInFrames={180}
           fps={30}
           width={1920}
           height={1080}
@@ -71,7 +71,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Seguimiento"
           component={Followup}
-          durationInFrames={390}
+          durationInFrames={270}
           fps={30}
           width={1920}
           height={1080}

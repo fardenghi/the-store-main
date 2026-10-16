@@ -1,113 +1,124 @@
-import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
-import { C, Stage, Enter, Tag, Glyph, clamp } from "../design";
+import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { C, Stage, Head, Enter, clamp } from "../design";
+import { Tile, Core, Rail, progress } from "../motion";
 export const Followup = () => {
   const f = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = f / fps;
   return (
-    <Stage step={7} label="Memoria de sesión · El ciclo continúa">
-      <div style={{ opacity: interpolate(t, [8, 9], [1, 0], clamp) }}>
-        <Enter style={{ position: "absolute", left: 96, top: 220 }}>
-          <Tag>La conversación también es contexto</Tag>
-          <div
-            style={{
-              fontSize: 96,
-              lineHeight: 1.08,
-              letterSpacing: -4,
-              marginTop: 35,
-            }}
-          >
-            “¿Algo más barato
-            <br />
-            que la de nogal?”
-          </div>
-          <div style={{ fontSize: 33, color: C.muted, marginTop: 35 }}>
-            Producto anterior: US$149
-            <br />
-            El primer llamado resuelve la referencia.
-          </div>
-        </Enter>
-        <Enter
-          at={1.8}
+    <Stage step={7} label="Memoria · Volver a buscar">
+      <div style={{ opacity: 1 - progress(t, 6.3, 7) }}>
+        <Head>“Nogal, más barata.”</Head>
+        <div
           style={{
             position: "absolute",
-            left: 1120,
-            top: 230,
-            width: 700,
-            background: C.panel,
-            border: `1px solid ${C.line}`,
-            borderRadius: 27,
-            padding: 40,
-            boxSizing: "border-box",
+            left: 160,
+            top: 408,
+            rotate: `${Math.sin(t) * 3}deg`,
           }}
         >
-          <Tag>01 / Reescritura</Tag>
+          <Tile index={0} size={180} />
           <div
             style={{
-              fontFamily: "Menlo, monospace",
-              fontSize: 32,
-              lineHeight: 1.8,
+              fontSize: 35,
+              textAlign: "center",
               marginTop: 25,
+              color: C.muted,
             }}
           >
-            query: <span style={{ color: C.lime }}>“desk lamp”</span>
-            <br />
-            maxPrice: <span style={{ color: C.lime, fontSize: 55 }}>148</span>
-            <br />
-            <span style={{ fontSize: 24, color: C.muted }}>
-              149 − 1 · dólares enteros
-            </span>
+            $149
           </div>
-        </Enter>
+        </div>
+        <Rail x1={340} y1={500} x2={960} y2={500} at={0.7} until={3} />
+        <Core x={960} y={500} number="01" label="Reescribir" size={160} />
         <Enter
-          at={4}
+          at={1.4}
           style={{
             position: "absolute",
-            left: 96,
-            right: 96,
-            top: 720,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            fontSize: 31,
+            left: 1300,
+            top: 415,
+            color: C.lime,
+            fontSize: 88,
+            letterSpacing: -4,
           }}
         >
-          <span style={{ color: C.lime }}>01 · Reescribir</span>
-          <span style={{ color: C.line }}>→</span>
-          <span>Embedding</span>
-          <span style={{ color: C.line }}>→</span>
-          <span>Qdrant + filtro</span>
-          <span style={{ color: C.line }}>→</span>
-          <span style={{ color: C.lime }}>02 · Responder</span>
+          ≤ ${Math.round(interpolate(t, [1.5, 2.8], [149, 148], clamp))}
         </Enter>
         <Enter
-          at={5.5}
+          at={1.5}
           style={{
             position: "absolute",
-            left: 96,
-            top: 844,
-            fontSize: 27,
+            left: 1320,
+            top: 542,
+            fontSize: 26,
             color: C.muted,
           }}
         >
-          Dos llamados en esta consulta simple. Las acciones con tools pueden
-          sumar llamadas.
+          desk lamp
         </Enter>
-      </div>
-      <Enter at={8.5} style={{ position: "absolute", left: 96, top: 280 }}>
-        <Glyph kind="model" size={95} />
         <div
           style={{
-            fontSize: 103,
-            letterSpacing: -5,
-            lineHeight: 1.05,
-            marginTop: 25,
+            position: "absolute",
+            left: 200,
+            top: 810,
+            display: "flex",
+            alignItems: "center",
+            gap: 95,
+            fontSize: 31,
           }}
         >
-          Entender. Buscar.
-          <br />
-          <span style={{ color: C.lime }}>Recomendar.</span>
+          {["01", "Qdrant", "02"].map((label, i) => (
+            <div
+              key={label}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 95,
+                color: t > 2.5 + i * 0.8 ? C.lime : C.line,
+              }}
+            >
+              <span
+                style={{
+                  border: `1px solid ${t > 2.5 + i * 0.8 ? C.lime : C.line}`,
+                  borderRadius: 18,
+                  padding: "15px 35px",
+                }}
+              >
+                {label}
+              </span>
+              {i < 2 && <span>→</span>}
+            </div>
+          ))}
         </div>
+        <Enter
+          at={4.6}
+          style={{
+            position: "absolute",
+            left: 1470,
+            top: 720,
+            display: "flex",
+            gap: 22,
+            alignItems: "center",
+          }}
+        >
+          <Tile index={4} size={145} selected />
+          <span style={{ fontSize: 49, color: C.lime }}>$79</span>
+        </Enter>
+      </div>
+      <Enter
+        at={6.9}
+        style={{
+          position: "absolute",
+          left: 96,
+          top: 355,
+          fontSize: 140,
+          lineHeight: 1,
+          letterSpacing: -7,
+        }}
+      >
+        Menos búsqueda.
+        <br />
+        <span style={{ color: C.lime }}>Más match.</span>
       </Enter>
     </Stage>
   );

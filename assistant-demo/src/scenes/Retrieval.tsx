@@ -1,181 +1,205 @@
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
-import { C, Stage, Head, Enter, Tag, Photo, products, clamp } from "../design";
-
-// A deterministic conceptual projection, not measured embedding coordinates.
-const points = Array.from({ length: 80 }, (_, i) => {
-  const cluster = i < 5;
-  const a = i * 2.399963;
-  return {
-    x: cluster ? 745 + Math.cos(a) * 75 : 160 + ((i * 157) % 890),
-    y: cluster ? 600 + Math.sin(a) * 75 : 400 + ((i * 113) % 420),
-  };
-});
+import { C, Stage, Head, Enter, Tag, clamp } from "../design";
+import { Tile, VectorBars, progress } from "../motion";
+// Conceptual projection. The animation does not claim measured vector positions.
+export const searchPoints = Array.from({ length: 80 }, (_, i) => ({
+  x: i < 5 ? 750 + Math.cos(i * 2.399) * 105 : 160 + ((i * 157) % 900),
+  y: i < 5 ? 585 + Math.sin(i * 2.399) * 105 : 365 + ((i * 113) % 480),
+}));
 export const Retrieval = () => {
   const f = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = f / fps;
-  const searching = interpolate(t, [4.5, 7.5], [0, 1], clamp);
+  const organize = progress(t, 0.2, 2.2);
+  const select = progress(t, 4.1, 5.4);
+  const target = { x: 750, y: 585 };
   return (
-    <Stage step={4} label="Gemini → Qdrant · Recuperación semántica">
-      <Head sub="La consulta también se transforma en un vector de 768 dimensiones.">
-        Buscar por significado.
-      </Head>
+    <Stage step={4} label="Qdrant · Similitud">
+      <Head>Encontrar.</Head>
       <Enter
-        at={0.6}
+        at={0.2}
         style={{
           position: "absolute",
-          left: 96,
-          top: 345,
-          display: "flex",
-          gap: 20,
-          alignItems: "center",
+          left: 1250,
+          top: 178,
+          fontSize: 94,
+          letterSpacing: -5,
+          color: C.muted,
         }}
       >
-        <div
-          style={{
-            padding: "14px 24px",
-            borderRadius: 12,
-            background: C.lime,
-            color: C.bg,
-            fontSize: 28,
-          }}
-        >
-          desk lamp
-        </div>
-        <span style={{ fontSize: 30, color: C.muted }}>→</span>
-        <span style={{ fontSize: 27, color: C.ink }}>Gemini</span>
-        <span style={{ fontSize: 30, color: C.muted }}>→</span>
-        <div
-          style={{ fontFamily: "Menlo,monospace", fontSize: 24, color: C.lime }}
-        >
-          [ 0.12, −0.08, 0.31, … ]
-        </div>
+        80 <span style={{ fontSize: 50 }}>→</span>{" "}
+        <span style={{ color: C.lime }}>5</span>
       </Enter>
       <svg
-        style={{ position: "absolute", inset: 0, width: 1920, height: 1080 }}
+        width={1920}
+        height={1080}
+        style={{ position: "absolute", inset: 0 }}
       >
-        <path
-          d="M130 850H1110M130 850V435"
-          stroke={C.line}
-          fill="none"
-          strokeWidth="1.5"
-        />
-        {[1, 2, 3].map((n) => (
-          <ellipse
-            key={n}
-            cx={745}
-            cy={600}
-            rx={n * 86 * searching}
-            ry={n * 66 * searching}
-            fill="none"
-            stroke={C.lime}
-            strokeOpacity={0.22 / n}
-            strokeWidth={1.5}
-          />
-        ))}
-        {points.map((p, i) => (
-          <g
-            key={i}
-            opacity={
-              interpolate(t, [1 + i * 0.015, 2 + i * 0.015], [0, 1], clamp) *
-              (i < 5 ? 1 : interpolate(t, [6, 8], [0.7, 0.15], clamp))
-            }
-          >
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r={i < 5 ? interpolate(t, [6, 8], [6, 12], clamp) : 5}
-              fill={i < 5 && t > 6 ? C.lime : C.muted}
+        {[0, 1, 2].map((i) => {
+          const p = (Math.max(0, t - 2.4) * 0.44 + i / 3) % 1;
+          return (
+            <ellipse
+              key={i}
+              cx={target.x}
+              cy={target.y}
+              rx={90 + p * 460}
+              ry={70 + p * 300}
+              fill="none"
+              stroke={C.lilac}
+              strokeWidth={2}
+              opacity={t < 2.4 ? 0 : (1 - p) * 0.35 * (1 - select * 0.6)}
             />
-            {i < 5 && t > 7 && (
+          );
+        })}
+        <g
+          style={{
+            transformOrigin: "750px 585px",
+            rotate: `${t * 35}deg`,
+            opacity: progress(t, 2.1, 3) * (1 - select * 0.9),
+          }}
+        >
+          <path d="M750 585L1050 585A300 300 0 0 0 962 373Z" fill="#c9b7ef09" />
+          <path
+            d="M750 585H1085"
+            stroke={C.lilac}
+            strokeWidth={1}
+            strokeOpacity={0.4}
+          />
+        </g>
+        {searchPoints.map((p, i) => {
+          const x = interpolate(
+            organize,
+            [0, 1],
+            [170 + (i % 10) * 92, p.x],
+            clamp,
+          );
+          const y = interpolate(
+            organize,
+            [0, 1],
+            [360 + Math.floor(i / 10) * 67, p.y],
+            clamp,
+          );
+          return (
+            <g
+              key={i}
+              opacity={
+                progress(t, i * 0.007, 0.8 + i * 0.007) *
+                (i < 5 ? 1 : 1 - select * 0.88)
+              }
+            >
               <circle
-                cx={p.x}
-                cy={p.y}
-                r={21}
-                stroke={C.lime}
-                strokeOpacity={0.35}
-                fill="none"
+                cx={x + Math.sin(t * 0.5 + i) * 3}
+                cy={y + Math.cos(t * 0.4 + i) * 3}
+                r={i < 5 ? 6 + select * 8 : 5}
+                fill={i < 5 && select > 0.3 ? C.lime : C.muted}
               />
-            )}
-          </g>
-        ))}
+              {i < 5 && (
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={18 + select * 9}
+                  fill="none"
+                  stroke={C.lime}
+                  strokeWidth={1}
+                  opacity={select}
+                />
+              )}
+            </g>
+          );
+        })}
         <circle
-          cx={interpolate(t, [3, 5], [370, 745], { ...clamp })}
-          cy={interpolate(t, [3, 5], [470, 600], clamp)}
-          r={11}
+          cx={interpolate(progress(t, 1.5, 3), [0, 1], [270, 750], clamp)}
+          cy={interpolate(progress(t, 1.5, 3), [0, 1], [300, 585], clamp)}
+          r={13}
           fill={C.lilac}
-          opacity={interpolate(t, [2.5, 3], [0, 1], clamp)}
+          opacity={progress(t, 1.3, 1.8)}
         />
-        {points.slice(0, 5).map((p, i) => {
-          const q = interpolate(t, [8 + i * 0.5, 9 + i * 0.5], [0, 1], clamp);
+        {searchPoints.slice(0, 5).map((p, i) => {
+          const q = progress(t, 5 + i * 0.3, 6.5 + i * 0.3);
           return (
             <path
               key={i}
-              d={`M${p.x} ${p.y} C1100 ${p.y} 1090 ${447 + i * 85} 1230 ${447 + i * 85}`}
+              d={`M${p.x} ${p.y}Q1080 ${p.y} 1320 ${330 + i * 117}`}
               fill="none"
               stroke={C.lime}
-              strokeWidth={1.5}
+              strokeWidth={2}
+              strokeOpacity={0.45}
               pathLength={1}
               strokeDasharray={1}
               strokeDashoffset={1 - q}
-              opacity={q * 0.6}
             />
           );
         })}
       </svg>
-      <Enter at={5} style={{ position: "absolute", left: 550, top: 742 }}>
-        <Tag color={C.lilac}>Vector de la consulta</Tag>
-      </Enter>
-      <Enter at={7.5} style={{ position: "absolute", left: 1230, top: 340 }}>
-        <Tag>Top 5 · similitud coseno</Tag>
-      </Enter>
-      {products.map((p, i) => (
-        <Enter
-          key={p.id}
-          at={8 + i * 0.5}
-          style={{
-            position: "absolute",
-            left: 1230,
-            top: 405 + i * 85,
-            width: 590,
-            height: 75,
-            background: C.panel,
-            border: `1px solid ${C.line}`,
-            borderRadius: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 18,
-            padding: "7px 18px",
-            boxSizing: "border-box",
-          }}
-        >
-          <span style={{ color: C.lime, fontSize: 21 }}>0{i + 1}</span>
-          <Photo index={i} size={57} />
-          <div style={{ fontSize: 27 }}>{p.name}</div>
-        </Enter>
-      ))}
-      <Enter
-        at={11}
-        style={{
-          position: "absolute",
-          left: 1230,
-          top: 864,
-          fontSize: 23,
-          color: C.muted,
-        }}
-      >
-        Hasta 5 resultados · umbral configurable
-      </Enter>
       <div
         style={{
           position: "absolute",
-          left: 151,
-          top: 877,
-          fontSize: 21,
-          color: C.muted,
+          left: 96,
+          top: 285,
+          display: "flex",
+          alignItems: "center",
+          gap: 22,
+          opacity: 1 - progress(t, 2.2, 3.2),
         }}
       >
-        Qdrant · colección products · proyección 2D y ranking ilustrativos
+        <span style={{ fontSize: 30, color: C.lime }}>desk lamp</span>
+        <VectorBars width={120} height={40} color={C.lilac} />
+      </div>
+      <Enter
+        at={3.1}
+        style={{
+          position: "absolute",
+          left: 615,
+          top: 770,
+          fontSize: 24,
+          color: C.lilac,
+        }}
+      >
+        ● Consulta
+      </Enter>
+      <Enter at={5.1} style={{ position: "absolute", left: 1320, top: 270 }}>
+        <Tag>Top 5</Tag>
+      </Enter>
+      {searchPoints.slice(0, 5).map((p, i) => {
+        const q = progress(t, 5 + i * 0.3, 6.5 + i * 0.3);
+        const destY = 360 + i * 117;
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: interpolate(q, [0, 1], [p.x - 49, 1320], clamp),
+              top: interpolate(q, [0, 1], [p.y - 49, destY - 49], clamp),
+              opacity: progress(t, 5 + i * 0.3, 5.4 + i * 0.3),
+              scale: 0.25 + q * 0.75,
+            }}
+          >
+            <Tile index={i} size={98} selected />
+            <span
+              style={{
+                position: "absolute",
+                left: 130,
+                top: 25,
+                fontSize: 36,
+                color: C.lime,
+                opacity: q,
+              }}
+            >
+              0{i + 1}
+            </span>
+          </div>
+        );
+      })}
+      <div
+        style={{
+          position: "absolute",
+          left: 96,
+          top: 911,
+          color: C.muted,
+          fontSize: 19,
+        }}
+      >
+        Proyección y ranking ilustrativos
       </div>
     </Stage>
   );

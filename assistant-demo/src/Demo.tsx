@@ -14,7 +14,7 @@ export const Demo = () => {
     <TransitionSeries>
       <TransitionSeries.Sequence
         name="01 · Apertura"
-        durationInFrames={6 * fps}
+        durationInFrames={4 * fps}
         premountFor={fps}
       >
         <Opening />
@@ -25,7 +25,7 @@ export const Demo = () => {
       />
       <TransitionSeries.Sequence
         name="02 · Arranque e indexación"
-        durationInFrames={14 * fps}
+        durationInFrames={11 * fps}
         premountFor={fps}
       >
         <Indexing />
@@ -36,7 +36,7 @@ export const Demo = () => {
       />
       <TransitionSeries.Sequence
         name="03 · Primer llamado: reescritura"
-        durationInFrames={14 * fps}
+        durationInFrames={9 * fps}
         premountFor={fps}
       >
         <Rewriting />
@@ -47,7 +47,7 @@ export const Demo = () => {
       />
       <TransitionSeries.Sequence
         name="04 · Búsqueda vectorial"
-        durationInFrames={16 * fps}
+        durationInFrames={11 * fps}
         premountFor={fps}
       >
         <Retrieval />
@@ -58,7 +58,7 @@ export const Demo = () => {
       />
       <TransitionSeries.Sequence
         name="05 · Segundo llamado: contexto"
-        durationInFrames={12 * fps}
+        durationInFrames={9 * fps}
         premountFor={fps}
       >
         <Context />
@@ -69,7 +69,7 @@ export const Demo = () => {
       />
       <TransitionSeries.Sequence
         name="06 · Respuesta"
-        durationInFrames={8 * fps}
+        durationInFrames={6 * fps}
         premountFor={fps}
       >
         <Response />
@@ -80,7 +80,7 @@ export const Demo = () => {
       />
       <TransitionSeries.Sequence
         name="07 · Seguimiento con memoria"
-        durationInFrames={13 * fps}
+        durationInFrames={9 * fps}
         premountFor={fps}
       >
         <Followup />

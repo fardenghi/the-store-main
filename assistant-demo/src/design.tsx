@@ -174,8 +174,6 @@ export const Stage: React.FC<{
   label: string;
   light?: boolean;
 }> = ({ children, step, label, light = false }) => {
-  const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
   return (
     <AbsoluteFill
       style={{
@@ -262,16 +260,6 @@ export const Stage: React.FC<{
           ))}
         </div>
       </div>
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          height: 3,
-          width: `${interpolate(frame, [0, durationInFrames - 1], [0, 100], clamp)}%`,
-          background: light ? "#58762a" : C.lime,
-        }}
-      />
     </AbsoluteFill>
   );
 };

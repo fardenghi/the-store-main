@@ -1,7 +1,9 @@
 # The Store — demo del asistente
 
-Video de arquitectura de **80 segundos**, 1920 × 1080, 30 fps, en español.
-Diseño oscuro con acentos lima, transiciones suaves y una escena clara para la respuesta.
+Video de arquitectura de **56 segundos**, 1920 × 1080, 30 fps, en español.
+Diseño oscuro con acentos lima, fotos en movimiento y diagramas animados.
+El relato se apoya en transformaciones, selección y recorridos visuales; los textos
+se limitan a títulos cortos, etiquetas y el pedido del usuario.
 Sin audio: preparado para acompañar la explicación oral del trabajo práctico.
 
 ## Vista previa
@@ -37,15 +39,15 @@ localmente y están excluidos.
 
 Los tiempos incluyen solapamientos de medio segundo entre escenas.
 
-| Tiempo      | Escena               | Lo que explica                                                                                                                             |
-| ----------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0–6 s       | Apertura             | Una pregunta se convierte en una recomendación.                                                                                            |
-| 5,5–19,5 s  | Arranque             | Catálogo → Assistant → Gemini → Qdrant; 80 productos, embeddings de 768 dimensiones y sincronización incremental.                          |
-| 19–33 s     | Primer llamado       | Consulta en español → intención, query en inglés y filtros; utiliza historial, productos anteriores y tags.                                |
-| 32,5–48,5 s | Recuperación         | Gemini embebe `desk lamp`; Qdrant selecciona los 5 vecinos más cercanos por similitud coseno.                                              |
-| 48–60 s     | Segundo llamado      | Solo los resultados recuperados forman el contexto de productos del turno. Se envían datos de producto; los vectores permanecen en Qdrant. |
-| 59,5–67,5 s | Respuesta            | Recomendación ilustrativa con un producto del catálogo; entrega en streaming por SSE.                                                      |
-| 67–80 s     | Seguimiento y cierre | “Más barato que la de nogal” resuelve el producto de US$149 y genera `maxPrice: 148`. Se repite el ciclo.                                  |
+| Tiempo      | Escena           | Animación principal                                                                                      |
+| ----------- | ---------------- | -------------------------------------------------------------------------------------------------------- |
+| 0–4 s       | Apertura         | Los productos orbitan y convergen en una recomendación.                                                  |
+| 3,5–14,5 s  | Arranque         | Fotos del catálogo atraviesan Gemini, se transforman en barras de embeddings y llegan a Qdrant.          |
+| 14–23 s     | Primer llamado   | Las palabras del pedido entran al LLM 01; salen como `desk lamp`. La memoria orbita el modelo.           |
+| 22,5–33,5 s | Recuperación     | La consulta recorre el espacio vectorial; el radar selecciona 5 puntos y los convierte en tarjetas.      |
+| 33–42 s     | Segundo llamado  | Solo las 5 tarjetas cruzan al LLM 02. El resto permanece en Qdrant.                                      |
+| 41,5–47,5 s | Respuesta        | Foto del producto, respuesta breve en streaming y precio.                                                |
+| 47–56 s     | Memoria y cierre | La referencia al producto de US$149 produce el filtro `≤ $148`; se activa el recorrido 01 → Qdrant → 02. |
 
 ## Fidelidad al proyecto
 
@@ -58,15 +60,16 @@ El flujo se verificó contra:
 - `../src/assistant/src/main/resources/application.yml`
 - `../src/catalog/repository/products.json`
 
-La nube, los valores del vector, el ranking y las respuestas son ilustrativos;
+La nube, el ranking, los tiempos y las respuestas son ilustrativos;
 no representan una ejecución grabada ni resultados medidos de la consulta.
+Las tarjetas representan los datos de los productos: el modelo recibe texto, no fotos.
 Nombres, precios y fotos provienen del catálogo local. El segundo llamado recibe
 además las instrucciones, la conversación y el mensaje original. En turnos
 posteriores puede recibir también productos mostrados previamente.
 
 La demo muestra una búsqueda simple con dos llamadas al LLM: reescritura y
 respuesta. Gemini es un proveedor de embeddings separado. Los turnos con tools
-pueden hacer más llamadas al modelo principal, como se aclara en el video.
+pueden hacer más llamadas al modelo principal; esos turnos no se muestran.
 No requiere levantar el cluster, usar claves ni consultar proveedores externos.
 
 ## Editar y verificar
@@ -74,6 +77,7 @@ No requiere levantar el cluster, usar claves ni consultar proveedores externos.
 - `src/Demo.tsx`: duración y transiciones de cada escena.
 - `src/scenes/`: textos, diagramas y animaciones.
 - `src/design.tsx`: colores, componentes compartidos y productos del ejemplo.
+- `src/motion.tsx`: tarjetas, nodos, pulsos, partículas y barras de embeddings.
 - `src/Root.tsx`: video completo y composiciones individuales.
 
 ```sh

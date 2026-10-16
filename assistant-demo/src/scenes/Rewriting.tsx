@@ -1,121 +1,116 @@
-import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
-import { C, Stage, Enter, Tag, Glyph, Note, clamp } from "../design";
+import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { C, Stage, Head, Enter, Tag, clamp } from "../design";
+import { Core, Rail, progress, VectorBars } from "../motion";
 export const Rewriting = () => {
   const f = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const query = "desk lamp";
+  const t = f / fps;
+  const out = progress(t, 4.8, 5.7);
   return (
-    <Stage step={3} label="Consulta · Primer llamado al modelo">
-      <Enter style={{ position: "absolute", left: 96, top: 200 }}>
-        <Tag>01 / Llamado al LLM · NVIDIA</Tag>
-        <div
-          style={{
-            fontSize: 105,
-            lineHeight: 1.02,
-            letterSpacing: -5,
-            marginTop: 32,
-          }}
-        >
-          Una pregunta.
-          <br />
-          Una consulta
-          <br />
-          <span style={{ color: C.lime }}>precisa.</span>
-        </div>
+    <Stage step={3} label="LLM 01 · Reescribir">
+      <Head>Entender.</Head>
+      <Rail x1={410} y1={530} x2={960} y2={530} at={1.3} until={4.5} />
+      <Rail x1={960} y1={530} x2={1510} y2={530} at={4.3} />
+      <Enter at={0.2} style={{ position: "absolute", left: 96, top: 351 }}>
+        <Tag color={C.muted}>Tu pedido</Tag>
       </Enter>
-      <Enter
-        at={1}
-        style={{
-          position: "absolute",
-          left: 96,
-          top: 635,
-          width: 755,
-          padding: 32,
-          background: C.ink,
-          color: C.bg,
-          borderRadius: "24px 24px 24px 4px",
-          fontSize: 39,
-          lineHeight: 1.25,
-        }}
-      >
-        “Necesito una lámpara
-        <br />
-        para mi escritorio”
-        <div style={{ fontSize: 20, marginTop: 20, color: "#74796e" }}>
-          MENSAJE DEL USUARIO
-        </div>
-      </Enter>
-      <Enter
-        at={2}
-        style={{
-          position: "absolute",
-          left: 1010,
-          top: 220,
-          width: 810,
-          height: 610,
-          border: `1px solid ${C.line}`,
-          background: C.panel,
-          borderRadius: 30,
-          padding: 45,
-          boxSizing: "border-box",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Tag>Query rewriter</Tag>
-          <Glyph kind="model" size={55} />
-        </div>
-        <div
-          style={{
-            color: C.muted,
-            fontSize: 28,
-            marginTop: 30,
-            lineHeight: 1.45,
-          }}
-        >
-          Mensaje + últimos 3 turnos
-          <br />+ productos previos + tags del catálogo
-        </div>
-        <div style={{ height: 1, background: C.line, margin: "30px 0" }} />
-        <div
-          style={{
-            fontFamily: "Menlo, monospace",
-            fontSize: 28,
-            lineHeight: 1.7,
-            color: C.muted,
-          }}
-        >
-          {"{"}
-          <div style={{ paddingLeft: 30 }}>
-            intent: <span style={{ color: C.lilac }}>“search”</span>,<br />
-            query:{" "}
-            <span style={{ color: C.lime }}>
-              “
-              {query.slice(
-                0,
-                Math.round(
-                  interpolate(f, [5 * fps, 6 * fps], [0, query.length], clamp),
-                ),
-              )}
-              ”
-            </span>
-            ,<br />
-            maxPrice: null,
-            <br />
-            excludeTags: []
+      {["Lámpara", "para mi", "escritorio"].map((word, i) => {
+        const p = progress(t, 1.8 + i * 0.24, 3.6 + i * 0.24);
+        return (
+          <div
+            key={word}
+            style={{
+              position: "absolute",
+              left: 160 + p * 700,
+              top: 425 + i * 95 - p * (i * 95 - 60),
+              padding: "18px 32px",
+              background: C.ink,
+              color: C.bg,
+              borderRadius: 18,
+              fontSize: 40,
+              opacity:
+                (1 - progress(p, 0.65, 1)) *
+                progress(t, 0.3 + i * 0.14, 0.8 + i * 0.14),
+              scale: 1 - p * 0.65,
+              rotate: `${p * 30}deg`,
+            }}
+          >
+            {word}
           </div>
-          {"}"}
+        );
+      })}
+      <Core x={960} y={530} label="Reescritura" number="01" />
+      {[0, 1, 2].map((i) => {
+        const a = t * 0.8 + i * 2.09;
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: 950 + Math.cos(a) * 185,
+              top: 520 + Math.sin(a) * 185,
+              width: 18,
+              height: 18,
+              borderRadius: 7,
+              background: C.lilac,
+              opacity: progress(t, 2, 3) * (1 - progress(t, 5.5, 6.5)),
+            }}
+          />
+        );
+      })}
+      <Enter
+        at={2.1}
+        style={{
+          position: "absolute",
+          left: 835,
+          top: 825,
+          color: C.lilac,
+          fontSize: 25,
+        }}
+      >
+        + memoria
+      </Enter>
+      <div
+        style={{
+          position: "absolute",
+          left: 1280,
+          top: 435,
+          scale: interpolate(out, [0, 1], [0.7, 1], clamp),
+          opacity: out,
+          width: 500,
+          height: 190,
+          boxSizing: "border-box",
+          padding: "30px 38px",
+          background: C.panel,
+          border: `1px solid ${C.lime}`,
+          borderRadius: 28,
+        }}
+      >
+        <Tag>Query</Tag>
+        <div
+          style={{
+            fontSize: 68,
+            letterSpacing: -3,
+            marginTop: 14,
+            color: C.lime,
+          }}
+        >
+          desk lamp
+        </div>
+      </div>
+      <Enter at={6.5} style={{ position: "absolute", left: 1420, top: 740 }}>
+        <VectorBars width={200} height={80} />
+        <div
+          style={{
+            fontSize: 23,
+            color: C.muted,
+            marginTop: 18,
+            textAlign: "center",
+          }}
+        >
+          → Gemini
         </div>
       </Enter>
-      <Note at={7}>
-        El primer llamado entiende la intención, traduce al inglés y extrae
-        filtros. Todavía no recomienda.
-      </Note>
     </Stage>
   );
 };

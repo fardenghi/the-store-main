@@ -1,130 +1,119 @@
 import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { Stage, Enter, Photo, clamp } from "../design";
+import { C, Stage, Enter, Photo, clamp } from "../design";
+import { Check, progress } from "../motion";
 export const Response = () => {
   const f = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const text =
-    "La Curved Brass and Walnut Desk Lamp combina base de nogal, estructura de latón y pantalla de tela. Una opción para tu escritorio por US$149.";
+  const t = f / fps;
+  const text = "Nogal. Latón. Para tu escritorio.";
   return (
-    <Stage step={6} label="Respuesta en streaming · SSE" light>
-      <Enter style={{ position: "absolute", left: 96, top: 225 }}>
-        <div style={{ fontSize: 23, letterSpacing: 3, color: "#65704f" }}>
-          DEL CONTEXTO A LA RECOMENDACIÓN
-        </div>
-        <div
-          style={{
-            fontSize: 109,
-            lineHeight: 1.02,
-            letterSpacing: -6,
-            marginTop: 35,
-          }}
-        >
-          Una respuesta.
-          <br />
-          Con productos
-          <br />
-          <span style={{ color: "#6b843a" }}>reales.</span>
-        </div>
-        <div
-          style={{
-            fontSize: 34,
-            color: "#6a7162",
-            lineHeight: 1.45,
-            marginTop: 42,
-          }}
-        >
-          El modelo redacta.
-          <br />
-          El catálogo aporta los datos.
-          <br />
-          La UI recibe fragmentos por SSE.
-        </div>
-      </Enter>
-      <Enter
-        at={0.5}
+    <Stage step={6} label="Streaming · SSE" light>
+      <div
         style={{
           position: "absolute",
-          left: 975,
-          top: 220,
-          width: 845,
-          height: 675,
-          border: "1px solid #ced1c4",
-          background: "#f8f8f1",
-          borderRadius: 30,
-          padding: 38,
-          boxSizing: "border-box",
-          boxShadow: "0 25px 70px #11141009",
+          left: 160,
+          top: 240,
+          width: 610,
+          height: 610,
+          borderRadius: "50%",
+          border: "1px solid #c9d2b7",
+          scale: 1 + 0.02 * Math.sin(t * 2),
+        }}
+      />
+      <Enter
+        at={0.1}
+        style={{
+          position: "absolute",
+          left: 215,
+          top: 280,
+          rotate: `${interpolate(t, [0, 3], [-9, 0], clamp)}deg`,
+          scale: interpolate(t, [0, 1], [0.7, 1], clamp),
         }}
       >
-        <div
-          style={{
-            fontSize: 26,
-            fontWeight: 500,
-            paddingBottom: 27,
-            borderBottom: "1px solid #d9dccf",
-          }}
-        >
-          A.G.E.N.T.{" "}
-          <span style={{ float: "right", fontSize: 19, color: "#71805b" }}>
-            ● EN LÍNEA
-          </span>
-        </div>
-        <div
-          style={{
-            background: "#e1e7d6",
-            padding: "22px 26px",
-            borderRadius: "18px 18px 4px 18px",
-            fontSize: 29,
-            marginTop: 26,
-            marginLeft: 65,
-          }}
-        >
-          Necesito una lámpara para mi escritorio
-        </div>
-        <div
-          style={{
-            fontSize: 29,
-            lineHeight: 1.45,
-            marginTop: 30,
-            minHeight: 170,
-          }}
-        >
-          {text.slice(
-            0,
-            Math.round(
-              interpolate(f, [2 * fps, 5.5 * fps], [0, text.length], clamp),
-            ),
-          )}
-          <span style={{ color: "#71805b", opacity: f / fps < 5.5 ? 1 : 0 }}>
-            ▍
-          </span>
-        </div>
-        <Enter
-          at={3.5}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 26,
-            background: "#fff",
-            border: "1px solid #dce0d3",
-            borderRadius: 20,
-            padding: 20,
-          }}
-        >
-          <Photo index={0} size={145} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 26, lineHeight: 1.3 }}>
-              Curved Brass and Walnut
-              <br />
-              Desk Lamp
-            </div>
-            <div style={{ fontSize: 33, marginTop: 14 }}>US$149</div>
-            <div style={{ fontSize: 19, color: "#73815b", marginTop: 10 }}>
-              PRODUCTO DEL CATÁLOGO
-            </div>
-          </div>
-        </Enter>
+        <Photo index={0} size={500} />
       </Enter>
+      <div
+        style={{
+          position: "absolute",
+          left: 655,
+          top: 725,
+          width: 108,
+          height: 108,
+          borderRadius: "50%",
+          background: C.lime,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          scale: interpolate(t, [1.5, 1.9, 2.2], [0, 1.15, 1], clamp),
+        }}
+      >
+        <Check size={58} />
+      </div>
+      <Enter
+        at={0.4}
+        style={{
+          position: "absolute",
+          left: 940,
+          top: 280,
+          fontSize: 130,
+          letterSpacing: -7,
+        }}
+      >
+        Tu match.
+      </Enter>
+      <Enter
+        at={1.4}
+        style={{
+          position: "absolute",
+          left: 950,
+          top: 466,
+          fontSize: 35,
+          color: "#6b765b",
+          maxWidth: 760,
+          minHeight: 100,
+        }}
+      >
+        {text.slice(
+          0,
+          Math.round(interpolate(t, [1.4, 3.6], [0, text.length], clamp)),
+        )}
+        <span style={{ opacity: t < 3.6 ? 1 : 0 }}>▍</span>
+      </Enter>
+      <Enter
+        at={2.5}
+        style={{
+          position: "absolute",
+          left: 942,
+          top: 610,
+          fontSize: 98,
+          letterSpacing: -5,
+        }}
+      >
+        US$149
+      </Enter>
+      <div
+        style={{
+          position: "absolute",
+          left: 950,
+          top: 785,
+          display: "flex",
+          gap: 8,
+          opacity: 1 - progress(t, 4.2, 5),
+        }}
+      >
+        {Array.from({ length: 16 }, (_, i) => (
+          <div
+            key={i}
+            style={{
+              width: 10,
+              height: 8 + Math.abs(Math.sin(t * 4 - i * 0.6)) * 30,
+              borderRadius: 5,
+              background: "#6b843a",
+              opacity: progress(t, 1.5 + i * 0.07, 1.7 + i * 0.07),
+            }}
+          />
+        ))}
+      </div>
     </Stage>
   );
 };
