@@ -20,6 +20,10 @@ class Chat {
   lastBotMessage() {
     return this.botMessages().last();
   }
+
+  productCards() {
+    return this.lastBotMessage().find(".chat-product-card");
+  }
 }
 
 module.exports = Chat;

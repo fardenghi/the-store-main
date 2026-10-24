@@ -53,12 +53,14 @@ Eventos que recibe el navegador, con cualquier provider:
 | Evento                 | `data`                                                | Qué hace el chat                                              |
 | ---------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
 | sin nombre (`message`) | `{"text": "<fragmento>"}`                             | Agrega el fragmento a la respuesta, renderizada como markdown |
-| `products`             | Productos recuperados por el assistant (RAG)          | Se ignora                                                     |
-| `tool`                 | `{tool, ok, error?, products?}`                       | Se ignora                                                     |
-| `cart-updated`         | `{itemId, name, quantity, unitPrice, cartItemCount?}` | Actualiza el contador del carrito, y la lista en `/cart`      |
+| `products`             | `[{id, name, price}]`, recuperados por el assistant (RAG) | No se muestra: alimenta las tarjetas de productos         |
+| `tool`                 | `{tool, ok, error?, products?}`                       | No se muestra: sus `products` alimentan las tarjetas          |
+| `cart-updated`         | `{itemId, name, quantity, unitPrice, cartItemCount?}` | Actualiza el contador del carrito, y la lista en `/cart`; alimenta las tarjetas |
 | `done`                 | `{}`                                                  | Termina el turno                                              |
 | `error`                | `{type, detail, retryAfterSeconds?}`                  | Muestra un aviso según el `type` y termina el turno           |
 | comentario `:keepalive` | -                                                    | Se ignora (cada `RETAIL_UI_ASSISTANT_KEEPALIVE_INTERVAL`)     |
+
+**Tarjetas de productos:** cuando el texto del asistente nombra un producto conocido, el chat muestra debajo del párrafo, ítem de lista o encabezado donde se lo nombra por primera vez una tarjeta con su imagen, nombre y precio, que enlaza a la ficha (`/catalog/{id}`). Un producto es conocido si llegó en un evento `products`, `tool` o `cart-updated` de la conversación visible, en ese turno o en uno anterior (el botón de borrar el chat los olvida). La mención se detecta por el nombre completo sobre el texto ya renderizado, sin distinguir mayúsculas ni formato markdown (negrita, guiones y comillas tipográficas); los nombres parciales o parafraseados no generan tarjeta. Hay como máximo una tarjeta por producto y 6 por mensaje, y aparecen mientras llega el texto. Solo se aceptan productos con id UUID, nombre no vacío y precio numérico no negativo: la imagen (`/assets/img/products/{id}.jpg`) y el enlace se arman a partir de ese id, nunca del texto del modelo, y la tarjeta se construye fuera del HTML sanitizado, así que las imágenes del markdown de la respuesta siguen sin cargarse. Con los providers `mock`, `openai` y `bedrock`, que no mandan estos eventos, no hay tarjetas.
 
 Todo turno termina con exactamente un evento `done` o `error` y HTTP 200. Además de los errores del `assistant` (por ejemplo `llm-quota-exceeded`), la `ui` genera estos tipos:
 

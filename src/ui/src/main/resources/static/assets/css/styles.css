@@ -131,3 +131,58 @@
   border-top: 1px solid #e5e7eb;
   margin: 1rem 0;
 }
+
+/* Tarjetas de los productos que nombra el asistente */
+.message-text a.chat-product-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 100%;
+  margin: 0 0 1rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  color: #1f2937;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.message-text a.chat-product-card:hover {
+  background-color: rgb(var(--primary-color-50));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  text-decoration: none;
+}
+
+.message-text li > a.chat-product-card {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.chat-product-card-image {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 0.375rem;
+  background-color: #f3f4f6;
+}
+
+.chat-product-card-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-product-card-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.chat-product-card-price {
+  font-size: 0.875rem;
+  color: rgb(var(--primary-color-700));
+}

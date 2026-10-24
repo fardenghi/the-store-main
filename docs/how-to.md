@@ -154,7 +154,7 @@ cambian.
 
 | Caso de uso | Qué hacer | Qué se tiene que ver |
 |---|---|---|
-| Búsqueda semántica | Escribir *"somewhere cozy to curl up with a book"* | Al menos 3 productos reales (sillones, pufs, lámparas) sin coincidencia de palabras. |
+| Búsqueda semántica | Escribir *"somewhere cozy to curl up with a book"* | Al menos 3 productos reales (sillones, pufs, lámparas) sin coincidencia de palabras. Debajo del párrafo o del ítem que nombra cada producto aparece su tarjeta con imagen, nombre y precio, que abre la ficha |
 | Tolerancia a errores de tipeo | Escribir *"mid sentury velvit armchiar"* | El mismo producto que con *"mid century velvet armchair"* (Aiden Mid-Century Velvet Armchair) |
 | Reescritura de la consulta | Seguir la conversación con *"too pricey, anything cheaper?"* | En el log, la consulta reescrita trae `maxPrice` y su top-k es mejor que el de la consulta cruda (`topk` contra `rawTopk`) |
 | Conversación multi-turno | Pedir algo para hacer más cómodo un ambiente y después *"not a lamp"* | Mantiene el tema del turno anterior y excluye las lámparas (`excludeTags=[lighting]` en el log) |

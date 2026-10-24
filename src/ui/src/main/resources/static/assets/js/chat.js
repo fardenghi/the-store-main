@@ -21,6 +21,12 @@ const ChatUI = {
   converter: null,
   contextPath: null,
   busy: false,
+  // Productos de los eventos products, tool y cart-updated de la
+  // conversación visible: id -> {id, name, price}. Alimentan las tarjetas.
+  knownProducts: new Map(),
+  maxCardsPerMessage: 6,
+  productIdPattern:
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
 
   init(contextPath) {
     this.elements = {
@@ -75,6 +81,7 @@ const ChatUI = {
 
   clearMessages() {
     this.elements.chatMessages.innerHTML = "";
+    this.knownProducts.clear();
 
     this.elements.userInput.value = "";
 
@@ -198,10 +205,157 @@ const ChatUI = {
     }
   },
 
-  updateBotMessage(messageDiv, text) {
-    const textDiv = messageDiv.querySelector(".message-text");
-    this.renderMarkdown(textDiv, text);
+  updateBotMessage(turn) {
+    const textDiv = turn.botMessageDiv.querySelector(".message-text");
+    this.renderMarkdown(textDiv, turn.runningText);
+    this.attachProductCards(textDiv, turn);
     this.scrollToBottom();
+  },
+
+  // Agrega debajo de cada bloque de texto las tarjetas de los productos
+  // conocidos que se nombran por primera vez en él. Trabaja sobre el DOM ya
+  // sanitizado, así que el markdown no está en el texto (D3).
+  attachProductCards(textDiv, turn) {
+    if (this.knownProducts.size === 0) return;
+
+    // De mayor a menor longitud, para que un nombre contenido en otro no
+    // genere una segunda tarjeta.
+    const candidates = [...this.knownProducts.values()]
+      .map((product) => ({ product, key: this.normalizeText(product.name) }))
+      .filter((candidate) => candidate.key !== "")
+      .sort((a, b) => b.key.length - a.key.length);
+
+    const placed = new Set();
+    const placements = [];
+    const blocks = textDiv.querySelectorAll(
+      "p, li, h1, h2, h3, h4, h5, h6, blockquote",
+    );
+
+    for (const block of blocks) {
+      let text = this.normalizeText(this.ownText(block));
+      const found = [];
+
+      for (const { product, key } of candidates) {
+        let index = text.indexOf(key);
+        if (index < 0) continue;
+
+        const first = index;
+        while (index >= 0) {
+          text =
+            text.slice(0, index) +
+            " ".repeat(key.length) +
+            text.slice(index + key.length);
+          index = text.indexOf(key, index + key.length);
+        }
+        if (!placed.has(product.id)) {
+          found.push({ product, first });
+        }
+      }
+
+      found.sort((a, b) => a.first - b.first);
+      const products = [];
+      for (const { product } of found) {
+        if (placed.size >= this.maxCardsPerMessage) break;
+        placed.add(product.id);
+        products.push(product);
+      }
+      if (products.length > 0) {
+        placements.push({ block, products });
+      }
+    }
+
+    // Se inserta al final, para no alterar el texto de los bloques que
+    // todavía no se recorrieron.
+    for (const { block, products } of placements) {
+      const cards = products.map((product) => this.productCard(turn, product));
+      this.insertCards(block, cards);
+    }
+  },
+
+  // El texto de un ítem de lista sin sus listas anidadas.
+  ownText(block) {
+    if (block.tagName !== "LI") return block.textContent;
+    const copy = block.cloneNode(true);
+    copy.querySelectorAll("ul, ol").forEach((list) => list.remove());
+    return copy.textContent;
+  },
+
+  normalizeText(text) {
+    return text
+      .toLowerCase()
+      .replace(/[‐-―−]/g, "-")
+      .replace(/[‘’‚‛′]/g, "'")
+      .replace(/[“-‟″]/g, '"')
+      .replace(/\s+/g, " ")
+      .trim();
+  },
+
+  // En un ítem de lista, las tarjetas van dentro del propio li (antes de una
+  // lista anidada), para no dejar un elemento suelto dentro de ul/ol.
+  insertCards(block, cards) {
+    if (block.tagName === "LI") {
+      const nested = [...block.children].find(
+        (child) => child.tagName === "UL" || child.tagName === "OL",
+      );
+      for (const card of cards) {
+        block.insertBefore(card, nested || null);
+      }
+      return;
+    }
+
+    let anchor = block;
+    for (const card of cards) {
+      anchor.insertAdjacentElement("afterend", card);
+      anchor = card;
+    }
+  },
+
+  // Cada turno reutiliza el nodo de cada tarjeta entre re-renders: mover un
+  // img ya cargado no lo vuelve a pedir ni lo hace parpadear (D4).
+  productCard(turn, product) {
+    let card = turn.cards.get(product.id);
+    if (!card) {
+      card = this.createProductCard(product);
+      turn.cards.set(product.id, card);
+    }
+    card.querySelector(".chat-product-card-name").textContent = product.name;
+    card.querySelector(".chat-product-card-price").textContent =
+      this.formatPrice(product.price);
+    return card;
+  },
+
+  // Solo createElement y textContent: ningún dato del texto del modelo llega
+  // a un src o un href, y las rutas salen del id ya validado (D5).
+  createProductCard(product) {
+    const card = document.createElement("a");
+    card.className = "chat-product-card";
+    card.href = `${this.contextPath}catalog/${product.id}`;
+
+    const image = document.createElement("img");
+    image.className = "chat-product-card-image";
+    image.alt = product.name;
+    image.loading = "lazy";
+    image.addEventListener("error", () => image.remove(), { once: true });
+    image.src = `${this.contextPath}assets/img/products/${product.id}.jpg`;
+    card.appendChild(image);
+
+    const info = document.createElement("span");
+    info.className = "chat-product-card-info";
+
+    const name = document.createElement("span");
+    name.className = "chat-product-card-name";
+    info.appendChild(name);
+
+    const price = document.createElement("span");
+    price.className = "chat-product-card-price";
+    info.appendChild(price);
+
+    card.appendChild(info);
+    return card;
+  },
+
+  formatPrice(price) {
+    return Number.isInteger(price) ? `$${price}` : `$${price.toFixed(2)}`;
   },
 
   setBusy(busy) {
@@ -224,6 +378,7 @@ const ChatUI = {
       botMessageDiv: null,
       runningText: "",
       finished: false,
+      cards: new Map(),
     };
     this.elements.chatMessages.appendChild(turn.loadingDiv);
     this.scrollToBottom();
@@ -318,13 +473,26 @@ const ChatUI = {
         if (data && typeof data.text === "string") {
           this.ensureBotMessage(turn);
           turn.runningText += data.text;
-          this.updateBotMessage(turn.botMessageDiv, turn.runningText);
+          this.updateBotMessage(turn);
         }
         break;
       }
-      case "cart-updated":
-        CartUI.handleCartUpdated(this.parseData(event) || {});
+      case "products":
+        this.rememberProducts(this.parseData(event));
         break;
+      case "tool": {
+        const data = this.parseData(event);
+        if (data) {
+          this.rememberProducts(data.products);
+        }
+        break;
+      }
+      case "cart-updated": {
+        const data = this.parseData(event) || {};
+        this.rememberProduct(data.itemId, data.name, data.unitPrice);
+        CartUI.handleCartUpdated(data);
+        break;
+      }
       case "done":
         turn.finished = true;
         break;
@@ -333,9 +501,31 @@ const ChatUI = {
         this.showError(turn, this.parseData(event) || {});
         break;
       default:
-        // products, tool y eventos desconocidos no se muestran (D4).
+        // Los eventos desconocidos no se muestran.
         break;
     }
+  },
+
+  rememberProducts(products) {
+    if (!Array.isArray(products)) return;
+    for (const product of products) {
+      if (product && typeof product === "object") {
+        this.rememberProduct(product.id, product.name, product.price);
+      }
+    }
+  },
+
+  // Solo entran ids UUID, con nombre y precio válidos: así las rutas de la
+  // imagen y de la ficha no pueden apuntar fuera de la tienda. Un id repetido
+  // reemplaza al anterior (el precio de las tools es el vivo).
+  rememberProduct(id, name, price) {
+    if (typeof id !== "string" || !this.productIdPattern.test(id)) return;
+    if (typeof name !== "string" || name.trim() === "") return;
+    if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
+      return;
+    }
+    const key = id.toLowerCase();
+    this.knownProducts.set(key, { id: key, name: name.trim(), price });
   },
 
   ensureBotMessage(turn) {
