@@ -99,8 +99,11 @@ cambiando la configuración, sin tocar código.
 ### 6. Apertura
 
 Ahora vamos a seguir un mensaje de punta a punta, para ver todo lo que pasa
-por atrás entre que el usuario escribe y recibe la respuesta. El ejemplo es
-alguien que pide una lámpara para su escritorio.
+por atrás entre que el usuario escribe y recibe la respuesta.
+
+▸
+
+El ejemplo es alguien que pide una lámpara para su escritorio.
 
 ### 7. Arranque e indexación
 
@@ -173,8 +176,12 @@ sin repetir que habla de una lámpara.
 
 Como la reescritura recibe la conversación, sabe que la lámpara anterior
 costaba 149 dólares y genera el filtro "menos de 148". Y se repite el mismo
-recorrido: reescritura, Qdrant y respuesta. La memoria guarda los últimos 10
-turnos de cada sesión y se olvida a los 30 minutos sin uso.
+recorrido: reescritura, Qdrant y respuesta.
+
+▸
+
+La memoria guarda los últimos 10 turnos de cada sesión y se olvida a los 30
+minutos sin uso. Menos búsqueda, más match.
 
 ### 13. Actuar: tools
 

@@ -163,9 +163,11 @@ export const Note: React.FC<{ children: React.ReactNode; at?: number }> = ({
   </Enter>
 );
 
+// `step` es el paso del recorrido de un mensaje (1 a 7). Las slides que no son
+// parte del recorrido lo omiten, y el pie muestra solo `label`.
 export const Stage: React.FC<{
   children: React.ReactNode;
-  step: number;
+  step?: number;
   label: string;
   light?: boolean;
 }> = ({ children, step, label, light = false }) => {
@@ -230,20 +232,29 @@ export const Stage: React.FC<{
         <div
           style={{ fontSize: 20, letterSpacing: 2, textTransform: "uppercase" }}
         >
-          <span style={{ color: light ? "#58762a" : C.lime, marginRight: 22 }}>
-            0{step}
-          </span>
+          {step !== undefined && (
+            <span
+              style={{ color: light ? "#58762a" : C.lime, marginRight: 22 }}
+            >
+              0{step}
+            </span>
+          )}
           {label}
         </div>
-        <div style={{ display: "flex", gap: 9 }}>
+        <div
+          style={{
+            display: step === undefined ? "none" : "flex",
+            gap: 9,
+          }}
+        >
           {Array.from({ length: 7 }, (_, i) => (
             <div
               key={i}
               style={{
-                width: i === step - 1 ? 56 : 18,
+                width: i === (step ?? 0) - 1 ? 56 : 18,
                 height: 4,
                 background:
-                  i === step - 1
+                  i === (step ?? 0) - 1
                     ? light
                       ? "#58762a"
                       : C.lime

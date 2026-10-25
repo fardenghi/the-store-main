@@ -14,12 +14,15 @@
     "remotion": "4.0.535"
   },
   "devDependencies": {
+    "@remotion/bundler": "4.0.535",
     "@remotion/eslint-config-flat": "4.0.535",
+    "@remotion/renderer": "4.0.535",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@types/web": "0.0.166",
     "@vitejs/plugin-react": "4.5.2",
     "eslint": "9.39.5",
+    "pptxgenjs": "4.0.1",
     "prettier": "3.8.1",
     "typescript": "5.9.3",
     "vite": "6.3.5"
@@ -28,6 +31,7 @@
     "dev": "remotion studio",
     "deck": "vite",
     "deck:build": "vite build",
+    "pptx": "node scripts/export-pptx.mjs",
     "render": "remotion render src/index.ts TheStore-Assistant out/the-store-assistant.mp4 --codec=h264",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",

@@ -58,6 +58,18 @@ composición de Remotion, así que se edita y se previsualiza igual que el video
 (`npm run dev`). `npm run deck:build` genera una versión estática en
 `dist/deck/`.
 
+### PPT para el Campus
+
+```sh
+VIDEO_URL=https://link-al-video npm run pptx
+```
+
+Genera `out/the-store-presentacion.pptx`: una slide por parada del deck, con la
+imagen de la parada tal como la ve el público, y al final una slide con los
+links al video y al repositorio. No lleva notas del orador. Sin `VIDEO_URL`,
+la slide final muestra "—" en lugar del link al video. Tarda unos 15 segundos
+y no necesita el deck ni el cluster levantados.
+
 ## Trabajar en equipo
 
 Después de clonar el repositorio (o hacer `git pull`), seguí los pasos de arriba.

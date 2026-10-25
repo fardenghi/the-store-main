@@ -87,7 +87,8 @@ export const SETTLE = 4;
 // de fondo no se congele. Por eso dura mucho más que la escena.
 export const PLAYER_SECONDS = 60 * 60;
 
-export type DeckProps = { holds: Hold[] };
+// `stops` solo lo usa el exportador del PPT (scripts/export-pptx.mjs).
+export type DeckProps = { holds: Hold[]; stops?: number[] };
 
 // La escena envuelta con las paradas que le pasa el deck por inputProps.
 const withHolds = (Scene: React.FC): React.FC<DeckProps> => {

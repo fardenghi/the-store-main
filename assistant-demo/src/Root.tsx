@@ -7,6 +7,15 @@ import { Retrieval } from "./scenes/Retrieval";
 import { Context } from "./scenes/Context";
 import { Response } from "./scenes/Response";
 import { Followup } from "./scenes/Followup";
+import {
+  FPS,
+  HEIGHT,
+  SETTLE,
+  WIDTH,
+  deckComponents,
+  slides,
+} from "./deck/slides";
+import { Resources } from "./deck/Resources";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -75,6 +84,34 @@ export const RemotionRoot: React.FC = () => {
           fps={30}
           width={1920}
           height={1080}
+        />
+      </Folder>
+      {/* Slides del deck con sus paradas, para exportar el PPT. Duran lo
+          suficiente para renderizar la última parada ya asentada. */}
+      <Folder name="Deck">
+        {slides.map((slide) => (
+          <Composition
+            key={slide.id}
+            id={`Deck-${slide.id}`}
+            component={deckComponents.get(slide.id)!}
+            durationInFrames={slide.durationInFrames + (SETTLE + 1) * FPS}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+            defaultProps={{ holds: [], stops: slide.stops }}
+          />
+        ))}
+        <Composition
+          id="Deck-Recursos"
+          component={Resources}
+          durationInFrames={3 * FPS}
+          fps={FPS}
+          width={WIDTH}
+          height={HEIGHT}
+          defaultProps={{
+            repo: "github.com/fardenghi/the-store-main",
+            video: "",
+          }}
         />
       </Folder>
     </>
