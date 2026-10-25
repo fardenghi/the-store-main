@@ -15,7 +15,7 @@ export const Resources: React.FC<ResourcesProps> = ({ repo, video }) => {
     [
       "Código y how-to",
       repo,
-      "docs/how-to.md: cómo desplegarlo y probar cada caso",
+      "HOW-TO.md: cómo desplegarlo y probar cada caso",
     ],
     [
       "Presentación interactiva",

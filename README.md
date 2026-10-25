@@ -13,8 +13,6 @@ Our platform provides a complete shopping experience with:
 
 The Store is built with a microservices architecture that uses different technologies:
 
-![Architecture](/docs/images/architecture.png)
-
 | Service | Language | Description |
 |---------|----------|-------------|
 | [UI](./src/ui/) | Java (Spring Boot) | Modern web interface with themes and chat bot |
@@ -25,9 +23,7 @@ The Store is built with a microservices architecture that uses different technol
 | [Assistant](./src/assistant/) | Java (Spring Boot + Spring AI) | GenAI shopping assistant: the only service that talks to the LLM (NVIDIA) and to the embeddings model (Gemini) |
 | Qdrant | Official image (`qdrant/qdrant`) | Vector store for the assistant, with a persistent volume. Internal only |
 
-The updated architecture diagram and network table are in [docs/arquitectura.md](./docs/arquitectura.md).
-
-**How-to (Spanish):** [docs/how-to.md](./docs/how-to.md) explains how the GenAI shopping assistant is implemented, how to deploy it from scratch and how to check each use case.
+**How-to (Spanish):** [HOW-TO.md](./HOW-TO.md) explains how the GenAI shopping assistant is implemented, how to deploy it from scratch and how to check each use case.
 
 
 ## 🛠️ Development
@@ -135,9 +131,9 @@ of the store and does not require the cluster or API keys.
 
 ## 🛋️ Product Catalog
 
-The catalog (~80 home and furniture products) is generated from a curated list with `scripts/catalog-data/generate.py`. See [docs/how-to.md](./docs/how-to.md#12-catálogo-de-productos) for how to curate and regenerate it.
+The catalog (~80 home and furniture products) is generated from a curated list with `scripts/catalog-data/generate.py`. See [HOW-TO.md](./HOW-TO.md#12-catálogo-de-productos) for how to curate and regenerate it.
 
-Product data and images are derived from the [Amazon Berkeley Objects (ABO)](https://amazon-berkeley-objects.s3.amazonaws.com/index.html) dataset by Amazon.com, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Names, descriptions and prices were adapted, and images were resized ([attribution details](./docs/how-to.md#atribución)).
+Product data and images are derived from the [Amazon Berkeley Objects (ABO)](https://amazon-berkeley-objects.s3.amazonaws.com/index.html) dataset by Amazon.com, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Names, descriptions and prices were adapted, and images were resized ([attribution details](./HOW-TO.md#atribución)).
 
 ---
 

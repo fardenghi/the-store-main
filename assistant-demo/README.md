@@ -143,5 +143,5 @@ descargar automáticamente Chrome Headless Shell para renderizar los fotogramas.
 ## Imágenes
 
 Fotos tomadas de los assets del proyecto, derivados de Amazon Berkeley Objects
-(Amazon.com, CC BY 4.0). Ver [atribución del catálogo](../docs/how-to.md#atribución)
+(Amazon.com, CC BY 4.0). Ver [atribución del catálogo](../HOW-TO.md#atribución)
 y [detalles del dataset](https://amazon-berkeley-objects.s3.amazonaws.com/index.html).

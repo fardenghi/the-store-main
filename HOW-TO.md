@@ -4,14 +4,12 @@
 
 Este documento explica cómo está hecha la implementación y cómo reproducirla
 desde cero: qué se agregó a The Store, cómo desplegarlo en un cluster kind,
-cómo comprobar cada caso de uso de la pre-entrega y cómo operarlo.
+cómo comprobar cada caso de uso y cómo operarlo.
 
 | Para ver… | Ir a |
 |---|---|
-| La propuesta aprobada (el contrato) | [`preentrega.md`](./preentrega.md) |
-| El diagrama de red actualizado, los CIDR y los desvíos | [`arquitectura.md`](./arquitectura.md) |
-| La API, la configuración y los detalles del `assistant` | [`src/assistant/README.md`](../src/assistant/README.md) |
-| La integración del chat en la `ui` | [`src/ui/README.md`](../src/ui/README.md) |
+| La API, la configuración y los detalles del `assistant` | [`src/assistant/README.md`](src/assistant/README.md) |
+| La integración del chat en la `ui` | [`src/ui/README.md`](src/ui/README.md) |
 
 ## 1. Qué se implementó
 
@@ -37,9 +35,6 @@ Modelos (en la nube, autorizados por la cátedra en lugar de Ollama):
 | Reescritura de la consulta | NVIDIA | `meta/muse-glimmer-30b` |
 | Embeddings | Google Gemini API | `gemini-embedding-001`, 768 dimensiones |
 | Plan B verificado | NVIDIA | `nvidia/nemotron-3-super-120b-a12b` (principal) y `nvidia/nemotron-3.5-lightning-30b-a3b` (reescritura) |
-
-Los motivos de cada desvío respecto de la pre-entrega están en
-[`arquitectura.md`](./arquitectura.md#qué-cambió-respecto-de-la-pre-entrega).
 
 ## 2. Requisitos
 
@@ -141,14 +136,17 @@ kubectl exec -n the-store deploy/assistant -- \
 # 200
 ```
 
-El camino que sigue ese tráfico (SNAT del nodo, NAT de Docker y kube-dns) está
-en [`arquitectura.md`](./arquitectura.md#verificación-de-la-salida-a-internet).
+Camino de ese tráfico: el pod resuelve el nombre con kube-dns (`10.96.0.10`),
+que reenvía los nombres externos al resolver del nodo kind. El paquete sale
+por el gateway del pod hacia el nodo, que le aplica SNAT (`MASQUERADE`) con su
+IP en la red `kind` de Docker; Docker hace un segundo NAT hacia el host, y de
+ahí sale a internet por HTTPS (TCP 443). Los pods usan la `10.244.0.0/16` y los
+Services la `10.96.0.0/16`, los rangos por defecto de kind. Es el único
+tráfico que sale del cluster.
 
 ## 6. Recorrer los casos de uso
 
-Abrir http://localhost y usar el botón de chat. Las frases son las de la
-pre-entrega adaptadas al catálogo de muebles. Los criterios de aceptación no
-cambian.
+Abrir http://localhost y usar el botón de chat.
 
 | Caso de uso | Qué hacer | Qué se tiene que ver |
 |---|---|---|
@@ -243,7 +241,7 @@ muestra un aviso de cuota agotada.
 ## 8. Qué se agregó en Kubernetes
 
 Todo vive en el namespace `the-store`, en
-[`dist/kubernetes.yaml`](../dist/kubernetes.yaml). Los servicios originales no
+[`dist/kubernetes.yaml`](dist/kubernetes.yaml). Los servicios originales no
 se tocaron.
 
 | Recurso | Detalle |
@@ -275,7 +273,7 @@ Decisiones principales:
 | Cambiar o rotar las claves | Editar `.env` y `./local.sh update-secrets` (reaplica el Secret y reinicia el `assistant`) |
 | Recompilar después de cambiar código | `./local.sh reload-images` y `kubectl rollout restart deployment -n the-store` |
 | Aplicar cambios del manifiesto | `kubectl apply -f dist/kubernetes.yaml -n the-store` |
-| Pasar al plan B (Nemotron) | Copiar las variables comentadas del ConfigMap `assistant` (o las de la sección "Razonamiento y plan B" del [README del `assistant`](../src/assistant/README.md)), aplicar y `kubectl rollout restart deployment/assistant -n the-store` |
+| Pasar al plan B (Nemotron) | Copiar las variables comentadas del ConfigMap `assistant` (o las de la sección "Razonamiento y plan B" del [README del `assistant`](src/assistant/README.md)), aplicar y `kubectl rollout restart deployment/assistant -n the-store` |
 | Reindexar el catálogo | `kubectl rollout restart deployment/assistant -n the-store`. Para empezar de cero, borrar antes la colección (ver el README del `assistant`) |
 | Probar la tienda sin el asistente | `kubectl scale deployment/assistant -n the-store --replicas=0`. Los e2e siguen pasando |
 | Ver la colección de Qdrant | `kubectl port-forward -n the-store svc/qdrant 6333:6333` y `curl -s localhost:6333/collections/products` |
