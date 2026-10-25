@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 
 /**
- * Escenarios de la spec {@code product-indexing} contra un Qdrant real, con
+ * Escenarios de la indexación contra un Qdrant real, con
  * el catálogo y el proveedor de embeddings mockeados.
  */
 class ProductIndexerTest {

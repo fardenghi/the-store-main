@@ -36,7 +36,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import reactor.core.publisher.Flux;
 
-/** Endpoint {@code POST /assistant/chat} (D1): validación, sesión ocupada y formato SSE. */
+/** Endpoint {@code POST /assistant/chat}: validación, sesión ocupada y formato SSE. */
 @WebMvcTest(ChatController.class)
 class ChatControllerTest {
 

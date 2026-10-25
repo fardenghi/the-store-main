@@ -37,7 +37,7 @@ public class SessionIDUtil {
     String sessionId = UUID.randomUUID().toString();
 
     // Path=/ para que una primera visita a /catalog/{id} no deje la cookie
-    // limitada a /catalog y el chat y el carrito compartan la sesión (D7).
+    // limitada a /catalog y el chat y el carrito compartan la sesión.
     ResponseCookie newCookie = ResponseCookie.from(COOKIE_NAME, sessionId)
       .path("/")
       .httpOnly(true)

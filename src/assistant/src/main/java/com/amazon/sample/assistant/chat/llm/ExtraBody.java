@@ -11,8 +11,7 @@ import org.springframework.ai.openai.api.OpenAiApi.ChatCompletionRequest;
 
 /**
  * Aplica un {@code extra-body} configurado a las opciones de un request, con
- * cada parámetro por un solo camino ({@code select-assistant-models}, segundo
- * intento).
+ * cada parámetro por un solo camino.
  *
  * <p>Spring AI 1.1.8 manda el {@code extraBody} al nivel raíz del JSON, pero en
  * los requests con tools vuelve a pasar el request por

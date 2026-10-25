@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Respuestas que terminan anunciando una acción sin hacerla (corrección posterior). */
+/** Respuestas que terminan anunciando una acción sin hacerla. */
 class ActionAnnouncementTest {
 
   /** Finales reales de las corridas de {@code MultiTurnCartSmokeIT} y variantes. */

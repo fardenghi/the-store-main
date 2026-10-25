@@ -10,12 +10,12 @@ import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.core.io.Resource;
 
 /**
- * System prompt del modelo principal (D8): la persona A.G.E.N.T. y las reglas
+ * System prompt del modelo principal: la persona A.G.E.N.T. y las reglas
  * de {@code prompts/system.st}, con el contexto de productos del turno. Vive en
  * el {@code assistant} y no es configurable por ConfigMap: cambiar la persona
  * es un cambio de código.
  *
- * <p>Con {@code add-assistant-tools} (D10) incluye la sección de tools con la
+ * <p>Incluye la sección de tools con la
  * lista de tags del catálogo, para que el modelo traduzca una categoría a tags
  * existentes.
  */

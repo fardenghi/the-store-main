@@ -36,7 +36,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.ai.google.genai.GoogleGenAiEmbeddingConnectionDetails;
 
 /**
- * Criterios de calidad de la spec {@code semantic-product-search} con el
+ * Criterios de calidad de la búsqueda semántica con el
  * catálogo real ({@code src/catalog/repository}), Gemini real y un Qdrant en
  * Testcontainers. Gasta 5 requests: 1 para indexar los 80 productos y 4
  * consultas (los similares no llaman a Gemini). Solo corre con

@@ -24,7 +24,7 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
-/** {@code searchProducts}: los dos caminos de D4, el precio vivo y la degradación. */
+/** {@code searchProducts}: los dos caminos de búsqueda, el precio vivo y la degradación. */
 class SearchProductsToolTest {
 
   private static final CatalogProduct DESK_LAMP = product("lamp1", "Brass Desk Lamp", 150,

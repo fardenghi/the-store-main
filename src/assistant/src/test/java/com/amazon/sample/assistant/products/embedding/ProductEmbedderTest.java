@@ -46,7 +46,7 @@ class ProductEmbedderTest {
     assertThat(configs.getAllValues()).allSatisfy(config -> {
       assertThat(config.taskType()).contains("RETRIEVAL_DOCUMENT");
       assertThat(config.outputDimensionality()).contains(768);
-      // Sin los reintentos propios del SDK: los decide la sincronización (D6).
+      // Sin los reintentos propios del SDK: los decide la sincronización.
       assertThat(config.httpOptions().orElseThrow().retryOptions().orElseThrow().attempts())
           .contains(1);
     });

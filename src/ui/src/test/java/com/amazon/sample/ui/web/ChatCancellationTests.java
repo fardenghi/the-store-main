@@ -31,7 +31,7 @@ import reactor.test.StepVerifier;
 
 /**
  * Si el navegador corta {@code POST /chat/submit}, la ui cierra la conexión con
- * el assistant (D3). El assistant falso es un socket crudo, en lugar de
+ * el assistant. El assistant falso es un socket crudo, en lugar de
  * MockWebServer, porque hace falta observar el EOF de la conexión: MockWebServer
  * no expone cuándo el cliente la cierra mientras escribe un cuerpo lento.
  */

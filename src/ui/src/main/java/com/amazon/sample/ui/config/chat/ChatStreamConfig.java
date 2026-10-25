@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/** Elige la implementación de {@link ChatStreamService} según el provider (D1). */
+/** Elige la implementación de {@link ChatStreamService} según el provider. */
 @Configuration
 @Slf4j
 @ConditionalOnProperty(

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Búsqueda semántica y similares por HTTP (D8). Solo se exponen dentro del
+ * Búsqueda semántica y similares por HTTP. Solo se exponen dentro del
  * cluster: el ingress enruta únicamente hacia la {@code ui}.
  */
 @RestController

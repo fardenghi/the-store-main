@@ -9,7 +9,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Limitador de solicitudes hacia el proveedor de chat, compartido por todas las
- * sesiones (D8 de {@code add-assistant-tools}): ventana deslizante de 60 s con
+ * sesiones: ventana deslizante de 60 s con
  * a lo sumo {@code requestsPerMinute} reservas, y una pausa global que fija un
  * 429.
  *
@@ -44,7 +44,7 @@ public class ChatRateLimiter {
 
   /**
    * @param requestsPerMinute reservas permitidas en cualquier ventana de 60 s
-   * @param defaultRetryAfter pausa ante un 429 sin {@code Retry-After} (D9)
+   * @param defaultRetryAfter pausa ante un 429 sin {@code Retry-After}
    * @param clock reloj; en los tests, uno falso
    */
   public ChatRateLimiter(int requestsPerMinute, Duration defaultRetryAfter, Clock clock) {
@@ -106,7 +106,7 @@ public class ChatRateLimiter {
 
   /**
    * Pausa todas las reservas por el {@code Retry-After} de un 429, o por
-   * {@code defaultRetryAfter} si no vino (D9).
+   * {@code defaultRetryAfter} si no vino.
    *
    * @return la pausa aplicada
    */

@@ -6,7 +6,7 @@ import com.amazon.sample.assistant.chat.session.ShownProduct;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** Sección de contexto del system prompt (D5). */
+/** Sección de contexto del system prompt. */
 class ContextFormatterTest {
 
   private static final ShownProduct ARMCHAIR = new ShownProduct("a1",

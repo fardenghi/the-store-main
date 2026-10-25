@@ -21,7 +21,7 @@ import reactor.core.Exceptions;
 
 /**
  * Traduce los errores de Spring AI y de los clientes HTTP a
- * {@link ChatProviderException} (D10):
+ * {@link ChatProviderException}:
  * <ul>
  *   <li>streaming (modelo principal): {@link WebClientResponseException}, con
  *       el status y el header {@code Retry-After};</li>
@@ -93,7 +93,7 @@ public final class ChatProviderErrors {
   /**
    * {@code Retry-After} como espera: en segundos ({@code "3"}, también con
    * decimales) o como fecha HTTP ({@code "Wed, 21 Oct 2026 07:28:00 GMT"}),
-   * relativa a ahora (D9 de {@code add-assistant-tools}). Ausente o inválido
+   * relativa a ahora. Ausente o inválido
    * devuelve {@code null}, y el limitador usa {@code default-retry-after}.
    */
   static Duration retryAfter(String header) {

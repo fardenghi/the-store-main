@@ -11,7 +11,7 @@ import org.springframework.validation.annotation.Validated;
  * @param syncOnStartup si se sincroniza al arrancar (los tests lo apagan)
  * @param pageSize productos por página al leer {@code GET /catalog/products}
  * @param batchSize textos por request a Gemini (el máximo de la API es 100)
- * @param maxProviderRetries reintentos por lote ante 429 o 5xx de Gemini (D6)
+ * @param maxProviderRetries reintentos por lote ante 429 o 5xx de Gemini
  */
 @Validated
 @ConfigurationProperties("retail.assistant.indexing")

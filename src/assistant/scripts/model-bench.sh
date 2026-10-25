@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Benchmark de modelos de chat (select-assistant-models, D6).
+# Benchmark de modelos de chat.
 #
 # Corre un smoke del assistant N veces, de forma secuencial y con una pausa
 # entre corridas, eligiendo los modelos y sus extra-body con -D (sin tocar los
 # defaults versionados). Guarda cada corrida en target/model-bench/ y lleva un
 # ledger acumulado de requests a NVIDIA y a Gemini: no arranca una corrida si
-# lo consumido más la estimación de la corrida supera el tope (D5).
+# lo consumido más la estimación de la corrida supera el tope.
 #
 #   scripts/model-bench.sh --smoke MultiTurnCartSmokeIT --runs 5 \
 #     --main meta/muse-glimmer-30b --main-on '<json>' --main-off '<json>' \
@@ -82,7 +82,7 @@ CLASS="${SMOKE%%#*}"
 METHOD=""
 [ "$CLASS" != "$SMOKE" ] && METHOD="${SMOKE#*#}"
 
-# Requests estimadas por corrida (D5): NVIDIA y Gemini.
+# Requests estimadas por corrida: NVIDIA y Gemini.
 estimate() {
   case "$SMOKE" in
     ModelSpikeSmokeIT) echo "19 0" ;;
@@ -271,12 +271,12 @@ for run in $(seq 1 "$RUNS"); do
   echo "model-bench: exit $status, NVIDIA $nvidia ($source), Gemini $gemini;" \
     "ledger NVIDIA $TOTAL_NVIDIA/$CAP_NVIDIA, Gemini $TOTAL_GEMINI/$CAP_GEMINI"
 
-  # La colección se reutiliza: si la sincronización embebió algo, se corta (D5).
+  # La colección se reutiliza: si la sincronización embebió algo, se corta.
   if grep -Eq "SyncReport\[[^]]*embedded=[1-9]" "$log"; then
     echo "model-bench: la sincronización embebió productos (reindexación): se corta la serie" >&2
     exit 4
   fi
   if grep -q "llm-quota-exceeded" "$log"; then
-    echo "model-bench: la corrida recibió un 429 (llm-quota-exceeded): queda invalidada (D2)" >&2
+    echo "model-bench: la corrida recibió un 429 (llm-quota-exceeded): queda invalidada" >&2
   fi
 done

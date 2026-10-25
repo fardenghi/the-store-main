@@ -7,8 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Salvaguarda del servidor para la spec "Confirmación fiel de las acciones"
- * (corrección posterior de {@code add-assistant-tools}): el texto del modelo
+ * Salvaguarda del servidor para que las acciones se confirmen con fidelidad:
+ * el texto del modelo
  * pasa por acá oración por oración, y una oración que afirma que algo se agregó
  * al carrito se descarta si en el turno no hubo un {@code addToCart} correcto.
  *

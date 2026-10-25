@@ -16,7 +16,7 @@ import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.test.context.ContextConfiguration;
 
 /**
- * Plan B por ConfigMap (D11): {@code SPRING_APPLICATION_JSON} reemplaza por
+ * Plan B por ConfigMap: {@code SPRING_APPLICATION_JSON} reemplaza por
  * completo los {@code extra-body} (no se combinan con los defaults de
  * Nemotron), y las variables escalares del ConfigMap cambian el resto.
  */

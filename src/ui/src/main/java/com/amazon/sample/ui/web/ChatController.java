@@ -90,7 +90,7 @@ public class ChatController {
 
   /**
    * Intercala un comentario SSE cada {@code interval} para que ningún proxy
-   * corte la conexión mientras el assistant razona (D5). El intervalo termina
+   * corte la conexión mientras el assistant razona. El intervalo termina
    * junto con el stream principal.
    */
   static Flux<ServerSentEvent<String>> withKeepalive(

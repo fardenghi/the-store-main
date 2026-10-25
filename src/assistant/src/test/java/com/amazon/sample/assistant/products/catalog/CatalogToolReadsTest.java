@@ -24,7 +24,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 /**
- * Lecturas de las tools al catálogo (D5 de {@code add-assistant-tools}): un
+ * Lecturas de las tools al catálogo: un
  * solo reintento ante 5xx, timeout o error de red, y 404 como vacío.
  */
 class CatalogToolReadsTest {

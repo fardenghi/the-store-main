@@ -11,10 +11,10 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Sinks;
 
 /**
- * Un turno en curso (D2). Todos los eventos SSE del turno salen por su
+ * Un turno en curso. Todos los eventos SSE del turno salen por su
  * {@link #sink()}, en orden: el evento {@code products}, los fragmentos del
- * modelo, {@code done} o {@code error}. {@code add-assistant-tools} emite por
- * el mismo canal sus propios eventos (por ejemplo, el del carrito) con
+ * modelo, {@code done} o {@code error}. Las tools emiten por el mismo canal
+ * sus propios eventos (por ejemplo, el del carrito) con
  * {@link #emit}, y suma sus solicitudes a NVIDIA con
  * {@link #countProviderRequest()}.
  */
@@ -98,7 +98,7 @@ public class ChatTurn {
 
   /**
    * Comprueba si el cliente de este turno sigue conectado, para cuando otra
-   * pestaña de la misma sesión quiere abrir un turno (D2).
+   * pestaña de la misma sesión quiere abrir un turno.
    *
    * <p>Mientras el modelo razona no se escribe nada, y Tomcat solo detecta que
    * el cliente cerró la conexión al escribir en ella. Por eso se mandan dos

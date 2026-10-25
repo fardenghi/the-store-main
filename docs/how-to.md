@@ -12,7 +12,6 @@ cómo comprobar cada caso de uso de la pre-entrega y cómo operarlo.
 | El diagrama de red actualizado, los CIDR y los desvíos | [`arquitectura.md`](./arquitectura.md) |
 | La API, la configuración y los detalles del `assistant` | [`src/assistant/README.md`](../src/assistant/README.md) |
 | La integración del chat en la `ui` | [`src/ui/README.md`](../src/ui/README.md) |
-| Cada decisión de diseño, con sus alternativas | `openspec/changes/archive/*/design.md` |
 
 ## 1. Qué se implementó
 
@@ -148,8 +147,7 @@ en [`arquitectura.md`](./arquitectura.md#verificación-de-la-salida-a-internet).
 ## 6. Recorrer los casos de uso
 
 Abrir http://localhost y usar el botón de chat. Las frases son las de la
-pre-entrega adaptadas al catálogo de muebles (D9 de
-`replace-catalog-with-home-furniture`). Los criterios de aceptación no
+pre-entrega adaptadas al catálogo de muebles. Los criterios de aceptación no
 cambian.
 
 | Caso de uso | Qué hacer | Qué se tiene que ver |
@@ -258,7 +256,7 @@ se tocaron.
 | `Service` `qdrant` | ClusterIP con gRPC 6334 (lo usa el `assistant`) y REST 6333 (probes y debug) |
 | `ConfigMap` `ui` | Tres variables nuevas: `RETAIL_UI_ENDPOINTS_ASSISTANT`, `RETAIL_UI_CHAT_ENABLED` y `RETAIL_UI_CHAT_PROVIDER` |
 
-Decisiones principales (detalladas en el `design.md` de `add-assistant-service`):
+Decisiones principales:
 
 - **El `assistant` no se expone en el ingress.** El navegador solo habla con
   la `ui`.

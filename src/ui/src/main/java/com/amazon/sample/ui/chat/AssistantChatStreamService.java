@@ -20,7 +20,7 @@ import reactor.core.scheduler.Schedulers;
 /**
  * Provider {@code assistant}: reenvía el mensaje a {@code POST /assistant/chat}
  * con el {@code X-Session-ID} de la cookie y retransmite los eventos SSE sin
- * modificar su {@code data} (D3). Cualquier falla termina en un único evento
+ * modificar su {@code data}. Cualquier falla termina en un único evento
  * {@code error}, nunca en un error HTTP hacia el navegador.
  */
 @Slf4j

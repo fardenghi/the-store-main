@@ -14,7 +14,7 @@ import org.springframework.ai.google.genai.GoogleGenAiEmbeddingConnectionDetails
  *
  * <p>No se usa el {@code EmbeddingModel} porque en Spring AI 1.1.8
  * {@code GoogleGenAiTextEmbeddingModel.call()} no envía el {@code taskType} a
- * Gemini (ver el desvío en el design de add-product-indexing).
+ * Gemini.
  */
 public class GoogleGenAiEmbeddingGateway implements EmbeddingGateway {
 

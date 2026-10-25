@@ -13,8 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 /**
- * El gauge {@code assistant.ratelimit.window} está en {@code /actuator/metrics}
- * (D12). Usa un límite propio para tener su propio contexto: con las mismas
+ * El gauge {@code assistant.ratelimit.window} está en {@code /actuator/metrics}.
+ * Usa un límite propio para tener su propio contexto: con las mismas
  * propiedades que {@code StartupWithoutKeysTest} reutilizaría el de ese test, que
  * necesita capturar el log del arranque.
  */

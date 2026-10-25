@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * Una vuelta del modelo con tool calls, tal como queda en la memoria de la
- * sesión (corrección posterior de D7 de {@code add-assistant-tools}): el texto
+ * sesión: el texto
  * que el usuario vio antes de los tool calls, los tool calls con sus ids y
  * argumentos, y un resultado compacto de cada tool.
  *

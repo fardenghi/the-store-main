@@ -52,7 +52,7 @@ describe("testing assistant integration", () => {
       });
   });
 
-  // Stream simulado: no depende del modelo ni de las claves (D7).
+  // Stream simulado: no depende del modelo ni de las claves.
   it("should show a card for each product the answer names", () => {
     const chat = new Chat();
     const armchair = {

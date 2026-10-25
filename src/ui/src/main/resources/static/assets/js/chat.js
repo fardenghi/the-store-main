@@ -192,7 +192,7 @@ const ChatUI = {
   },
 
   renderMarkdown(element, text) {
-    // Sin DOMPurify no se asigna HTML: se muestra el texto plano (D4). Las
+    // Sin DOMPurify no se asigna HTML: se muestra el texto plano. Las
     // imágenes también se descartan: el texto lo genera un LLM y una URL de
     // imagen haría que el navegador cargue recursos de terceros.
     if (window.DOMPurify) {
@@ -214,7 +214,7 @@ const ChatUI = {
 
   // Agrega debajo de cada bloque de texto las tarjetas de los productos
   // conocidos que se nombran por primera vez en él. Trabaja sobre el DOM ya
-  // sanitizado, así que el markdown no está en el texto (D3).
+  // sanitizado, así que el markdown no está en el texto.
   attachProductCards(textDiv, turn) {
     if (this.knownProducts.size === 0) return;
 
@@ -311,7 +311,7 @@ const ChatUI = {
   },
 
   // Cada turno reutiliza el nodo de cada tarjeta entre re-renders: mover un
-  // img ya cargado no lo vuelve a pedir ni lo hace parpadear (D4).
+  // img ya cargado no lo vuelve a pedir ni lo hace parpadear.
   productCard(turn, product) {
     let card = turn.cards.get(product.id);
     if (!card) {
@@ -325,7 +325,7 @@ const ChatUI = {
   },
 
   // Solo createElement y textContent: ningún dato del texto del modelo llega
-  // a un src o un href, y las rutas salen del id ya validado (D5).
+  // a un src o un href, y las rutas salen del id ya validado.
   createProductCard(product) {
     const card = document.createElement("a");
     card.className = "chat-product-card";
@@ -581,7 +581,7 @@ const ChatUI = {
     });
   },
 };
-// Refleja en la página los cambios de carrito hechos desde el chat (D6).
+// Refleja en la página los cambios de carrito hechos desde el chat.
 const CartUI = {
   refreshTimer: null,
   refreshDelayMs: 300,

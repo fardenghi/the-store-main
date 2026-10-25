@@ -5,8 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Resultado de error de una tool, dirigido al modelo (D2 de
- * {@code add-assistant-tools}): {@code {"error": "<tipo>", "message": "...", ...}}.
+ * Resultado de error de una tool, dirigido al modelo: {@code {"error": "<tipo>", "message": "...", ...}}.
  * Se devuelve como resultado y no como excepción, para que el modelo lo
  * explique y el turno siga.
  */

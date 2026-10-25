@@ -12,7 +12,7 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
-/** Lock de turno y commit explícito (D2, D6). */
+/** Lock de turno y commit explícito. */
 class SessionStateTest {
 
   @RepeatedTest(20)

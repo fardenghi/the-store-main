@@ -17,8 +17,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * {@code retail.assistant.rewrite.max-tokens} ({@code select-assistant-models},
- * task 1.6): con un modelo que no puede apagar el razonamiento, los tokens de
+ * {@code retail.assistant.rewrite.max-tokens}: con un modelo que no puede apagar el razonamiento, los tokens de
  * la reescritura lo incluyen, así que el límite se configura sin reconstruir la
  * imagen y llega al request de NVIDIA.
  */

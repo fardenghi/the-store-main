@@ -2,11 +2,11 @@ package com.amazon.sample.assistant.chat.rewrite;
 
 import java.util.Locale;
 
-/** Intención del mensaje según la reescritura (D4). */
+/** Intención del mensaje según la reescritura. */
 public enum Intent {
   /** Pide productos: se busca en el catálogo. */
   SEARCH,
-  /** Pide comparar productos: se busca, se suman los del turno anterior y se razona (D7). */
+  /** Pide comparar productos: se busca, se suman los del turno anterior y se razona. */
   COMPARE,
   /** Saludos, agradecimientos o charla: no se busca. */
   OTHER;

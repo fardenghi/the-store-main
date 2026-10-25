@@ -14,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Busca los productos del turno con la consulta reescrita y sus filtros (D5).
+ * Busca los productos del turno con la consulta reescrita y sus filtros.
  *
  * <p>La búsqueda semántica no sabe excluir tags: con {@code excludeTags} se
  * piden {@code min(3·k, 20)} resultados y se filtran acá hasta quedarse con
@@ -55,13 +55,13 @@ public class ContextRetriever {
     } catch (IndexUnavailableException | VectorStoreException e) {
       log.warn("Catálogo no disponible en el turno: índice ({})", e.getMessage());
     }
-    // Sin catálogo no se nombran productos, tampoco los del turno anterior (D5).
+    // Sin catálogo no se nombran productos, tampoco los del turno anterior.
     return new Retrieval(true, true, List.of(), List.of(), false, elapsed(start));
   }
 
   /**
    * Busca con la consulta y los filtros, y descarta los productos con tags
-   * excluidos. La usa también el log comparativo con la consulta cruda (D9).
+   * excluidos. La usa también el log comparativo con la consulta cruda.
    */
   public List<ShownProduct> search(String query, Integer minPrice, Integer maxPrice,
       List<String> excludeTags) {

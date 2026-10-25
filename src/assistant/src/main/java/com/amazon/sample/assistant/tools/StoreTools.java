@@ -27,14 +27,14 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.http.codec.ServerSentEvent;
 
 /**
- * Las tres tools del modelo principal (D2 a D7 de {@code add-assistant-tools}):
+ * Las tres tools del modelo principal:
  * búsqueda con filtros estructurados, detalle con precio vivo y agregar al
  * carrito de la sesión.
  *
- * <p>Cada tool valida sus argumentos antes de llamar a cualquier servicio (D3),
- * devuelve los errores como resultado para el modelo (D2), emite el evento
+ * <p>Cada tool valida sus argumentos antes de llamar a cualquier servicio,
+ * devuelve los errores como resultado para el modelo, emite el evento
  * {@code tool} (y {@code cart-updated}) por el canal del turno y deja una línea
- * en el logger {@code assistant.tool} (D7, D12). El contexto del turno (la
+ * en el logger {@code assistant.tool}. El contexto del turno (la
  * sesión, que es el {@code customerId}) llega por el {@link ToolContext} y no
  * es un parámetro que el modelo vea o pueda elegir.
  */
@@ -44,7 +44,7 @@ public class StoreTools {
   public static final String GET_PRODUCT_DETAILS = "getProductDetails";
   public static final String ADD_TO_CART = "addToCart";
 
-  /** Tamaño de página al recorrer {@code GET /catalog/products} y tope de páginas (D4). */
+  /** Tamaño de página al recorrer {@code GET /catalog/products} y tope de páginas. */
   static final int CATALOG_PAGE_SIZE = 50;
   static final int CATALOG_MAX_PAGES = 10;
 
@@ -190,7 +190,7 @@ public class StoreTools {
     });
   }
 
-  /** Búsqueda con texto: índice semántico, hidratada con el catálogo (D4). */
+  /** Búsqueda con texto: índice semántico, hidratada con el catálogo. */
   private Outcome searchSemantic(Criteria criteria, Calls calls) {
     List<ProductResult> found;
     try {
@@ -225,7 +225,7 @@ public class StoreTools {
     return searchResult(filtered, "semantic", null);
   }
 
-  /** Búsqueda sin texto: {@code GET /catalog/products} con tags y orden, y precio acá (D4). */
+  /** Búsqueda sin texto: {@code GET /catalog/products} con tags y orden, y precio acá. */
   private Outcome searchCatalog(Criteria criteria, Calls calls, String degraded) {
     String catalogOrder = "relevance".equals(criteria.order()) ? null : criteria.order();
     Map<String, CatalogProduct> products = new LinkedHashMap<>();

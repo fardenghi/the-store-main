@@ -31,7 +31,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.HttpClientErrorException;
 
-/** Prompt, salida estructurada, validación y fallback de la reescritura (D4). */
+/** Prompt, salida estructurada, validación y fallback de la reescritura. */
 class QueryRewriterTest {
 
   private static final String RAW = "hey, got anything comfy to sink into?";
@@ -255,7 +255,7 @@ class QueryRewriterTest {
   void promptClassifiesCartRequestsAndPriceQuestionsAsOther() {
     String prompt = rewriter(Duration.ofSeconds(5)).renderPrompt(session, List.of("seating"));
 
-    // add-assistant-tools (D10): sin búsqueda ni embedding para estos pedidos.
+    // Sin búsqueda ni embedding para estos pedidos.
     assertThat(prompt).contains("Requests to add a product to the cart")
         .contains("A question about the current price or details of a product is \"other\" only "
             + "if that product is\n  in the list of products shown in the previous turn")

@@ -5,8 +5,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * Cliente del servicio {@code carts} para la tool {@code addToCart} (D5 de
- * {@code add-assistant-tools}).
+ * Cliente del servicio {@code carts} para la tool {@code addToCart}.
  *
  * <p>El {@code POST} que agrega un ítem <b>no se reintenta</b>: no es
  * idempotente, y un reintento después de un timeout podría duplicar la línea.

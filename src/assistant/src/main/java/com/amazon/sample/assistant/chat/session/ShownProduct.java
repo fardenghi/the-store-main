@@ -3,7 +3,7 @@ package com.amazon.sample.assistant.chat.session;
 import com.amazon.sample.assistant.products.search.ProductResult;
 import java.util.List;
 
-/** Snapshot de un producto que el asistente mostró en un turno (D6). */
+/** Snapshot de un producto que el asistente mostró en un turno. */
 public record ShownProduct(
     String id,
     String name,

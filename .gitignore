@@ -31,9 +31,6 @@ devenv.local.nix
 
 .pre-commit-config.yaml
 
-.agents
-.claude
-
 # Secrets locales (NVIDIA_API_KEY, GOOGLE_API_KEY)
 .env
 

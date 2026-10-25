@@ -2,8 +2,7 @@
 
 > Este documento **reemplaza la sección 4 ("Diagrama de arquitectura") de
 > [`preentrega.md`](./preentrega.md)**, que no se edita porque es el contrato
-> aprobado por la cátedra. El desvío se justifica en el `design.md` del change
-> `add-assistant-service` (decisión D8).
+> aprobado por la cátedra. Los desvíos se justifican abajo.
 
 ## Qué cambió respecto de la pre-entrega
 
@@ -14,8 +13,9 @@
   `gemini-embedding-001`, 768 dimensiones).
 - **Modelo de embeddings:** `gemini-embedding-001` (768 dimensiones, coseno)
   en lugar de `nomic-embed-text` en Ollama. Se mantienen Qdrant, las 768
-  dimensiones y la distancia coseno de la pre-entrega. El desvío se justifica
-  en la decisión D10 del `design.md` del change `add-product-indexing`.
+  dimensiones y la distancia coseno de la pre-entrega. El modelo de embeddings
+  tiene que ser del mismo proveedor externo que se autorizó en lugar de Ollama,
+  y `gemini-embedding-001` permite fijar las 768 dimensiones.
 - **Aparece tráfico saliente**: solo desde el pod `assistant`, por HTTPS (TCP
   443), hacia esos dos destinos. El resto de los servicios, Qdrant incluido
   (con la telemetría desactivada), sigue sin tráfico hacia afuera del cluster.
@@ -72,7 +72,7 @@ flowchart TB
 | Almacenamiento | StorageClass `standard` (`rancher.io/local-path`, `WaitForFirstConsumer`) para el PVC de Qdrant (vectores, 1 GiB, `volumeClaimTemplates` del StatefulSet). Ya no hay PVC de Ollama |
 | Sistemas operativos | Host: Ubuntu 24.04.5 LTS (kernel 6.8) · Nodo `kind`: Debian 13 (containerd 2.3.4) · Contenedores de la app: Amazon Linux 2023 (Qdrant usa su imagen oficial `unprivileged`) |
 | Protocolos | HTTP/1.1 REST entre servicios (`ClusterIP`, puerto 80 → 8080 del contenedor) · SSE (`text/event-stream`) navegador ↔ `ui` y `ui` ↔ `assistant` · gRPC 6334 `assistant` → Qdrant (REST 6333 para probes y debug) · HTTPS 443 `assistant` → proveedores en la nube |
-| Tráfico hacia afuera del cluster | Solo desde el pod `assistant`, HTTPS (TCP 443) hacia `integrate.api.nvidia.com` (chat) y `generativelanguage.googleapis.com` (embeddings con `gemini-embedding-001`, que reemplaza a `nomic-embed-text` de la pre-entrega: ver la decisión D10 del `design.md` de `add-product-indexing`). Consumo de cuota de Gemini (100 RPM y 1.000 requests por día, independiente de la de NVIDIA): 80 requests en el primer arranque (el catálogo se embebe en lotes de hasta 100 productos, pero Gemini cuenta cada texto del lote como una request), 0 en los reinicios sin cambios en el catálogo, 1 por búsqueda no cacheada (las consultas repetidas salen de un caché en memoria) y 0 por productos similares (se calculan en Qdrant con el vector ya guardado). Camino: pod (`10.244.0.0/24`) → SNAT/masquerade del nodo kind (`172.19.0.2`) → bridge Docker `kind` → NAT del host → internet. DNS: pod → kube-dns (`10.96.0.10`) → `forward` al resolver del nodo → DNS embebido de Docker. Ningún otro servicio sale a internet en operación (Qdrant corre con `QDRANT__TELEMETRY_DISABLED=true`). Credenciales en el Secret `assistant-api-keys`, nunca versionado |
+| Tráfico hacia afuera del cluster | Solo desde el pod `assistant`, HTTPS (TCP 443) hacia `integrate.api.nvidia.com` (chat) y `generativelanguage.googleapis.com` (embeddings con `gemini-embedding-001`, que reemplaza a `nomic-embed-text` de la pre-entrega). Consumo de cuota de Gemini (100 RPM y 1.000 requests por día, independiente de la de NVIDIA): 80 requests en el primer arranque (el catálogo se embebe en lotes de hasta 100 productos, pero Gemini cuenta cada texto del lote como una request), 0 en los reinicios sin cambios en el catálogo, 1 por búsqueda no cacheada (las consultas repetidas salen de un caché en memoria) y 0 por productos similares (se calculan en Qdrant con el vector ya guardado). Camino: pod (`10.244.0.0/24`) → SNAT/masquerade del nodo kind (`172.19.0.2`) → bridge Docker `kind` → NAT del host → internet. DNS: pod → kube-dns (`10.96.0.10`) → `forward` al resolver del nodo → DNS embebido de Docker. Ningún otro servicio sale a internet en operación (Qdrant corre con `QDRANT__TELEMETRY_DISABLED=true`). Credenciales en el Secret `assistant-api-keys`, nunca versionado |
 
 ## Verificación de la salida a internet
 
@@ -109,17 +109,15 @@ Camino observado en el cluster:
 4. **NAT de Docker:** el bridge `kind` (gateway `172.x.0.1`) hace un segundo
    NAT hacia la interfaz del host, y de ahí a internet.
 
-## Chat del asistente (`add-assistant-chat`)
+## Chat del asistente
 
 ### Desvíos respecto de la pre-entrega
 
-Justificados en la decisión D13 del `design.md` del change `add-assistant-chat`.
-
 | Pre-entrega | Implementación | Justificación |
 |---|---|---|
-| `llama3.2:3b` en Ollama, dentro del cluster (sección 4) | `meta/muse-glimmer-30b` para reescribir y para responder, vía la API de NVIDIA (`select-assistant-models`). Plan B verificado: `nvidia/nemotron-3.5-lightning-30b-a3b` y `nvidia/nemotron-3-super-120b-a12b` | Autorizado por la cátedra (D8 de `add-assistant-service`). Un 3B solo con CPU no da latencias de demo ni comparaciones razonadas confiables |
-| "Modelo compacto con RAG, modelo intermedio con razonamiento" (sección 3) | Un mismo modelo, `meta/muse-glimmer-30b`, en los dos roles: reescribe la consulta con el esfuerzo de razonamiento mínimo (`low`) y salida corta (el papel del compacto), y genera la respuesta con RAG y tools con `low` en los turnos simples y `high` en las comparaciones (el papel del intermedio) | Decisión del grupo con la evidencia de `select-assistant-models` (D8): en `MultiTurnCartSmokeIT` agregó el producto pedido en 14 de 15 sesiones (Nemotron: 3 de 6), sin confirmaciones falsas ni productos equivocados. Los dos roles conservan prompts y configuración separados, así que volver a dos modelos (el plan B, los Nemotron) es cambiar el ConfigMap. Costo: el texto visible tarda más (p50 6,8 s del modelo en los turnos simples) porque el modelo no permite apagar el razonamiento |
-| Frase de la demo "*not a vehicle*" | "*not a lamp*" | Ya documentado en D9 de `replace-catalog-with-home-furniture`. El criterio no cambia |
+| `llama3.2:3b` en Ollama, dentro del cluster (sección 4) | `meta/muse-glimmer-30b` para reescribir y para responder, vía la API de NVIDIA. Plan B verificado: `nvidia/nemotron-3.5-lightning-30b-a3b` y `nvidia/nemotron-3-super-120b-a12b` | Autorizado por la cátedra. Un 3B solo con CPU no da latencias de demo ni comparaciones razonadas confiables |
+| "Modelo compacto con RAG, modelo intermedio con razonamiento" (sección 3) | Un mismo modelo, `meta/muse-glimmer-30b`, en los dos roles: reescribe la consulta con el esfuerzo de razonamiento mínimo (`low`) y salida corta (el papel del compacto), y genera la respuesta con RAG y tools con `low` en los turnos simples y `high` en las comparaciones (el papel del intermedio) | Decisión del grupo con la evidencia de la evaluación de modelos: en `MultiTurnCartSmokeIT` agregó el producto pedido en 14 de 15 sesiones (Nemotron: 3 de 6), sin confirmaciones falsas ni productos equivocados. Los dos roles conservan prompts y configuración separados, así que volver a dos modelos (el plan B, los Nemotron) es cambiar el ConfigMap. Costo: el texto visible tarda más (p50 6,8 s del modelo en los turnos simples) porque el modelo no permite apagar el razonamiento |
+| Frase de la demo "*not a vehicle*" | "*not a lamp*" | El catálogo pasó a ser de muebles y hogar, así que las frases de ejemplo se adaptaron. El criterio no cambia |
 
 Agregados que no contradicen la pre-entrega: el evento `products` del SSE y
 los filtros de precio y de exclusión que produce la reescritura. La memoria
@@ -151,16 +149,14 @@ En tres corridas la consulta reescrita acertó 45, 43 y 47 contra 42 de la
 cruda. La ganancia está en las referencias al turno anterior ("cheaper", "not a
 lamp"), de las que la consulta cruda no puede sacar el precio ni la exclusión.
 
-## Tools del asistente (`add-assistant-tools`)
+## Tools del asistente
 
 ### Desvíos respecto de la pre-entrega
-
-Justificados en la decisión D13 del `design.md` del change `add-assistant-tools`.
 
 | Pre-entrega | Implementación | Justificación |
 |---|---|---|
 | "Búsqueda con filtros estructurados que combina tags y ordenamiento de `GET /catalog/products` junto con filtros de rango de precio sobre el payload en `qdrant`" (sección 2) | `searchProducts` tiene dos caminos según haya texto. Con texto: tags y rango de precio sobre el payload de Qdrant, y orden por el precio vivo en el `assistant`. Sin texto: tags y orden de `GET /catalog/products`, y rango de precio filtrado en el `assistant` | La API del catálogo no busca por texto ni filtra por precio, y la búsqueda vectorial de Qdrant no ordena por precio. Se usan los tres mecanismos de la pre-entrega, cada uno donde puede resolver el pedido. El caso de uso "Filtros estructurados" da el mismo resultado: categoría → tags reales, presupuesto → rango de precio, orden → orden por precio |
-| Modelo local en Ollama para el function calling | `nvidia/nemotron-3-super-120b-a12b` vía NVIDIA (desde `select-assistant-models`, `meta/muse-glimmer-30b`, con Nemotron como plan B) | Ya documentado en D8 de `add-assistant-service` y D13 de `add-assistant-chat`. Este change suma el limitador y la espera ante 429 que exige usar un proveedor con cuota |
+| Modelo local en Ollama para el function calling | `meta/muse-glimmer-30b` vía NVIDIA, con Nemotron como plan B | Ver la tabla del chat. Por usar un proveedor con cuota se suman el limitador y la espera ante 429 que exige usar un proveedor con cuota |
 
 Agregados que no contradicen la pre-entrega: los eventos SSE `tool` y
 `cart-updated`, el límite de vueltas y de tools por turno, la validación de
@@ -189,7 +185,7 @@ límite alcanza para unos 12 turnos con tools por minuto. Las tools que van a
 `catalog` y a `carts` son tráfico interno y no consumen cuota; solo
 `searchProducts` con texto consume un embedding de Gemini.
 
-## Integración con la UI (`integrate-ui-assistant`)
+## Integración con la UI
 
 La `ui` llama al `assistant` de dos formas, siempre por el `Service` interno
 `http://assistant` (el ingress sigue enrutando solo hacia la `ui`):
@@ -204,9 +200,7 @@ La `ui` llama al `assistant` de dos formas, siempre por el `Service` interno
 
 ### Agregados respecto de la pre-entrega
 
-Justificados en la decisión D13 del `design.md` del change
-`integrate-ui-assistant`. No hay desvíos: son agregados que no contradicen la
-pre-entrega.
+No hay desvíos: son agregados que no contradicen la pre-entrega.
 
 | Agregado | Justificación |
 |---|---|

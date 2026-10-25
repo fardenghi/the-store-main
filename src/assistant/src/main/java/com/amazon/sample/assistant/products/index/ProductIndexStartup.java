@@ -7,7 +7,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * Dispara la sincronización al quedar listo el servicio, en un hilo propio,
- * para no demorar el arranque ni la readiness (D5).
+ * para no demorar el arranque ni la readiness.
  */
 public class ProductIndexStartup implements DisposableBean {
 

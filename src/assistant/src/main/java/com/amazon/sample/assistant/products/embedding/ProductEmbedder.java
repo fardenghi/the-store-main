@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Embeddings de productos y de consultas con {@code gemini-embedding-001}
- * (D1): {@code RETRIEVAL_DOCUMENT} al indexar y {@code RETRIEVAL_QUERY} al
+ * Embeddings de productos y de consultas con {@code gemini-embedding-001}:
+ * {@code RETRIEVAL_DOCUMENT} al indexar y {@code RETRIEVAL_QUERY} al
  * buscar, con las dimensiones configuradas. Los errores del proveedor salen
  * como {@link EmbeddingProviderException}.
  */
@@ -21,7 +21,7 @@ public class ProductEmbedder {
   /**
    * El cliente de Google GenAI reintenta por defecto hasta 5 veces ante 429 y
    * 5xx. Se apaga para que cada llamada sea una sola request y los reintentos
-   * los decida la sincronización (D6).
+   * los decida la sincronización.
    */
   private static final HttpOptions SINGLE_ATTEMPT = HttpOptions.builder()
       .retryOptions(HttpRetryOptions.builder().attempts(1).build())
@@ -58,7 +58,7 @@ public class ProductEmbedder {
 
   /**
    * Embebe una consulta. Las consultas iguales salvo mayúsculas y espacios
-   * salen del caché sin llamar al proveedor (D9).
+   * salen del caché sin llamar al proveedor.
    */
   public float[] embedQuery(String query) {
     return queryCache.get(query, normalized -> call(List.of(normalized), QUERY_TASK).get(0));

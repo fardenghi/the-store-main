@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Una línea de log por tool ejecutada, en formato {@code clave=valor}, con el
- * logger {@code assistant.tool} (D12 de {@code add-assistant-tools}): la sesión
+ * logger {@code assistant.tool}: la sesión
  * truncada a 8 caracteres, la tool, sus argumentos (que nunca incluyen la
  * sesión), {@code ok} o el tipo de error, la cantidad de productos, las
  * llamadas a {@code catalog} y {@code carts} y la latencia.

@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 
 /**
  * Traduce las excepciones del SDK de Google GenAI a
- * {@link EmbeddingProviderException} (D6).
+ * {@link EmbeddingProviderException}.
  */
 final class GeminiErrors {
 

@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Una línea de log por turno en formato {@code clave=valor}, con el logger
- * {@code assistant.turn} (D9). Incluye el mensaje crudo y la consulta
+ * {@code assistant.turn}. Incluye el mensaje crudo y la consulta
  * reescrita con los ids de ambos top-k, para hacer observable la mejora de la
  * reescritura.
  */

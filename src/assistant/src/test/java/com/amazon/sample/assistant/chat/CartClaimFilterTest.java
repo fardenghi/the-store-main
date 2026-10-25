@@ -8,13 +8,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Salvaguarda de agregados al carrito (corrección posterior de
- * {@code add-assistant-tools}): qué oraciones cuentan como afirmación de un
+ * Salvaguarda de agregados al carrito: qué oraciones cuentan como afirmación de un
  * agregado y cómo se retiene el texto por oración.
  */
 class CartClaimFilterTest {
 
-  /** Afirmaciones reales del reporte de {@code integrate-ui-assistant} y variantes. */
+  /** Afirmaciones reales del modelo, vistas en las pruebas en el cluster, y variantes. */
   @ParameterizedTest
   @ValueSource(strings = {
       "Two Aiden Mid-Century Velvet Armchairs have been successfully added.",
@@ -39,7 +38,7 @@ class CartClaimFilterTest {
     assertThat(CartClaimFilter.isClaim(sentence)).as(sentence).isTrue();
   }
 
-  /** Texto legítimo que no puede borrarse (condición del coordinador). */
+  /** Texto legítimo que no puede borrarse. */
   @ParameterizedTest
   @ValueSource(strings = {
       "You can add it to your cart from the product page.",

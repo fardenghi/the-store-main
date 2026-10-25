@@ -14,8 +14,8 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestWatcher;
 
 /**
- * Salida parseable de los smoke de punta a punta para el benchmark de modelos
- * ({@code select-assistant-models}, D6): una línea {@code bench.result} por
+ * Salida parseable de los smoke de punta a punta para el benchmark de modelos:
+ * una línea {@code bench.result} por
  * escenario o sesión, que lee {@code scripts/model_bench_report.py}. No cambia
  * qué afirma cada test: solo registra el resultado y los datos que el test
  * anota en {@link #scenario()} mientras corre.

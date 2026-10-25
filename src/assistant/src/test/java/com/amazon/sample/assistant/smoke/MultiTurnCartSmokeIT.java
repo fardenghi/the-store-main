@@ -48,9 +48,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Sesiones largas con pedidos de carrito al final (corrección posterior de
- * {@code add-assistant-tools}): las tres sesiones del reporte de
- * {@code integrate-ui-assistant} en las que, desde el segundo o tercer turno,
+ * Sesiones largas con pedidos de carrito al final: las tres sesiones de las
+ * pruebas en el cluster en las que, desde el segundo o tercer turno,
  * el modelo dejaba de llamar a las tools y confirmaba agregados que no hizo.
  *
  * <p>Por cada turno verifica que la respuesta no afirme un agregado sin un
@@ -63,7 +62,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * Gemini por turno con búsqueda. Igual que los demás smoke de punta a punta,
  * con {@code -Dsmoke.qdrant.*} reutiliza una colección ya indexada.
  *
- * <p>Para el benchmark de modelos ({@code select-assistant-models}) imprime una
+ * <p>Para el benchmark de modelos imprime una
  * línea {@code bench.result} por sesión ({@link BenchReporter}) con
  * {@code added}: {@code ok} si el último pedido terminó con el producto pedido
  * en el carrito, {@code none} si no se agregó y {@code wrong} si se agregó otro.

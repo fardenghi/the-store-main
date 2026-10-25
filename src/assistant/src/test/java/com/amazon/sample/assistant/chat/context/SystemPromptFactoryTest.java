@@ -7,7 +7,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
-/** Persona A.G.E.N.T., reglas y contexto en el system prompt (D8). */
+/** Persona A.G.E.N.T., reglas y contexto en el system prompt. */
 class SystemPromptFactoryTest {
 
   private final SystemPromptFactory factory = new SystemPromptFactory(
@@ -27,7 +27,7 @@ class SystemPromptFactoryTest {
         .contains("deployment")
         .contains("Never break character")
         .doesNotContain("spy gadget e-commerce");
-    // Reglas de D8.
+    // Reglas del prompt.
     assertThat(prompt).contains("exact name and exact price")
         .contains("does not sell")
         .contains("price difference")
@@ -54,7 +54,7 @@ class SystemPromptFactoryTest {
   void rendersTheToolsSectionWithTheCatalogTags() {
     String prompt = factory.render(new Retrieval(false, false, List.of(), List.of(), false, 0));
 
-    // add-assistant-tools (D10).
+    // Tools.
     assertThat(prompt).contains("searchProducts", "getProductDetails", "addToCart")
         .contains("order price_asc")
         .contains("do not mention the price in the product context")

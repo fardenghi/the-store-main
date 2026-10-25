@@ -4,9 +4,9 @@ import reactor.core.publisher.Flux;
 
 /**
  * Descarta los bloques {@code <think>…</think>} de un stream de fragmentos de
- * texto, aunque las etiquetas lleguen partidas entre fragmentos (D7). Solo se
+ * texto, aunque las etiquetas lleguen partidas entre fragmentos. Solo se
  * aplica con modelos que mezclan el razonamiento en el texto: Nemotron lo
- * devuelve aparte, en {@code reasoning_content} (spike, D12).
+ * devuelve aparte, en {@code reasoning_content}.
  *
  * <p>Cada suscripción tiene su propio estado.
  */

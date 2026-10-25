@@ -47,10 +47,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * De punta a punta en el proceso (task 9.1 de {@code add-assistant-tools}): el
+ * De punta a punta en el proceso: el
  * {@code assistant} completo con NVIDIA y Gemini reales, Qdrant, el catálogo
  * real servido por {@link FakeCatalog} y un {@code carts} en memoria
- * ({@link FakeCarts}). Recorre los escenarios de la spec {@code assistant-tools}
+ * ({@link FakeCarts}). Recorre los escenarios de las tools
  * por {@code POST /assistant/chat}.
  *
  * <p>Gasta unas 40 requests a NVIDIA (12 turnos de 3 a 4, espaciados; el
@@ -60,7 +60,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * {@code -Dsmoke.qdrant.port} y {@code -Dsmoke.qdrant.collection} reutiliza una
  * colección ya indexada y no gasta las 80 requests de la indexación.
  *
- * <p>Para el benchmark de modelos ({@code select-assistant-models}) imprime una
+ * <p>Para el benchmark de modelos imprime una
  * línea {@code bench.result} por escenario ({@link BenchReporter}), con
  * {@code added} en los de carrito y {@code askedInsteadOfAdding} en el ambiguo,
  * y una {@code bench.usage} con el consumo de la corrida.
@@ -369,7 +369,7 @@ class ToolsEndToEndSmokeIT {
         .toList();
   }
 
-  /** Spec "Nombres verificables": cada producto nombrado está en un evento, con su precio. */
+  /** Nombres verificables: cada producto nombrado está en un evento, con su precio. */
   private static void assertNamedProductsAreInTheEvents(SseEvents events) {
     List<Map<String, Object>> all = events.allProducts();
     for (CatalogProduct product : named(events.text())) {

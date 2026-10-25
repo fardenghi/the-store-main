@@ -17,7 +17,7 @@ import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-/** Cliente de {@code carts} de la tool {@code addToCart} (D5 de {@code add-assistant-tools}). */
+/** Cliente de {@code carts} de la tool {@code addToCart}. */
 class CartsClientTest {
 
   private final RestClient.Builder builder = RestClient.builder().baseUrl("http://carts");

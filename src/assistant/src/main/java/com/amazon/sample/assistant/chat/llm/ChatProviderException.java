@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /**
  * Error del proveedor de chat (NVIDIA), independiente de Spring AI y del
- * cliente HTTP (D10). En el modelo principal termina el stream con el evento
+ * cliente HTTP. En el modelo principal termina el stream con el evento
  * {@code error}; en la reescritura dispara el fallback.
  */
 public class ChatProviderException extends RuntimeException {

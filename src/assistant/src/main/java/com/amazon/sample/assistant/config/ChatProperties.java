@@ -14,12 +14,12 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Chat del asistente: reescritura de consulta ({@code retail.assistant.rewrite})
- * y turno de conversación ({@code retail.assistant.chat}) (D11).
+ * y turno de conversación ({@code retail.assistant.chat}).
  *
  * <p>Los {@code extra-body} son mapas anidados que se mandan tal cual en el
  * cuerpo del request a NVIDIA (salvo {@code reasoning_effort}, que va por la
  * opción nativa, ver {@code ExtraBody}). Sus defaults (los de
- * {@code meta/muse-glimmer-30b}, elegido en {@code select-assistant-models}) están acá y no
+ * {@code meta/muse-glimmer-30b}) están acá y no
  * en {@code application.yml}: Spring Boot combina las claves de un mapa
  * definido en varias fuentes, así que un default en el YAML no se podría
  * reemplazar por completo desde {@code SPRING_APPLICATION_JSON} (plan B). Un
@@ -28,8 +28,8 @@ import org.springframework.validation.annotation.Validated;
  * y los números se convierten a su tipo JSON: si no, NVIDIA recibiría
  * {@code "enable_thinking": "false"}, que el chat template evalúa como verdadero.
  *
- * @param rewrite reescritura de consulta (D4)
- * @param chat turno de conversación (D5, D6, D7, D10)
+ * @param rewrite reescritura de consulta
+ * @param chat turno de conversación
  */
 @Validated
 @ConfigurationProperties("retail.assistant")
@@ -39,7 +39,7 @@ public record ChatProperties(@NotNull @Valid Rewrite rewrite, @NotNull @Valid Ch
    * @param timeout tiempo límite de la llamada de reescritura; si se excede, fallback
    * @param historyTurns turnos de la sesión que recibe el modelo de reescritura
    * @param maxTokens límite de tokens de salida de la reescritura; incluye el
-   *     razonamiento en los modelos que no lo pueden apagar ({@code select-assistant-models})
+   *     razonamiento en los modelos que no lo pueden apagar
    * @param extraBody campos extra del request de reescritura (thinking desactivado)
    */
   public record Rewrite(
@@ -58,10 +58,10 @@ public record ChatProperties(@NotNull @Valid Rewrite rewrite, @NotNull @Valid Ch
    * @param minScore umbral de score de la búsqueda (0 lo desactiva)
    * @param maxTokens límite de tokens de salida con el razonamiento desactivado
    * @param maxTokensReasoning límite con el razonamiento activado (incluye sus tokens)
-   * @param compareRawRetrieval si se calcula el top-k de la consulta cruda para el log (D9)
-   * @param reasoning cuándo y cómo se activa el razonamiento (D7)
-   * @param memory memoria por sesión (D6)
-   * @param timeouts tiempos límite del modelo principal (D10)
+   * @param compareRawRetrieval si se calcula el top-k de la consulta cruda para el log
+   * @param reasoning cuándo y cómo se activa el razonamiento
+   * @param memory memoria por sesión
+   * @param timeouts tiempos límite del modelo principal
    */
   public record Chat(
       @Min(1) @Max(20) int retrievalK,
@@ -82,7 +82,7 @@ public record ChatProperties(@NotNull @Valid Rewrite rewrite, @NotNull @Valid Ch
    * @param onExtraBody campos extra del request con el razonamiento activado
    * @param offExtraBody campos extra del request con el razonamiento desactivado
    * @param stripThinkTags si se descartan bloques {@code <think>} del texto; solo
-   *     hace falta con modelos que mezclan el razonamiento en la respuesta (D7)
+   *     hace falta con modelos que mezclan el razonamiento en la respuesta
    */
   public record Reasoning(
       @NotNull ReasoningMode mode,

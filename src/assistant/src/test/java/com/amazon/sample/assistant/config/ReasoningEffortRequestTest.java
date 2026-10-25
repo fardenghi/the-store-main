@@ -22,8 +22,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Regresión del 400 "duplicate field `reasoning_effort`"
- * ({@code select-assistant-models}, segundo intento): con
+ * Regresión del 400 "duplicate field `reasoning_effort`":
+ * con
  * {@code reasoning_effort} en los {@code extra-body}, el cuerpo que llega al
  * proveedor lo trae una sola vez, también en los requests con tools, y con el
  * nivel del turno ({@code low} sin razonamiento, {@code high} en las

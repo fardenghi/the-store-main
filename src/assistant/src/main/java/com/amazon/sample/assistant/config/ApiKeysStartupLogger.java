@@ -11,7 +11,7 @@ import org.springframework.util.StringUtils;
 /**
  * Informa al arrancar si cada clave de proveedor está configurada, sin mostrar
  * nunca su valor. Con el placeholder el servicio arranca igual, pero las
- * llamadas al proveedor van a fallar con 401/403 (D3).
+ * llamadas al proveedor van a fallar con 401/403.
  */
 @Component
 public class ApiKeysStartupLogger {

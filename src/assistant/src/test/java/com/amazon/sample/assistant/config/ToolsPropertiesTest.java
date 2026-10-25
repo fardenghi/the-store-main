@@ -11,7 +11,7 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
-/** Defaults y validación de {@code retail.assistant.tools} y {@code retail.assistant.rate-limit} (D11). */
+/** Defaults y validación de {@code retail.assistant.tools} y {@code retail.assistant.rate-limit}. */
 class ToolsPropertiesTest {
 
   @Configuration(proxyBeanMethods = false)

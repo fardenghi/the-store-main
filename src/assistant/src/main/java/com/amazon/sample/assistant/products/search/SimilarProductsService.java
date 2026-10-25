@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Productos similares a uno dado (D8), calculados en Qdrant con el vector ya
+ * Productos similares a uno dado, calculados en Qdrant con el vector ya
  * guardado del producto. No depende del proveedor de embeddings: funciona
  * aunque Gemini no esté disponible o no haya clave.
  */

@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 
 /**
  * Validación de los argumentos de las tools en el servidor, antes de llamar a
- * cualquier servicio (D3 de {@code add-assistant-tools}). Cada método devuelve
+ * cualquier servicio. Cada método devuelve
  * el valor normalizado o lanza {@link ToolError.Failure} con el resultado de
  * error para el modelo.
  */

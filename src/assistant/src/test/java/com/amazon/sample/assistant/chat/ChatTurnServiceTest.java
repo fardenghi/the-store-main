@@ -39,7 +39,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-/** Pipeline de un turno (D2): orden de eventos, streaming, keepalive, cancelación y memoria. */
+/** Pipeline de un turno: orden de eventos, streaming, keepalive, cancelación y memoria. */
 class ChatTurnServiceTest {
 
   private static final ShownProduct ARMCHAIR = new ShownProduct("a1",
@@ -196,7 +196,7 @@ class ChatTurnServiceTest {
   }
 
   /**
-   * Corrección posterior de D2: con la sesión ocupada, el turno nuevo sondea la
+   * Con la sesión ocupada, el turno nuevo sondea la
    * conexión del turno en curso. Acá el cliente del primer turno ya cortó: la
    * escritura del sondeo lo detecta (el suscriptor cancela al recibirla, como
    * Spring cuando falla la escritura), el turno libera el lock y el nuevo entra.
@@ -326,7 +326,7 @@ class ChatTurnServiceTest {
 
   @Test
   void quotaErrorEndsWithErrorEventAndRetryAfterWithoutStoringTheTurn() {
-    // add-assistant-tools (D9): el 429 se reintenta 2 veces respetando el
+    // El 429 se reintenta 2 veces respetando el
     // Retry-After; si persiste, el turno termina como antes.
     HttpHeaders headers = new HttpHeaders();
     headers.add(HttpHeaders.RETRY_AFTER, "12");
@@ -392,7 +392,7 @@ class ChatTurnServiceTest {
 
   @Test
   void reasoningContentCountsAsTheFirstFragment() {
-    // Un modelo que razona siempre (select-assistant-models, segundo intento):
+    // Un modelo que razona siempre:
     // razona a los 5 s y el texto llega a los 30 s, con el límite de 20 s.
     model(() -> Flux.concat(
         Mono.delay(Duration.ofSeconds(5)).thenReturn(reasoning("", "The user wants a chair.")),

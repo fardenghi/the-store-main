@@ -8,7 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Flux;
 
-/** Descarte de {@code <think>…</think>} en el stream (D7). */
+/** Descarte de {@code <think>…</think>} en el stream. */
 class ThinkTagFilterTest {
 
   private static String filter(String... fragments) {

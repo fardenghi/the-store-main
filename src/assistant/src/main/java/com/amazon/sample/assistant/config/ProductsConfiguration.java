@@ -25,8 +25,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.client.RestClient;
 
 /**
- * Indexación del catálogo en Qdrant, búsqueda semántica y similares
- * (add-product-indexing).
+ * Indexación del catálogo en Qdrant, búsqueda semántica y similares.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({IndexingProperties.class, SearchProperties.class})
@@ -39,7 +38,7 @@ public class ProductsConfiguration {
 
   /**
    * Modelo y dimensiones salen de las mismas propiedades que configuran el
-   * {@code EmbeddingModel} del starter, para que no puedan desalinearse (D2).
+   * {@code EmbeddingModel} del starter, para que no puedan desalinearse.
    */
   @Bean
   ProductEmbedder productEmbedder(EmbeddingGateway gateway,
@@ -79,14 +78,14 @@ public class ProductsConfiguration {
         indexing.maxProviderRetries(), Backoff.DEFAULT, Sleeper.THREAD, Clock.systemUTC());
   }
 
-  /** Componente {@code productIndex} de {@code /actuator/health}, fuera de la readiness (D7). */
+  /** Componente {@code productIndex} de {@code /actuator/health}, fuera de la readiness. */
   @Bean("productIndex")
   ProductIndexHealthIndicator productIndexHealthIndicator(ProductIndexState state) {
     return new ProductIndexHealthIndicator(state);
   }
 
   /**
-   * Un hilo para la sincronización (D5). No se registra como bean
+   * Un hilo para la sincronización. No se registra como bean
    * {@code TaskExecutor} para no reemplazar el executor que autoconfigura
    * Spring Boot; el ciclo de vida lo maneja {@link ProductIndexStartup}.
    */

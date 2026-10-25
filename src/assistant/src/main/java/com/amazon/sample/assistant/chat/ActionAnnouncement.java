@@ -3,8 +3,8 @@ package com.amazon.sample.assistant.chat;
 import java.util.regex.Pattern;
 
 /**
- * Detecta una respuesta que termina anunciando una acción que no hizo
- * (corrección posterior de {@code add-assistant-tools}): "Let me check our
+ * Detecta una respuesta que termina anunciando una acción que no hizo:
+ * "Let me check our
  * inventory for that item.", "I need to search for it first." o la acotación
  * "*getting current price for the Aiden*". {@code nemotron-3-super} a veces
  * escribe el anuncio y cierra la vuelta sin pedir la tool, y el turno terminaba

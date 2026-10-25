@@ -7,9 +7,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Estado de una sesión de chat (D6): ventana de los últimos turnos, productos
- * del último turno con búsqueda y el lock que permite un solo turno a la vez
- * (D2).
+ * Estado de una sesión de chat: ventana de los últimos turnos, productos
+ * del último turno con búsqueda y el lock que permite un solo turno a la vez.
  *
  * <p>Un turno se guarda solo con {@link #commit}, que el turno llama cuando el
  * stream terminó bien: un turno fallido o cancelado no deja rastro.

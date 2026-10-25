@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Reporte del benchmark de modelos (select-assistant-models, D6).
+"""Reporte del benchmark de modelos.
 
 Lee los .log de las corridas de scripts/model-bench.sh (o cualquier salida de
 ./mvnw -Psmoke verify) y arma en Markdown una tabla por corrida y otra total
-con los criterios de aceptación de design.md: M1 a M8 (modelo principal) y R1
+con los criterios de aceptación de la evaluación: M1 a M8 (modelo principal) y R1
 a R4 (reescritura), cada uno con su valor, umbral, línea base y ✔/✘.
 
 Líneas que parsea:
@@ -36,7 +36,7 @@ TURN = re.compile(r"assistant\.turn\s+:\s+(session=.*)$")
 BENCH = re.compile(r"^.*?\b(bench\.(?:result|rewrite|capability|usage))\s+(.*)$")
 FIELD = re.compile(r'(\w+)=("(?:[^"\\]|\\.)*"|\[[^\]]*\]|\S*)')
 
-# M1: capacidades que tiene que mostrar el spike.
+# M1: capacidades que tiene que mostrar la prueba inicial del modelo.
 CAPABILITIES = [
     "streaming",
     "reasoning-off",
@@ -48,7 +48,7 @@ CAPABILITIES = [
     "tool-choice-required",
 ]
 
-# M6: escenarios estables (design.md, D2).
+# M6: escenarios estables.
 STABLE = {
     "ChatEndToEndSmokeIT": [
         "recommendationWithRealProducts",
@@ -85,7 +85,7 @@ UNSTABLE = {
 AMBIGUOUS = ("ToolsEndToEndSmokeIT", "ambiguousRequestAsksInsteadOfAdding")
 MULTI_TURN = "MultiTurnCartSmokeIT"
 
-# Umbrales fijados antes de la primera corrida (D2, D3, D5).
+# Umbrales fijados antes de la primera corrida.
 M4_REQUIRED, M4_SESSIONS = 10, 15
 M5_MAX, M5_SAMPLES = 1, 5
 M7_OFF_P50, M7_OFF_P95, M7_ON_MAX = 3000, 8000, 30000
@@ -184,7 +184,7 @@ def model_latency(turn, field="firstFragmentMs"):
     """M7: firstFragmentMs - rewriteMs - retrievalMs - limiterWaitMs (los '-' cuentan 0).
 
     Con field="firstReasoningMs", lo mismo para el primer fragmento de
-    razonamiento, que el usuario no ve (segundo intento con muse-glimmer-30b).
+    razonamiento, que el usuario no ve.
     """
     first = number(turn.get(field))
     if first is None:
@@ -306,7 +306,7 @@ def m6(runs):
             passes = outcomes.count("pass")
             fails = outcomes.count("fail")
             provider = outcomes.count("provider-error")
-            # Una falla del proveedor se compensa con un re-intento que pasa (D2).
+            # Una falla del proveedor se compensa con un re-intento que pasa.
             if fails or passes < max(expected, 1):
                 status = FAIL
                 rows.append("{} {}/{} ({} fail, {} provider-error)".format(
@@ -534,13 +534,13 @@ def report(runs, role="all"):
     out += run_table(runs)
     out += ["", "## Totales", ""]
     if role in ("all", "main"):
-        out += ["### Modelo principal (D2)", ""] + metric_table(runs, MAIN_METRICS)
+        out += ["### Modelo principal", ""] + metric_table(runs, MAIN_METRICS)
         extra = informative(runs)
         if extra:
             out += ["", "Sin umbral:", ""] + extra
         out.append("")
     if role in ("all", "rewrite"):
-        out += ["### Reescritura (D3)", ""] + metric_table(runs, REWRITE_METRICS)
+        out += ["### Reescritura", ""] + metric_table(runs, REWRITE_METRICS)
         out.append("")
     return "\n".join(out)
 

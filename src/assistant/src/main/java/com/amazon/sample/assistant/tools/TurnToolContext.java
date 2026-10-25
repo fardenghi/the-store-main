@@ -14,7 +14,7 @@ import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Sinks;
 
 /**
- * Contexto de un turno para las tools (D2 de {@code add-assistant-tools}).
+ * Contexto de un turno para las tools.
  * Viaja en el {@link ToolContext} de Spring AI, que no se expone al modelo: la
  * sesión que se usa como {@code customerId} del carrito sale de acá y nunca de
  * un argumento de la tool.

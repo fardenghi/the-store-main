@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * Eventos SSE de una respuesta completa de {@code POST /assistant/chat},
- * incluidos los {@code tool} y {@code cart-updated} de {@code add-assistant-tools}.
+ * incluidos los {@code tool} y {@code cart-updated}.
  */
 record SseEvents(List<Map<String, Object>> products, String text, boolean done,
     Map<String, Object> error, String raw, List<Map<String, Object>> tools,
@@ -61,7 +61,7 @@ record SseEvents(List<Map<String, Object>> products, String text, boolean done,
 
   /**
    * Productos del evento {@code products} y de los eventos {@code tool}, sin
-   * repetidos: los que el turno puede nombrar (spec "Nombres verificables").
+   * repetidos: los que el turno puede nombrar.
    */
   @SuppressWarnings("unchecked")
   List<Map<String, Object>> allProducts() {

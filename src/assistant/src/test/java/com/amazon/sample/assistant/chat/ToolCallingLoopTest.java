@@ -64,8 +64,7 @@ import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
 /**
- * Ciclo de tool calling del turno (D1, D8, D9 y D7 de
- * {@code add-assistant-tools}) sobre un {@link ChatModel} mockeado.
+ * Ciclo de tool calling del turno sobre un {@link ChatModel} mockeado.
  */
 class ToolCallingLoopTest {
 
@@ -493,7 +492,7 @@ class ToolCallingLoopTest {
         .endsWith(ToolCallingLoop.NOT_ADDED_TEXT).doesNotContain("adds two lamps");
   }
 
-  // Segundo intento de select-assistant-models: vuelta correctiva sin tool_choice required
+  // Vuelta correctiva sin tool_choice required
 
   private ChatTurnService promptService() {
     return ChatTestSupport.service(sessions, rewriter, retriever, chat,

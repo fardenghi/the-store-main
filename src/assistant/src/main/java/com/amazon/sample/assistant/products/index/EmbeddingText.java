@@ -8,7 +8,7 @@ import java.util.HexFormat;
 import java.util.stream.Collectors;
 
 /**
- * Texto que se embebe por producto y su hash de contenido (D3).
+ * Texto que se embebe por producto y su hash de contenido.
  *
  * <pre>
  * &lt;name&gt;

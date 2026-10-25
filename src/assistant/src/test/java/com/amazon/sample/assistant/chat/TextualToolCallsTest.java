@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Tool calls escritos como texto por el modelo (corrección posterior). */
+/** Tool calls escritos como texto por el modelo. */
 class TextualToolCallsTest {
 
   private final TextualToolCalls textual = new TextualToolCalls(

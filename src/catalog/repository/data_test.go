@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Invariantes del catálogo (openspec: product-catalog) verificadas sobre el JSON embebido.
+// Invariantes del catálogo verificadas sobre el JSON embebido.
 
 var (
 	typeTags  = []string{"seating", "tables", "storage", "lighting", "rugs", "decor", "beds"}

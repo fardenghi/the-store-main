@@ -30,7 +30,7 @@ import reactor.core.scheduler.Schedulers;
 
 /**
  * Reescribe el mensaje del usuario como una consulta de búsqueda autocontenida
- * con el modelo compacto (D4): recibe los últimos turnos, los productos del
+ * con el modelo compacto: recibe los últimos turnos, los productos del
  * turno anterior, los tags del catálogo y el mensaje, y devuelve la intención,
  * la consulta y los filtros de precio y de exclusión.
  *
@@ -38,11 +38,10 @@ import reactor.core.scheduler.Schedulers;
  * que no valida, el turno sigue con el mensaje crudo y sin filtros
  * ({@link Rewrite#fallback}). Nunca lanza excepciones.
  *
- * <p>Pasa por el limitador de solicitudes a NVIDIA sin esperar (D8 de
- * {@code add-assistant-tools}): si no hay lugar inmediato, no llama al modelo y
+ * <p>Pasa por el limitador de solicitudes a NVIDIA sin esperar: si no hay lugar inmediato, no llama al modelo y
  * usa el mensaje crudo ({@link Rewrite#rateLimited}). Un 429 pausa el
  * limitador para todas las sesiones y también usa el mensaje crudo, sin
- * reintentar (D9).
+ * reintentar.
  */
 public class QueryRewriter {
 

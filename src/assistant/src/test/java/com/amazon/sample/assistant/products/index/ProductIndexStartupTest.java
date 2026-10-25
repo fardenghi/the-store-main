@@ -30,7 +30,7 @@ import org.springframework.test.context.bean.override.convention.TestBean;
 /**
  * La sincronización arranca sola con {@code ApplicationReadyEvent}, en segundo
  * plano: mientras {@code catalog} demora la respuesta, la readiness ya está
- * {@code UP} y {@code productIndex} está en {@code SYNCING} (D5).
+ * {@code UP} y {@code productIndex} está en {@code SYNCING}.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
     "retail.assistant.indexing.sync-on-startup=true",

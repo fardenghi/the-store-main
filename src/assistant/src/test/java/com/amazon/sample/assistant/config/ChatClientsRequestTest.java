@@ -20,10 +20,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Lo que manda cada {@code ChatClient} a NVIDIA (D3, D7): modelo,
+ * Lo que manda cada {@code ChatClient} a NVIDIA: modelo,
  * {@code temperature}, {@code max_tokens} y el nivel de razonamiento
- * ({@code reasoning_effort} de {@code meta/muse-glimmer-30b}, los defaults de
- * {@code select-assistant-models}), capturado por un proveedor falso.
+ * ({@code reasoning_effort} de {@code meta/muse-glimmer-30b}, los defaults),
+ * capturado por un proveedor falso.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.NONE, properties = {
     "spring.ai.openai.api-key=test-key",
@@ -78,7 +78,7 @@ class ChatClientsRequestTest {
     assertThat(request.path("reasoning_effort").asText()).isEqualTo("low");
     assertThat(request.has("chat_template_kwargs")).isFalse();
     assertThat(request.path("stream").asBoolean(false)).isFalse();
-    // add-assistant-tools (D2): la reescritura no tiene tools.
+    // La reescritura no tiene tools.
     assertThat(request.has("tools")).isFalse();
   }
 

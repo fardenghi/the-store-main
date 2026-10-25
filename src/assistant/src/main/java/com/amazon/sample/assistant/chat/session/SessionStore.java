@@ -6,7 +6,7 @@ import com.github.benmanes.caffeine.cache.Ticker;
 import java.time.Duration;
 
 /**
- * Sesiones de chat en memoria del proceso (D6): una por {@code X-Session-ID},
+ * Sesiones de chat en memoria del proceso: una por {@code X-Session-ID},
  * descartada después de {@code idle-ttl} sin uso y con un máximo de sesiones.
  * La memoria se pierde al reiniciar, que es aceptable para el POC con una
  * réplica.

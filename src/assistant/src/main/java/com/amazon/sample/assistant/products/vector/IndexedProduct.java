@@ -3,7 +3,7 @@ package com.amazon.sample.assistant.products.vector;
 import java.util.List;
 
 /**
- * Payload de un punto de la colección {@code products} (D2). El id del punto
+ * Payload de un punto de la colección {@code products}. El id del punto
  * es el {@code id} (UUID) del producto.
  */
 public record IndexedProduct(

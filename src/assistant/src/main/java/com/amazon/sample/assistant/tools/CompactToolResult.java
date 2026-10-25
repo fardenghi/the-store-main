@@ -7,8 +7,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
- * Resultado de una tool reducido para la memoria de la sesión (corrección
- * posterior de D7): lo justo para que el modelo vea en los turnos siguientes
+ * Resultado de una tool reducido para la memoria de la sesión: lo justo para que el modelo vea en los turnos siguientes
  * qué hizo cada tool, sin las descripciones ni los tags que ya usó para
  * responder.
  *

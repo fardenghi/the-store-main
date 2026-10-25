@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * Errores del chat antes de abrir el stream, como {@link ProblemDetail} con un
- * {@code type} estable (D1). El {@code Content-Type} va explícito porque el
+ * {@code type} estable. El {@code Content-Type} va explícito porque el
  * endpoint produce {@code text/event-stream}. Tiene precedencia sobre el
  * handler genérico de ProblemDetail de Spring, para que un cuerpo ilegible
  * también responda {@code invalid-parameter}.

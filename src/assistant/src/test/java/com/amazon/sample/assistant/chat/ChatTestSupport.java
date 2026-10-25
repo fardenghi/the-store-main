@@ -94,7 +94,7 @@ final class ChatTestSupport {
         loop, TOOLS.maxToolCalls(), chat);
   }
 
-  /** El turno sin tools, como en {@code add-assistant-chat}. */
+  /** El turno sin tools. */
   static ChatTurnService service(SessionStore sessions, QueryRewriter rewriter,
       ContextRetriever retriever, ChatModel chatModel, ChatProperties.Chat chat) {
     return service(sessions, rewriter, retriever, chat,

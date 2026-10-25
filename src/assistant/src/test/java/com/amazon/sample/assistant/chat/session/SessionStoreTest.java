@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
-/** Memoria por sesión (D6): ventana de turnos, expiración por inactividad y aislamiento. */
+/** Memoria por sesión: ventana de turnos, expiración por inactividad y aislamiento. */
 class SessionStoreTest {
 
   private final AtomicLong nanos = new AtomicLong();

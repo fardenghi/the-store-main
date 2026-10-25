@@ -46,9 +46,9 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * De punta a punta en el proceso (task 10.1): el {@code assistant} completo
+ * De punta a punta en el proceso: el {@code assistant} completo
  * con Qdrant en Testcontainers, el catálogo real servido por HTTP e indexado
- * con Gemini, y NVIDIA real. Recorre los escenarios de la spec
+ * con Gemini, y NVIDIA real. Recorre los escenarios del chat
  * {@code assistant-chat} por {@code POST /assistant/chat}.
  *
  * <p>Gasta unas 28 requests a NVIDIA (14 turnos de 2 requests, espaciados para
@@ -63,7 +63,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * sincronización incremental no vuelve a embeber los productos sin cambios.
  * Sin esas propiedades, levanta un Qdrant con Testcontainers.
  *
- * <p>Para el benchmark de modelos ({@code select-assistant-models}) imprime una
+ * <p>Para el benchmark de modelos imprime una
  * línea {@code bench.result} por escenario ({@link BenchReporter}) y una
  * {@code bench.usage} con el consumo de la corrida.
  */
@@ -390,7 +390,7 @@ class ChatEndToEndSmokeIT {
 
   /**
    * Cada producto nombrado está en el evento {@code products} o en el de una
-   * tool ({@code add-assistant-tools}) con el precio de {@code GET /catalog/products/{id}}.
+   * tool con el precio de {@code GET /catalog/products/{id}}.
    */
   private static void assertNamedProductsAreInTheEventWithCatalogPrices(SseEvents events) {
     List<Map<String, Object>> all = events.allProducts();

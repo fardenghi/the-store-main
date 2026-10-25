@@ -3,7 +3,7 @@ package com.amazon.sample.assistant.products.index;
 import java.time.Instant;
 
 /**
- * Estado en memoria de la indexación (D7). Lo actualiza
+ * Estado en memoria de la indexación. Lo actualiza
  * {@link ProductIndexer} y lo expone {@link ProductIndexHealthIndicator}.
  */
 public class ProductIndexState {

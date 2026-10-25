@@ -14,7 +14,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
-/** Ventana deslizante de 60 s y pausa global del limitador hacia NVIDIA (D8). */
+/** Ventana deslizante de 60 s y pausa global del limitador hacia NVIDIA. */
 class ChatRateLimiterTest {
 
   private static final Instant START = Instant.parse("2026-10-06T12:00:00Z");

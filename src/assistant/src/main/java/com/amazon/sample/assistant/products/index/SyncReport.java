@@ -2,7 +2,7 @@ package com.amazon.sample.assistant.products.index;
 
 import java.time.Duration;
 
-/** Contadores de una sincronización (D4, paso 7). */
+/** Contadores de una sincronización. */
 public record SyncReport(
     int catalogProducts,
     int embedded,

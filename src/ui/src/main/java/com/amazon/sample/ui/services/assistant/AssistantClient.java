@@ -16,7 +16,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * Llamadas REST de la ui al assistant. Hoy solo los productos similares de la
- * ficha (D9): cualquier falla devuelve una lista vacía para que la ficha se
+ * ficha: cualquier falla devuelve una lista vacía para que la ficha se
  * muestre igual, sin la sección.
  */
 @Slf4j

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Componente {@code qdrant} de {@code /actuator/health}. Es informativo: no
- * forma parte del grupo de readiness (D4).
+ * forma parte del grupo de readiness.
  */
 @Component("qdrant")
 public class QdrantHealthIndicator implements HealthIndicator {

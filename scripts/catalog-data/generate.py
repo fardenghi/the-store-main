@@ -33,10 +33,10 @@ TAGS_JSON = SCRIPT_DIR / "tags.json"
 BUCKET_URL = "https://amazon-berkeley-objects.s3.amazonaws.com/"
 LISTING_SHARDS = "0123456789abcdef"
 
-# D5: namespace fijo para los ids UUIDv5.
+# Namespace fijo para los ids UUIDv5.
 ID_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, BUCKET_URL)
 
-# D2: el tag de tipo se deriva del grupo.
+# El tag de tipo se deriva del grupo.
 GROUP_TYPE_TAG = {
     "sofa": "seating",
     "chair": "seating",
@@ -51,7 +51,7 @@ GROUP_TYPE_TAG = {
 }
 TYPE_TAGS = set(GROUP_TYPE_TAG.values())
 
-# D4: rango de precio (USD) por grupo.
+# Rango de precio (USD) por grupo.
 GROUP_PRICE_RANGE = {
     "sofa": (600, 1800),
     "chair": (90, 550),
@@ -65,16 +65,16 @@ GROUP_PRICE_RANGE = {
     "decor": (15, 120),
 }
 
-# D3: bullets que se descartan y cantidad que se conserva.
+# Bullets que se descartan y cantidad que se conserva.
 DISCARDED_BULLET = re.compile(r"warrant|return|guarantee|customer service|satisf", re.IGNORECASE)
 FORBIDDEN_DESCRIPTION = re.compile(r"warranty|return", re.IGNORECASE)
 MAX_BULLETS = 4
 
-# D6: normalización de imágenes.
+# Normalización de imágenes.
 IMAGE_SIZE = 640
 JPEG_QUALITY = 85
 
-# D7: destinos.
+# Destinos.
 DATA_DIRS = [
     Path("src/catalog/repository"),
     Path("src/ui/src/main/resources/data"),
@@ -85,7 +85,7 @@ IMAGE_DIRS = [
     Path("samples/images"),
 ]
 
-# Invariantes del spec.
+# Invariantes del catálogo.
 MIN_PRODUCTS, MAX_PRODUCTS = 70, 90
 MIN_PER_TAG = 3
 MIN_PER_TYPE_TAG = 5
@@ -101,7 +101,7 @@ class ValidationError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Descargas (D1)
+# Descargas
 # ---------------------------------------------------------------------------
 
 
@@ -173,7 +173,7 @@ def product_types(item):
 
 
 # ---------------------------------------------------------------------------
-# Transformaciones (D3, D4, D5, D6)
+# Transformaciones
 # ---------------------------------------------------------------------------
 
 

@@ -20,7 +20,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Spec "Sin clave de chat": con {@code NVIDIA_API_KEY} en el placeholder y un
+ * Sin clave de chat: con {@code NVIDIA_API_KEY} en el placeholder y un
  * proveedor que responde 401, el stream termina con
  * {@code llm-provider-unauthorized} y la readiness sigue en {@code UP}. La
  * reescritura también recibe 401 y cae al mensaje crudo; Qdrant no está, así

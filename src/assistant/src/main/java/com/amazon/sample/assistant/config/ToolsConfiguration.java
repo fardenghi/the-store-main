@@ -19,8 +19,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 /**
- * Tools del modelo principal y limitador de solicitudes hacia NVIDIA
- * (add-assistant-tools).
+ * Tools del modelo principal y limitador de solicitudes hacia NVIDIA.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({ToolsProperties.class, RateLimitProperties.class})
@@ -28,7 +27,7 @@ public class ToolsConfiguration {
 
   /**
    * {@link RestClient} de las tools hacia {@code catalog} o {@code carts}, con
-   * los tiempos límite de {@code retail.assistant.tools.http} (D5). Parte de
+   * los tiempos límite de {@code retail.assistant.tools.http}. Parte de
    * una copia del builder para no cambiar los tiempos de los demás clientes.
    */
   public static RestClient toolsRestClient(RestClient.Builder builder, String baseUrl,
@@ -59,14 +58,14 @@ public class ToolsConfiguration {
     return new StoreTools(catalog, carts, search, arguments, tools);
   }
 
-  /** Un único limitador para todas las sesiones: la cuota de NVIDIA es de la cuenta (D8). */
+  /** Un único limitador para todas las sesiones: la cuota de NVIDIA es de la cuenta. */
   @Bean
   ChatRateLimiter chatRateLimiter(RateLimitProperties properties) {
     return new ChatRateLimiter(properties.requestsPerMinute(), properties.defaultRetryAfter(),
         Clock.systemUTC());
   }
 
-  /** Gauge {@code assistant.ratelimit.window}: reservas en la ventana de 60 s actual (D12). */
+  /** Gauge {@code assistant.ratelimit.window}: reservas en la ventana de 60 s actual. */
   @Bean
   MeterBinder chatRateLimiterMetrics(ChatRateLimiter limiter) {
     return registry -> Gauge.builder("assistant.ratelimit.window", limiter,

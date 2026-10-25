@@ -9,8 +9,7 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Limitador de solicitudes hacia el proveedor de chat y reintento ante 429
- * ({@code retail.assistant.rate-limit}, D8, D9 y D11 de
- * {@code add-assistant-tools}).
+ * ({@code retail.assistant.rate-limit}).
  *
  * @param requestsPerMinute solicitudes permitidas en cualquier ventana de 60 s,
  *     sumando todas las sesiones (por debajo de los 40 RPM de NVIDIA)

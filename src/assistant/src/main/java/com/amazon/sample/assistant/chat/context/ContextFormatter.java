@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Arma la sección de contexto del system prompt (D5): una línea por producto
+ * Arma la sección de contexto del system prompt: una línea por producto
  * con id, nombre, precio, tags y descripción, los productos del turno anterior
  * en una sección aparte y el aviso de catálogo no disponible.
  */

@@ -6,7 +6,7 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 
 /**
- * Componente {@code productIndex} de {@code /actuator/health} (D7): {@code UP}
+ * Componente {@code productIndex} de {@code /actuator/health}: {@code UP}
  * en {@code READY}, {@code DOWN} en {@code FAILED} y {@code UNKNOWN} mientras
  * no empezó o está sincronizando. Igual que {@code qdrant}, no forma parte del
  * grupo de readiness.

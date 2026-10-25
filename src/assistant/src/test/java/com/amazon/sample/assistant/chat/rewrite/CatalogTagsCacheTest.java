@@ -18,7 +18,7 @@ import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-/** Tags del catálogo para la reescritura (D4): se cachean y un error no corta el turno. */
+/** Tags del catálogo para la reescritura: se cachean y un error no corta el turno. */
 @RestClientTest
 class CatalogTagsCacheTest {
 

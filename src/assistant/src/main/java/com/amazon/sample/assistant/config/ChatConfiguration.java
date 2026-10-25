@@ -30,8 +30,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 
 /**
- * Chat con el asistente (add-assistant-chat): dos {@link ChatClient} sobre el
- * mismo {@link OpenAiChatModel} autoconfigurado (D3), memoria por sesión,
+ * Chat con el asistente: dos {@link ChatClient} sobre el
+ * mismo {@link OpenAiChatModel} autoconfigurado, memoria por sesión,
  * reescritura, retrieval y el pipeline del turno.
  */
 @Configuration(proxyBeanMethods = false)
@@ -41,7 +41,7 @@ public class ChatConfiguration {
   /** Temperatura del modelo principal: la que usaba la {@code ui}. */
   static final double MAIN_TEMPERATURE = 0.6;
 
-  /** Opciones base del modelo principal; el turno les suma razonamiento y max-tokens (D7). */
+  /** Opciones base del modelo principal; el turno les suma razonamiento y max-tokens. */
   @Bean
   OpenAiChatOptions mainChatOptions(
       @Value("${spring.ai.openai.chat.options.model}") String model, ChatProperties properties) {
@@ -56,7 +56,7 @@ public class ChatConfiguration {
 
   /**
    * Modelo compacto de reescritura: temperatura 0, max-tokens acotado y thinking
-   * desactivado (D3). Va sin streaming, por el {@code RestClient} de Spring AI,
+   * desactivado. Va sin streaming, por el {@code RestClient} de Spring AI,
    * así que su lectura HTTP tiene el {@code spring.http.client.read-timeout}.
    */
   @Bean
@@ -77,7 +77,7 @@ public class ChatConfiguration {
    * El {@code read-timeout} de los {@code RestClient} tiene que ser mayor que el
    * tiempo límite de la reescritura: si no, la lectura HTTP corta la reescritura
    * antes (con 10 s contra 12 s, los fallbacks llegaban a los 10 s como
-   * {@code llm-provider-unavailable}, {@code select-assistant-models}).
+   * {@code llm-provider-unavailable}).
    *
    * @param readTimeout {@code spring.http.client.read-timeout}; sin valor, el del
    *     cliente HTTP, que no corta antes
@@ -92,7 +92,7 @@ public class ChatConfiguration {
   }
 
   /**
-   * Las tools del modelo principal ({@code add-assistant-tools}, D2), envueltas
+   * Las tools del modelo principal, envueltas
    * para que un tool call ilegible vuelva al modelo como error.
    */
   @Bean
@@ -102,9 +102,8 @@ public class ChatConfiguration {
   }
 
   /**
-   * Modelo principal (D3). El razonamiento y el max-tokens se eligen por turno.
-   * Es el único cliente con tools: el de reescritura no las tiene
-   * ({@code add-assistant-tools}, D2).
+   * Modelo principal. El razonamiento y el max-tokens se eligen por turno.
+   * Es el único cliente con tools: el de reescritura no las tiene.
    */
   @Bean
   ChatClient mainChatClient(OpenAiChatModel chatModel,

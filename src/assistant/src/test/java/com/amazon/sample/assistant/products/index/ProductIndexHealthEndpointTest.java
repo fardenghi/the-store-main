@@ -18,7 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Con la sincronización fallida, {@code productIndex} queda {@code DOWN} en
- * {@code /actuator/health} y la readiness sigue {@code UP} (D7).
+ * {@code /actuator/health} y la readiness sigue {@code UP}.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
     "spring.ai.openai.api-key=" + ApiKeysStartupLogger.PLACEHOLDER,

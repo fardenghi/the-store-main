@@ -31,8 +31,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Corte del cliente con Tomcat real (corrección posterior de D2 de
- * {@code add-assistant-chat}): mientras el modelo "razona" sin mandar nada, el
+ * Corte del cliente con Tomcat real: mientras el modelo "razona" sin mandar nada, el
  * cliente cierra la conexión y la misma sesión vuelve a escribir enseguida,
  * como cuando se cierra una pestaña y se escribe desde otra. El segundo turno
  * tiene que entrar (no {@code 409}) y el turno cortado no puede quedar en la

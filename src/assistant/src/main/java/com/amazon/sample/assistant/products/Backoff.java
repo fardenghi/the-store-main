@@ -3,7 +3,7 @@ package com.amazon.sample.assistant.products;
 import java.time.Duration;
 
 /**
- * Backoff exponencial con tope (D6) y la forma de esperar, inyectable para que
+ * Backoff exponencial con tope y la forma de esperar, inyectable para que
  * los tests no esperen de verdad.
  */
 public final class Backoff {
@@ -16,7 +16,7 @@ public final class Backoff {
     void sleep(Duration duration) throws InterruptedException;
   }
 
-  /** El de D6 para {@code catalog} y Qdrant: de 2 s a 30 s. */
+  /** El de la sincronización con {@code catalog} y Qdrant: de 2 s a 30 s. */
   public static final Backoff DEFAULT = new Backoff(Duration.ofSeconds(2), Duration.ofSeconds(30));
 
   private final Duration initial;

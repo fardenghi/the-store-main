@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.test.StepVerifier;
 
-/** Eventos {@code tool} y {@code cart-updated} (D7) y línea {@code assistant.tool} (D12). */
+/** Eventos {@code tool} y {@code cart-updated} y línea {@code assistant.tool}. */
 class ToolEventsTest {
 
   private static final CatalogProduct ARMCHAIR = product("armchair",

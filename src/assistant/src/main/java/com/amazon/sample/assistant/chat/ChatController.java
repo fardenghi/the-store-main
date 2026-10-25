@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 /**
- * Chat con el asistente en streaming SSE (D1). La sesión se identifica con
+ * Chat con el asistente en streaming SSE. La sesión se identifica con
  * {@code X-Session-ID}, el mismo id que la {@code ui} usa como
  * {@code customerId} del carrito.
  *

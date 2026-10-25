@@ -529,7 +529,7 @@ data:
   SPRING_AI_VECTORSTORE_QDRANT_HOST: qdrant
   SPRING_AI_VECTORSTORE_QDRANT_PORT: "6334"
   SPRING_AI_OPENAI_BASE_URL: https://integrate.api.nvidia.com
-  # Modelos elegidos en select-assistant-models: meta/muse-glimmer-30b en los
+  # Modelos: meta/muse-glimmer-30b en los
   # dos roles, con reasoning_effort low (high en las comparaciones), que son
   # los extra-body por defecto de ChatProperties.
   SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: meta/muse-glimmer-30b
@@ -537,7 +537,7 @@ data:
   RETAIL_ASSISTANT_MODELS_REWRITE: meta/muse-glimmer-30b
   SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_MODEL: gemini-embedding-001
   SPRING_AI_GOOGLE_GENAI_EMBEDDING_TEXT_OPTIONS_DIMENSIONS: "768"
-  # Chat (add-assistant-chat, D11). Plan B verificado (los Nemotron): cambiar
+  # Chat. Plan B verificado (los Nemotron): cambiar
   # los dos modelos y, además (ver "Razonamiento y plan B" en el README):
   # SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: nvidia/nemotron-3-super-120b-a12b
   # RETAIL_ASSISTANT_MODELS_REWRITE: nvidia/nemotron-3.5-lightning-30b-a3b
@@ -561,7 +561,7 @@ data:
   RETAIL_ASSISTANT_CHAT_TIMEOUTS_FIRST_TOKEN_REASONING: 60s
   RETAIL_ASSISTANT_CHAT_TIMEOUTS_TURN: 120s
   RETAIL_ASSISTANT_CHAT_TIMEOUTS_KEEPALIVE: 10s
-  # Tools y limitador hacia NVIDIA (add-assistant-tools, D11). Con más de una
+  # Tools y limitador hacia NVIDIA. Con más de una
   # réplica, bajar REQUESTS_PER_MINUTE en proporción: el limitador es por proceso.
   RETAIL_ASSISTANT_TOOLS_MAX_MODEL_CALLS: "4"
   RETAIL_ASSISTANT_TOOLS_MAX_TOOL_CALLS: "6"
@@ -825,7 +825,7 @@ data:
   RETAIL_UI_ENDPOINTS_CARTS: http://carts
   RETAIL_UI_ENDPOINTS_CHECKOUT: http://checkout
   RETAIL_UI_ENDPOINTS_ORDERS: http://orders
-  # Chat con el assistant y similares de la ficha (integrate-ui-assistant, D10).
+  # Chat con el assistant y similares de la ficha.
   # La ui no recibe claves de proveedores: solo las monta el assistant.
   RETAIL_UI_ENDPOINTS_ASSISTANT: http://assistant
   RETAIL_UI_CHAT_ENABLED: "true"

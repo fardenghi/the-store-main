@@ -10,8 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Validación de los argumentos de las tools en el servidor (D3, spec
- * "Validación de los argumentos de las tools"): cada caso inválido devuelve un
+ * Validación de los argumentos de las tools en el servidor: cada caso inválido devuelve un
  * error que nombra el argumento y no llama a ningún servicio.
  */
 class ToolArgumentsValidationTest {

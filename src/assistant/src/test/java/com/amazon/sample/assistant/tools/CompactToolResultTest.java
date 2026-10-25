@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-/** Resultado compacto de las tools para la memoria (corrección posterior de D7). */
+/** Resultado compacto de las tools para la memoria. */
 class CompactToolResultTest {
 
   @Test

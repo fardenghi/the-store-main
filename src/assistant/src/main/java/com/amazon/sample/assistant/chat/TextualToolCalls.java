@@ -12,7 +12,7 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 
 /**
  * Tool calls que el modelo escribió como texto en lugar de pedirlos como tool
- * calls (corrección posterior de {@code add-assistant-tools}):
+ * calls:
  * {@code nemotron-3-super} a veces responde
  * {@code [addToCart: {"productId": "…", "quantity": 2}]} en el contenido y
  * cierra la vuelta sin {@code tool_calls}. El turno terminaba sin ejecutar nada

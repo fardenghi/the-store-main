@@ -51,17 +51,17 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import reactor.core.publisher.Flux;
 
 /**
- * Spike de modelos (D12): verifica contra NVIDIA, con Spring AI 1.1.8, lo que
+ * Spike de modelos: verifica contra NVIDIA, con Spring AI 1.1.8, lo que
  * el pipeline de chat da por hecho.
  *
  * <p>Modelo principal: streaming con {@code ChatClient.stream()}, razonamiento
  * activado y desactivado por request con {@code extraBody}, dónde llega el
  * razonamiento ({@code reasoning_content} o {@code <think>} en el texto) y tool
  * calling en streaming. Modelo de reescritura: 10 llamadas con el razonamiento
- * desactivado que tienen que devolver el JSON de D4, y su latencia mediana.
+ * desactivado que tienen que devolver el JSON de la reescritura, y su latencia mediana.
  *
  * <p>Los modelos y sus {@code extra-body} se eligen con propiedades de sistema,
- * para repetir el spike con el plan B sin tocar el código:
+ * para repetir la prueba con otros modelos sin tocar el código:
  * <pre>
  * ./mvnw -Psmoke verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false \
  *   -Dit.test=ModelSpikeSmokeIT \
@@ -74,14 +74,14 @@ import reactor.core.publisher.Flux;
  * <p>Gasta 15 requests a NVIDIA: 1 sin razonamiento, 1 con razonamiento, 2 del
  * tool calling (la llamada con la tool y la respuesta final) y 10 de reescritura.
  *
- * <p>{@code add-assistant-tools} (tasks 1.1 y 1.2) suma dos casos que se corren
+ * <p>Dos casos de tools se corren
  * aparte, porque uno agota la cuota a propósito:
  * <ul>
- *   <li>{@code controlledToolCalling} (D1): tool calling con
+ *   <li>{@code controlledToolCalling}: tool calling con
  *       {@code internalToolExecutionEnabled=false} en streaming, ejecución con
  *       {@link ToolCallingManager} y una vuelta con {@code tool_choice: "none"}
  *       (3 requests);</li>
- *   <li>{@code quotaBurst} (D9): una ráfaga de 45 requests mínimas al modelo de
+ *   <li>{@code quotaBurst}: una ráfaga de 45 requests mínimas al modelo de
  *       reescritura para forzar un 429 y ver qué trae, más 1 request en
  *       streaming que tiene que llegar como {@code ChatProviderException}
  *       {@code QUOTA}. Habilitado solo con {@code -Dspike.quota-burst=true}.</li>
@@ -91,7 +91,7 @@ import reactor.core.publisher.Flux;
  *   -Dit.test='ModelSpikeSmokeIT#controlledToolCalling+quotaBurst' -Dspike.quota-burst=true
  * </pre>
  *
- * <p>{@code select-assistant-models} (D4 y D6) agrega:
+ * <p>Para el benchmark de modelos agrega:
  * <ul>
  *   <li>una línea {@code bench.capability} por capacidad (incluida una vuelta de
  *       {@code controlledToolCalling} con {@code tool_choice: "required"}, que
@@ -133,7 +133,7 @@ class ModelSpikeSmokeIT {
   /** Tiempo límite de la reescritura en el {@code assistant}: más lento cuenta como fallback. */
   private static final Duration REWRITE_TIMEOUT = Duration.ofSeconds(12);
 
-  /** Timeout de descarte de {@code thinkingProbe} (D4) y pausa antes del reintento. */
+  /** Timeout de descarte de {@code thinkingProbe} y pausa antes del reintento. */
   private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(30);
   private static final Duration PROBE_RETRY_PAUSE = Duration.ofSeconds(60);
 
@@ -152,7 +152,7 @@ class ModelSpikeSmokeIT {
       "a rug for the living room, nothing too expensive pls",
       "smth to put my books on, like a shelf i guess");
 
-  /** Salida de D4 que tiene que devolver la reescritura. */
+  /** Salida que tiene que devolver la reescritura. */
   record SpikeRewrite(String intent, String query, Integer minPrice, Integer maxPrice,
       List<String> excludeTags) {
   }
@@ -285,7 +285,7 @@ class ModelSpikeSmokeIT {
   @Order(4)
   void rewriteReturnsJsonQuickly() {
     BeanOutputConverter<SpikeRewrite> converter = new BeanOutputConverter<>(SpikeRewrite.class);
-    // El extra-body por el mismo camino que el assistant (ExtraBody, segundo intento).
+    // El extra-body por el mismo camino que el assistant (ExtraBody).
     OpenAiChatOptions rewriteOptions = OpenAiChatOptions.builder().model(rewriteModel)
         .temperature(0.0).maxTokens(rewriteMaxTokens).build();
     ExtraBody.apply(rewriteOptions, rewriteExtra);
@@ -335,13 +335,13 @@ class ModelSpikeSmokeIT {
     long median = latencies.stream().sorted().toList().get(latencies.size() / 2);
     System.out.printf("spike %s: mediana %d ms, JSON inválido %d de %d%n", rewriteModel, median,
         invalid, REWRITE_MESSAGES.size());
-    // Criterio de D12 para quedarse con el modelo.
+    // Criterio para quedarse con el modelo.
     assertThat(invalid).isLessThanOrEqualTo(1);
     assertThat(Duration.ofMillis(median)).isLessThanOrEqualTo(Duration.ofSeconds(2));
   }
 
   /**
-   * D1: el {@code assistant} controla el ciclo de tools. Con
+   * El {@code assistant} controla el ciclo de tools. Con
    * {@code internalToolExecutionEnabled=false}, el stream tiene que devolver los
    * tool calls completos sin ejecutarlos; {@link ToolCallingManager} los ejecuta
    * y arma el historial para una segunda vuelta que responde en texto; y una
@@ -406,7 +406,7 @@ class ModelSpikeSmokeIT {
     assertThat(round2.toolCalls).isEmpty();
     assertThat(round2.text.toString()).contains("139");
 
-    // Vuelta final de D1: las mismas tools, con tool_choice "none".
+    // Vuelta final: las mismas tools, con tool_choice "none".
     OpenAiChatOptions none = OpenAiChatOptions.fromOptions(options);
     none.setToolChoice("none");
     Round round3 = capturing("tool-choice-none", () -> round(new Prompt(List.of(new UserMessage(
@@ -417,8 +417,8 @@ class ModelSpikeSmokeIT {
     capability("tool-choice-none", round3.toolCalls.isEmpty()
         && !round3.text.toString().isBlank(), "ms=" + round3.millis);
 
-    // Vuelta correctiva de add-assistant-tools: tool_choice "required" obliga a
-    // pedir una tool aunque el mensaje no la necesite (select-assistant-models).
+    // Vuelta correctiva: tool_choice "required" obliga a
+    // pedir una tool aunque el mensaje no la necesite.
     OpenAiChatOptions required = OpenAiChatOptions.fromOptions(options);
     required.setToolChoice("required");
     Round round4 = capturing("tool-choice-required", () -> round(new Prompt(List.of(
@@ -434,7 +434,7 @@ class ModelSpikeSmokeIT {
   }
 
   /**
-   * D4 de {@code select-assistant-models}: con qué {@code extra-body} se apaga
+   * Con qué {@code extra-body} se apaga
    * ({@code -Dspike.probe-mode=off}, el default) o se prende ({@code on}) el
    * razonamiento de {@code -Dspike.probe-model}. Una request sin streaming por
    * variante, en orden, hasta la primera que cumple el criterio:
@@ -588,7 +588,7 @@ class ModelSpikeSmokeIT {
   }
 
   /**
-   * D9: qué responde NVIDIA ante un 429. Manda 45 requests mínimas (1 token de
+   * Qué responde NVIDIA ante un 429. Manda 45 requests mínimas (1 token de
    * salida) en paralelo al modelo de reescritura, más que los 40 RPM de la
    * cuenta, y reporta los status y los headers de los 429. Después hace 1
    * request en streaming con el cliente de Spring AI, que tiene que llegar como
@@ -638,7 +638,7 @@ class ModelSpikeSmokeIT {
     if (rejected == null) {
       // Resultado del 2026-10-06: las 45 respondieron 200 (NVIDIA las demoró en
       // lugar de rechazarlas). Sin 429 no hay header que inspeccionar: queda el
-      // default-retry-after de D9 y el parseo se prueba con tests unitarios.
+      // default-retry-after y el parseo se prueba con tests unitarios.
       System.out.println("spike 429: ninguna request de la ráfaga respondió 429");
       return;
     }
@@ -707,7 +707,7 @@ class ModelSpikeSmokeIT {
 
   private StreamResult stream(Map<String, Object> extraBody, int maxTokens, Object tool,
       String message) {
-    // defaultOptions como los del cliente principal (D3) y opciones por request
+    // defaultOptions como los del cliente principal y opciones por request
     // con el extraBody del razonamiento, armadas como copia de los defaults.
     OpenAiChatOptions defaults = OpenAiChatOptions.builder().model(mainModel).temperature(0.6)
         .maxTokens(1024).build();

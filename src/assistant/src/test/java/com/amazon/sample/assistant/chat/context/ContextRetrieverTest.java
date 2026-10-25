@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
-/** Retrieval del turno (D5). */
+/** Retrieval del turno. */
 class ContextRetrieverTest {
 
   private final ProductSearchService search = mock(ProductSearchService.class);

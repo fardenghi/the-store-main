@@ -17,9 +17,9 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * El tiempo límite de la reescritura es el que corta, no el
- * {@code spring.http.client.read-timeout} de los {@code RestClient}
- * ({@code select-assistant-models}, segundo intento: con 10 s contra 12 s, la
- * reescritura caía al fallback a los 10 s como {@code llm-provider-unavailable}).
+ * {@code spring.http.client.read-timeout} de los {@code RestClient}: con 10 s
+ * contra 12 s, la reescritura caía al fallback a los 10 s como
+ * {@code llm-provider-unavailable}.
  */
 class RewriteTimeoutTest {
 

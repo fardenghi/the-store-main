@@ -20,8 +20,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import reactor.core.publisher.Flux;
 
 /**
- * Formato SSE de los eventos con nombre {@code tool} y {@code cart-updated}
- * (D7 de {@code add-assistant-tools}), con el servicio del turno mockeado.
+ * Formato SSE de los eventos con nombre {@code tool} y {@code cart-updated},
+ * con el servicio del turno mockeado.
  */
 @WebMvcTest(ChatController.class)
 class ChatControllerToolEventsTest {

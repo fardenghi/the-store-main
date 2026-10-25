@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * Errores de la búsqueda y de los similares como {@link ProblemDetail}, con un
- * {@code type} estable (D8).
+ * {@code type} estable.
  */
 @RestControllerAdvice(assignableTypes = ProductSearchController.class)
 public class ProductSearchExceptionHandler {

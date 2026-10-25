@@ -19,7 +19,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-/** Traducción de los errores del proveedor de chat (D10). */
+/** Traducción de los errores del proveedor de chat. */
 class ChatProviderErrorsTest {
 
   private static WebClientResponseException streamingError(int status, String retryAfter) {
@@ -88,7 +88,7 @@ class ChatProviderErrorsTest {
   @Test
   void retryAfterParsing() {
     assertThat(ChatProviderErrors.retryAfter("2.5")).isEqualTo(Duration.ofMillis(2500));
-    // Fecha HTTP: relativa a ahora (add-assistant-tools, D9).
+    // Fecha HTTP: relativa a ahora.
     java.time.Instant now = java.time.Instant.parse("2026-10-21T07:27:50Z");
     assertThat(ChatProviderErrors.retryAfter("Wed, 21 Oct 2026 07:28:00 GMT", now))
         .isEqualTo(Duration.ofSeconds(10));

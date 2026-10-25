@@ -6,7 +6,7 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 
 /**
  * Decide por turno si el modelo principal razona y arma las opciones del
- * request (D7): en modo {@code auto}, el razonamiento se activa solo en las
+ * request: en modo {@code auto}, el razonamiento se activa solo en las
  * comparaciones. Activado lleva el {@code on-extra-body} y
  * {@code max-tokens-reasoning}, porque los tokens del razonamiento cuentan
  * dentro del límite; desactivado, el {@code off-extra-body} y

@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * Producto devuelto por la búsqueda y por los similares, armado desde el
- * payload de Qdrant (D8).
+ * payload de Qdrant.
  */
 public record ProductResult(
     String id,

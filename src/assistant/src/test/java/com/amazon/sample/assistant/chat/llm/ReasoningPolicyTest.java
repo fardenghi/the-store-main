@@ -12,7 +12,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.ai.openai.OpenAiChatOptions;
 
-/** Razonamiento por turno según el modo y el intent (D7). */
+/** Razonamiento por turno según el modo y el intent. */
 class ReasoningPolicyTest {
 
   private static final OpenAiChatOptions BASE = OpenAiChatOptions.builder()

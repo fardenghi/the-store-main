@@ -34,7 +34,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Evaluación de la reescritura (D9): cada consulta de
+ * Evaluación de la reescritura: cada consulta de
  * {@code rewrite-eval.json} se busca cruda y reescrita (con el turno previo
  * simulado cuando lo tiene) y se cuentan los productos esperados en el top-5.
  * La reescrita tiene que acertar más en total.
@@ -48,7 +48,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * colección ya indexada: la sincronización no vuelve a embeber los productos
  * sin cambios y la corrida gasta solo las búsquedas.
  *
- * <p>Para el benchmark de modelos ({@code select-assistant-models}) imprime una
+ * <p>Para el benchmark de modelos imprime una
  * línea {@code bench.rewrite} por consulta ({@code outcome} {@code ok},
  * {@code fallback} o {@code invalid}, latencia y aciertos del top-5 crudo y
  * reescrito) y una {@code bench.usage} con el consumo de la corrida.

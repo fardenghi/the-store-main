@@ -32,7 +32,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.publisher.Flux;
 
-/** Línea de log por turno y top-k crudo en segundo plano (D9). */
+/** Línea de log por turno y top-k crudo en segundo plano. */
 class TurnLogTest {
 
   private static ShownProduct product(String id) {

@@ -9,21 +9,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Tools del modelo principal ({@code retail.assistant.tools}, D11 de
- * {@code add-assistant-tools}).
+ * Tools del modelo principal ({@code retail.assistant.tools}).
  *
  * @param maxModelCalls solicitudes al modelo principal por turno, incluidas las
- *     que siguen a las tools; la última va con {@code tool_choice: "none"} (D1)
+ *     que siguen a las tools; la última va con {@code tool_choice: "none"}
  * @param maxToolCalls tools ejecutadas por turno; las que exceden reciben
- *     {@code tool-budget-exhausted} (D1)
- * @param maxQuantity cantidad máxima de {@code addToCart} (D3)
+ *     {@code tool-budget-exhausted}
+ * @param maxQuantity cantidad máxima de {@code addToCart}
  * @param searchDefaultLimit resultados de {@code searchProducts} sin {@code limit}
- * @param searchMaxLimit máximo de {@code limit} en {@code searchProducts} (D3)
- * @param descriptionMaxChars largo máximo de las descripciones en los resultados (D2)
- * @param http tiempos límite de las llamadas a {@code catalog} y {@code carts} (D5)
+ * @param searchMaxLimit máximo de {@code limit} en {@code searchProducts}
+ * @param descriptionMaxChars largo máximo de las descripciones en los resultados
+ * @param http tiempos límite de las llamadas a {@code catalog} y {@code carts}
  * @param correctiveToolChoice cómo se obliga a pedir una tool en la vuelta
- *     correctiva de un pedido de carrito ({@code select-assistant-models},
- *     segundo intento); sin valor, {@code required}
+ *     correctiva de un pedido de carrito; sin valor, {@code required}
  */
 @Validated
 @ConfigurationProperties("retail.assistant.tools")

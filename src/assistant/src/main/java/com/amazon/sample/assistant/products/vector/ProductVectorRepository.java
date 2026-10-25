@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Acceso a la colección {@code products} de Qdrant sobre el
- * {@link QdrantClient} gRPC que autoconfigura el starter (D1). No usa el
+ * {@link QdrantClient} gRPC que autoconfigura el starter. No usa el
  * {@code QdrantVectorStore} de Spring AI.
  */
 public class ProductVectorRepository {
@@ -74,7 +74,7 @@ public class ProductVectorRepository {
   /**
    * Crea la colección (vector de {@code dimensions}, coseno) y sus índices de
    * payload si no existe. Si existe con otra dimensión o distancia, la borra y
-   * la recrea, lo que obliga a reindexar todo (D2).
+   * la recrea, lo que obliga a reindexar todo.
    *
    * @return {@code true} si la colección se creó o se recreó
    */
@@ -190,7 +190,7 @@ public class ProductVectorRepository {
   }
 
   /**
-   * Los {@code k} puntos más cercanos al vector que cumplen los filtros (D8):
+   * Los {@code k} puntos más cercanos al vector que cumplen los filtros:
    * {@code tags} con semántica OR (match any) y {@code price} en el rango
    * inclusivo. Los filtros ausentes no se aplican.
    */

@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Caché LRU en memoria de los embeddings de consultas (D9). La clave es la
+ * Caché LRU en memoria de los embeddings de consultas. La clave es la
  * consulta normalizada: sin espacios en los extremos, en minúsculas y con los
  * espacios internos colapsados.
  */

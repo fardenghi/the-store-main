@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Resultado del retrieval de un turno (D5).
+ * Resultado del retrieval de un turno.
  *
  * @param searched si el turno buscó en el catálogo (no lo hace con intent {@code other})
  * @param catalogUnavailable si la búsqueda falló por el índice o por los embeddings

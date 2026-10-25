@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Tags del catálogo para la reescritura (D4). Se leen de {@code catalog} la
+ * Tags del catálogo para la reescritura. Se leen de {@code catalog} la
  * primera vez que hacen falta y quedan cacheados: el catálogo es estático en
  * runtime. Si la lectura falla, devuelve una lista vacía (la reescritura sigue
  * sin tags) y vuelve a intentar en el turno siguiente.

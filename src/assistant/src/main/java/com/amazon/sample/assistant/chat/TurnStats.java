@@ -4,7 +4,7 @@ import com.amazon.sample.assistant.chat.context.Retrieval;
 import com.amazon.sample.assistant.chat.rewrite.Rewrite;
 import java.util.List;
 
-/** Datos de un turno para su línea de log (D9). Los completa el pipeline. */
+/** Datos de un turno para su línea de log. Los completa el pipeline. */
 class TurnStats {
 
   final String sessionId;
@@ -17,8 +17,7 @@ class TurnStats {
   volatile long firstFragmentMillis = -1;
   /**
    * Primer fragmento de razonamiento ({@code reasoning_content}) del modelo
-   * principal, desde el inicio del turno; el usuario no lo ve
-   * ({@code select-assistant-models}, segundo intento: M7 por separado).
+   * principal, desde el inicio del turno; el usuario no lo ve.
    */
   volatile long firstReasoningMillis = -1;
   volatile long totalMillis = -1;

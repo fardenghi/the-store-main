@@ -16,8 +16,7 @@ import org.springframework.ai.tool.resolution.ToolCallbackResolver;
 /**
  * Envuelve una tool para que un tool call que no se puede ni siquiera convertir
  * en argumentos (un JSON roto, un tipo imposible) vuelva al modelo como
- * {@code invalid-argument} en lugar de cortar el turno (D2 y D3 de
- * {@code add-assistant-tools}). Con {@link #unknownToolResolver()}, lo mismo
+ * {@code invalid-argument} en lugar de cortar el turno. Con {@link #unknownToolResolver()}, lo mismo
  * para un nombre de tool que no existe.
  */
 public final class SafeToolCallback implements ToolCallback {

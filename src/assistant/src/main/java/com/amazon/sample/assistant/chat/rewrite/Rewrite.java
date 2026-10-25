@@ -3,7 +3,7 @@ package com.amazon.sample.assistant.chat.rewrite;
 import java.util.List;
 
 /**
- * Reescritura validada que usa el turno (D4).
+ * Reescritura validada que usa el turno.
  *
  * @param intent intención del mensaje
  * @param query consulta de búsqueda; con {@code fallback}, el mensaje crudo
@@ -14,7 +14,7 @@ import java.util.List;
  * @param providerRequests solicitudes hechas al modelo de reescritura (0 o 1)
  * @param latencyMillis duración de la reescritura
  * @param rateLimited si se usó el mensaje crudo sin llamar al modelo porque el
- *     limitador no tenía lugar inmediato (D8 de {@code add-assistant-tools})
+ *     limitador no tenía lugar inmediato
  */
 public record Rewrite(
     Intent intent,

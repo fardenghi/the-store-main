@@ -11,7 +11,7 @@ import org.springframework.validation.annotation.Validated;
  * @param maxK máximo de {@code k} en la búsqueda
  * @param similarDefaultK similares si no se indica {@code k}
  * @param similarMaxK máximo de {@code k} en los similares
- * @param queryCacheSize entradas del caché LRU de embeddings de consultas (D9)
+ * @param queryCacheSize entradas del caché LRU de embeddings de consultas
  */
 @Validated
 @ConfigurationProperties("retail.assistant.search")

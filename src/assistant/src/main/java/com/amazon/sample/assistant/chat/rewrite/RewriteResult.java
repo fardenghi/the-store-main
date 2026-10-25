@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 
 /**
- * Salida estructurada del modelo de reescritura (D4), tal como la devuelve
+ * Salida estructurada del modelo de reescritura, tal como la devuelve
  * el modelo. {@link QueryRewriter} la valida antes de usarla.
  */
 public record RewriteResult(

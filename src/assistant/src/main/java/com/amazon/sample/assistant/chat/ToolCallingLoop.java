@@ -41,11 +41,11 @@ import reactor.core.scheduler.Schedulers;
 
 /**
  * Ciclo de tool calling de un turno, controlado por el {@code assistant} y no
- * por Spring AI (D1 de {@code add-assistant-tools}):
+ * por Spring AI:
  *
  * <pre>
  * vuelta n (n = 1..max-model-calls)
- *   ─► reservar lugar en el limitador (D8), como Mono.delay
+ *   ─► reservar lugar en el limitador, como Mono.delay
  *   ─► stream del modelo con las tools (en la última vuelta: tool_choice = none)
  *   ─► reenviar los fragmentos de texto al canal del turno
  *   ─► al cerrar el stream: ¿trajo tool calls?
@@ -58,7 +58,7 @@ import reactor.core.scheduler.Schedulers;
  * al primer fragmento se miden por vuelta desde que el limitador otorga el
  * lugar; el del turno lo controla {@link ChatTurnService}. Si una vuelta recibe
  * un 429 antes de emitir algo, pausa el limitador por el {@code Retry-After} y
- * la reintenta, hasta {@code max-429-retries} veces (D9).
+ * la reintenta, hasta {@code max-429-retries} veces.
  *
  * <p>Correcciones posteriores (confirmación fiel de las acciones):
  * <ul>
@@ -86,7 +86,7 @@ public class ToolCallingLoop {
 
   private static final Logger log = LoggerFactory.getLogger(ToolCallingLoop.class);
 
-  /** Texto de la persona cuando la última vuelta no trajo texto (D1). */
+  /** Texto de la persona cuando la última vuelta no trajo texto. */
   static final String NO_ANSWER_TEXT = "Mission aborted, Operative: I couldn't complete that "
       + "operation this time. Try asking me again.";
 
@@ -245,7 +245,7 @@ public class ToolCallingLoop {
   /**
    * El modelo le está preguntando o pidiendo una aclaración al usuario: en ese
    * caso la vuelta correctiva no se fuerza, para que pueda preguntar en lugar de
-   * elegir un producto (spec "Pedido ambiguo").
+   * elegir un producto ante un pedido ambiguo.
    */
   private static final Pattern ASKS_USER = Pattern.compile(
       "\\?|¿|\\b(clarify|which one|which of|specify|confirm|do you mean|cuál|aclar\\w*)\\b",
@@ -360,7 +360,7 @@ public class ToolCallingLoop {
 
   /**
    * Una vuelta con su lugar en el limitador, reintentada ante un 429 que llegó
-   * antes de cualquier fragmento (D9).
+   * antes de cualquier fragmento.
    */
   private Mono<Round> attempt(List<Message> messages, OpenAiChatOptions options, Run run,
       int retriesLeft) {
@@ -402,8 +402,8 @@ public class ToolCallingLoop {
    * trae algo: texto, razonamiento ({@code reasoning_content}) o un tool call.
    * Un modelo que razona siempre, aun con el esfuerzo mínimo (como
    * {@code meta/muse-glimmer-30b}), ya está respondiendo mientras razona, y
-   * antes los turnos se cortaban a los 20 s sin texto visible
-   * ({@code select-assistant-models}, segundo intento). Un chunk vacío (solo el
+   * antes los turnos se cortaban a los 20 s sin texto visible.
+   * Un chunk vacío (solo el
    * rol o el {@code finish_reason}) no cuenta. Después del primero, el límite es
    * el del turno.
    */

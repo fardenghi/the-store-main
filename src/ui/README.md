@@ -72,7 +72,7 @@ Todo turno termina con exactamente un evento `done` o `error` y HTTP 200. Ademá
 
 Si el navegador cierra la conexión, la `ui` cierra la conexión con el `assistant`, que cancela el turno y libera la sesión. La conversación visible en el chat no se conserva al navegar entre páginas, pero el `assistant` mantiene la memoria de la sesión.
 
-### Verificación en el cluster (`integrate-ui-assistant`)
+### Verificación en el cluster
 
 Verificado el 2026-10-06 en kind (`./local.sh create-cluster`, `dist/kubernetes.yaml`), con `NVIDIA_API_KEY` y `GOOGLE_API_KEY` válidas y el índice cargado desde un snapshot de Qdrant (la sincronización dio `80 sin cambios, 0 requests al proveedor de embeddings`). Cada sesión es un contexto nuevo de Playwright (equivalente a una ventana privada) contra `http://localhost`.
 
@@ -91,7 +91,7 @@ Verificado el 2026-10-06 en kind (`./local.sh create-cluster`, `dist/kubernetes.
 | "add two of the first one to my cart" en el catálogo | 2 | Falló en la primera sesión (ver abajo). En una sesión nueva, después de la búsqueda, el contador pasó de 0 a 2 durante el turno, sin recargar y con la conversación visible |
 | El mismo pedido con `/cart` abierto | 2 | Falló en el tercer turno de una sesión (ver abajo). En una sesión nueva la lista pasó de vacía a "Curved Brass and Walnut Desk Lamp x2" ($298) a los 3,2 s, en medio del turno, con el chat abierto |
 
-**Limitación conocida del `assistant` (pendiente fuera de este change):** en sesiones de más de dos o tres turnos, el modelo principal a veces deja de llamar a las tools y responde como si las hubiera usado ("Two lamps have been added to your cart"). En el log `assistant.turn` esos turnos tienen `tools=-` y `modelCalls=1`, y el carrito no cambia. Como no hay `cart-updated`, la `ui` no actualiza el contador, que es el comportamiento esperado. En una sesión nueva, con el pedido en el primer o segundo turno, las tools funcionan (`tools=searchProducts:ok,addToCart:ok` y evento `cart-updated`).
+**Limitación observada con el modelo anterior (Nemotron), ya corregida:** en sesiones de más de dos o tres turnos, el modelo principal a veces dejaba de llamar a las tools y respondía como si las hubiera usado ("Two lamps have been added to your cart"). En el log `assistant.turn` esos turnos tenían `tools=-` y `modelCalls=1`, y el carrito no cambiaba; como no había `cart-updated`, la `ui` no actualizaba el contador. Se corrigió en el `assistant` con la salvaguarda de agregados al carrito y el cambio a `meta/muse-glimmer-30b` (ver el README del `assistant`).
 
 **Aislamiento de fallas:**
 

@@ -13,7 +13,7 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
-/** Defaults de {@code retail.assistant.rewrite} y {@code retail.assistant.chat} (D11). */
+/** Defaults de {@code retail.assistant.rewrite} y {@code retail.assistant.chat}. */
 class ChatPropertiesTest {
 
   @Configuration(proxyBeanMethods = false)
@@ -57,7 +57,7 @@ class ChatPropertiesTest {
     runner.run(context -> {
       ChatProperties properties = context.getBean(ChatProperties.class);
 
-      // Defaults de muse-glimmer-30b (select-assistant-models); la clave conserva
+      // Defaults de muse-glimmer-30b; la clave conserva
       // el guion bajo.
       assertThat(properties.rewrite().extraBody()).isEqualTo(Map.of("reasoning_effort", "low"));
       assertThat(properties.chat().reasoning().onExtraBody())

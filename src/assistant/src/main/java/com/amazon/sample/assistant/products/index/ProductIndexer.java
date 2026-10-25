@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.task.TaskExecutor;
 
 /**
- * Sincroniza la colección {@code products} de Qdrant con el catálogo (D4):
+ * Sincroniza la colección {@code products} de Qdrant con el catálogo:
  * asegura la colección, lee el catálogo completo, compara contra el payload
  * de los puntos y embebe solo los productos nuevos o con texto cambiado. Es
  * idempotente: el id del punto es el del producto.
@@ -36,7 +36,7 @@ public class ProductIndexer {
 
   private static final Logger log = LoggerFactory.getLogger(ProductIndexer.class);
 
-  /** Intentos contra Qdrant cuando no responde (D6). */
+  /** Intentos contra Qdrant cuando no responde. */
   static final int QDRANT_MAX_ATTEMPTS = 10;
 
   private final CatalogClient catalog;
@@ -65,7 +65,7 @@ public class ProductIndexer {
   }
 
   /**
-   * Lanza la sincronización en {@code executor} (D5). Si ya hay una en curso,
+   * Lanza la sincronización en {@code executor}. Si ya hay una en curso,
    * ignora el disparo.
    *
    * @return {@code false} si se ignoró
@@ -220,7 +220,7 @@ public class ProductIndexer {
    * Embebe un lote (una request) con hasta {@code max-provider-retries}
    * reintentos ante {@code QUOTA} y {@code UNAVAILABLE}, esperando el
    * {@code retryDelay} del proveedor o el backoff. {@code UNAUTHORIZED} no se
-   * reintenta (D6).
+   * reintenta.
    */
   private BatchResult embedWithRetry(List<String> texts) throws InterruptedException {
     for (int attempt = 1; ; attempt++) {

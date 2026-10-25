@@ -35,7 +35,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-/** {@code getProductDetails} y {@code addToCart} (D6): precio vivo y carrito de la sesión. */
+/** {@code getProductDetails} y {@code addToCart}: precio vivo y carrito de la sesión. */
 class ProductAndCartToolsTest {
 
   private static final CatalogProduct ARMCHAIR = product("armchair",

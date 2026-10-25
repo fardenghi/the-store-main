@@ -14,7 +14,7 @@ public class AssistantConfig {
   /**
    * Cliente HTTP hacia el assistant, compartido por el chat y los similares.
    * Solo tiene timeout de conexión: un turno con razonamiento puede pasar más
-   * de 60 s sin bytes, así que cada llamada aplica su propio límite total (D3).
+   * de 60 s sin bytes, así que cada llamada aplica su propio límite total.
    */
   @Bean
   public WebClient assistantWebClient(

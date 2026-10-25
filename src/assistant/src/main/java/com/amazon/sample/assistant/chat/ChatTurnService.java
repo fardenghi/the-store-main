@@ -39,7 +39,7 @@ import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * Orquesta un turno de chat (D2):
+ * Orquesta un turno de chat:
  *
  * <pre>
  * lock de la sesión ─► reescritura ─► retrieval ─► evento products
@@ -48,8 +48,8 @@ import reactor.core.scheduler.Schedulers;
  *   ─► liberar el lock ─► en segundo plano: top-k crudo y línea de log
  * </pre>
  *
- * <p>La parte del modelo principal la resuelve el {@link ToolCallingLoop}
- * ({@code add-assistant-tools}, D1): vueltas con tools, eventos {@code tool} y
+ * <p>La parte del modelo principal la resuelve el {@link ToolCallingLoop}:
+ * vueltas con tools, eventos {@code tool} y
  * {@code cart-updated}, limitador y reintento ante 429. El razonamiento se
  * decide una vez por turno y vale para todas las vueltas.
  *
@@ -80,7 +80,7 @@ public class ChatTurnService {
   private record Prepared(Rewrite rewrite, Retrieval retrieval) {
   }
 
-  /** Productos que recuerda la sesión de un turno (D7 de {@code add-assistant-tools}). */
+  /** Productos que recuerda la sesión de un turno. */
   static final int MAX_SHOWN_PRODUCTS = 10;
 
   /** Espera entre las dos escrituras del sondeo de un turno en curso. */
@@ -98,7 +98,7 @@ public class ChatTurnService {
   private final int maxToolCalls;
   private final ChatProperties.Chat properties;
   private final TurnLogger turnLogger = new TurnLogger();
-  /** Turno en curso de cada sesión, para sondear su conexión (D2). */
+  /** Turno en curso de cada sesión, para sondear su conexión. */
   private final ConcurrentMap<String, ChatTurn> active = new ConcurrentHashMap<>();
 
   public ChatTurnService(SessionStore sessions, QueryRewriter rewriter, ContextRetriever retriever,
@@ -220,7 +220,7 @@ public class ChatTurnService {
         .timeout(remaining(deadline))
         .doOnTerminate(() -> stats.tools = toolTurn.outcomes())
         .flatMap(answer -> Mono.<Void>fromRunnable(() -> {
-          // Un turno cortado libera el lock enseguida (D2): si eso ya pasó,
+          // Un turno cortado libera el lock enseguida: si eso ya pasó,
           // commitIfOwner no lo guarda aunque su respuesta termine después.
           if (turn.isCancelled() || !turn.session().commitIfOwner(turn,
               new Turn(turn.message(), answer.text(), answer.toolRounds()),
@@ -237,7 +237,7 @@ public class ChatTurnService {
    * usuario, cada vuelta con tools como un {@link AssistantMessage} con sus tool
    * calls seguido de un {@link ToolResponseMessage} con los resultados
    * compactos, y la respuesta final. Así el modelo ve qué acciones se hicieron
-   * de verdad (corrección posterior de D7 de {@code add-assistant-tools}).
+   * de verdad.
    */
   static List<Message> history(Turn turn) {
     List<Message> messages = new ArrayList<>();
@@ -265,7 +265,7 @@ public class ChatTurnService {
   }
 
   /**
-   * Productos que recuerda la sesión (D7 de {@code add-assistant-tools}): los
+   * Productos que recuerda la sesión: los
    * que devolvieron las tools del turno, primero, y después los del evento
    * {@code products}, sin repetidos y hasta 10. Sin productos de tools, sigue la
    * regla del chat: los del retrieval si el turno buscó, o {@code null} para
@@ -288,7 +288,7 @@ public class ChatTurnService {
   /**
    * Después de cerrar el stream: calcula el top-k de la consulta cruda (si la
    * comparación está activada y el turno buscó) y loguea la línea del turno,
-   * en segundo plano para no sumar latencia (D9).
+   * en segundo plano para no sumar latencia.
    */
   private void afterTurn(ChatTurn turn, TurnStats stats) {
     Retrieval retrieval = stats.retrieval;
@@ -312,7 +312,7 @@ public class ChatTurnService {
   /**
    * Agrega un comentario {@code :keepalive} cada vez que pasa
    * {@code timeouts.keepalive} sin ningún evento, para que un proxy no corte
-   * la conexión mientras el modelo razona (D1).
+   * la conexión mientras el modelo razona.
    */
   Flux<ServerSentEvent<?>> withKeepalive(Flux<ServerSentEvent<?>> events) {
     Duration every = properties.timeouts().keepalive();

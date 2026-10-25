@@ -4,8 +4,8 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * Error del proveedor de embeddings, independiente del SDK de Google GenAI
- * (D6). Lo usan la sincronización (para decidir si reintenta) y la búsqueda
+ * Error del proveedor de embeddings, independiente del SDK de Google GenAI.
+ * Lo usan la sincronización (para decidir si reintenta) y la búsqueda
  * (para elegir el {@code 503} que responde).
  */
 public class EmbeddingProviderException extends RuntimeException {

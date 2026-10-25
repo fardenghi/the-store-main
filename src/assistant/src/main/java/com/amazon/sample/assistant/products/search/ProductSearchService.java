@@ -6,7 +6,7 @@ import com.amazon.sample.assistant.products.vector.ProductVectorRepository;
 import java.util.List;
 
 /**
- * Búsqueda semántica de productos (D8): embebe la consulta en modo
+ * Búsqueda semántica de productos: embebe la consulta en modo
  * {@code RETRIEVAL_QUERY} y busca en Qdrant con los filtros de tags (OR) y
  * precio (rango inclusivo), que se combinan con AND.
  */

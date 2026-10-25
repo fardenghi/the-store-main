@@ -22,16 +22,16 @@ import org.springframework.web.client.RestClientException;
 
 /**
  * Lee el catálogo completo del servicio {@code catalog} paginando
- * {@code GET /catalog/products} (D4).
+ * {@code GET /catalog/products}.
  *
  * <p>Ante errores de conexión, timeouts y 5xx (incluido el chaos middleware)
  * reintenta sin límite con backoff exponencial, porque al arrancar el cluster
- * {@code catalog} puede tardar (D6). Cada reintento vuelve a leer desde la
+ * {@code catalog} puede tardar. Cada reintento vuelve a leer desde la
  * primera página: un error en cualquier página invalida la lectura completa y
  * nunca se devuelve un resultado parcial.
  *
- * <p>Las lecturas de las tools ({@link #getProduct} y {@link #listProducts}, D5
- * de {@code add-assistant-tools}) usan otro {@link RestClient}, con tiempos
+ * <p>Las lecturas de las tools ({@link #getProduct} y {@link #listProducts})
+ * usan otro {@link RestClient}, con tiempos
  * límite cortos, y reintentan <b>una</b> vez ante 5xx, timeout o error de red:
  * un turno de chat no puede esperar indefinidamente.
  */
@@ -92,8 +92,7 @@ public class CatalogClient {
   /**
    * Devuelve los tags del catálogo ({@code GET /catalog/tags}) en una sola
    * llamada, sin reintentos: la usa la reescritura de consulta, que ante un
-   * error sigue sin la lista y la vuelve a pedir en el turno siguiente (D4 de
-   * {@code add-assistant-chat}).
+   * error sigue sin la lista y la vuelve a pedir en el turno siguiente.
    *
    * @throws RestClientException si {@code catalog} no responde o responde un error
    */
@@ -107,7 +106,7 @@ public class CatalogClient {
 
   /**
    * Un producto ({@code GET /catalog/products/{id}}), siempre leído del
-   * catálogo y sin caché (D6 de {@code add-assistant-tools}).
+   * catálogo y sin caché.
    *
    * @return el producto, o vacío si {@code catalog} responde 404
    * @throws CatalogUnavailableException si falla también el reintento

@@ -5,10 +5,9 @@ import java.util.List;
 /**
  * Un turno guardado en la memoria de la sesión: el mensaje del usuario, la
  * respuesta que vio y, si el turno usó tools, sus vueltas con tool calls y un
- * resultado compacto de cada una. Sin el razonamiento ni el contexto RAG (D6).
+ * resultado compacto de cada una. Sin el razonamiento ni el contexto RAG.
  *
- * <p>Las vueltas con tools se guardan desde la corrección posterior de D7 de
- * {@code add-assistant-tools}: sin ellas, el historial mostraba respuestas como
+ * <p>Las vueltas con tools se guardan porque, sin ellas, el historial mostraba respuestas como
  * "added to your cart" sin ningún tool call, y el modelo las imitaba en los
  * turnos siguientes en lugar de llamar a {@code addToCart}.
  *
