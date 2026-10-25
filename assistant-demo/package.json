@@ -7,6 +7,7 @@
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.535",
+    "@remotion/player": "4.0.535",
     "@remotion/transitions": "4.0.535",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -15,13 +16,18 @@
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.535",
     "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
     "@types/web": "0.0.166",
+    "@vitejs/plugin-react": "4.5.2",
     "eslint": "9.39.5",
     "prettier": "3.8.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vite": "6.3.5"
   },
   "scripts": {
     "dev": "remotion studio",
+    "deck": "vite",
+    "deck:build": "vite build",
     "render": "remotion render src/index.ts TheStore-Assistant out/the-store-assistant.mp4 --codec=h264",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",

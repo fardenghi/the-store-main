@@ -1,10 +1,10 @@
-import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { interpolate } from "remotion";
+import { useSceneTime } from "../clock";
 import { C, Stage, Enter, Photo, clamp } from "../design";
 import { Check, progress } from "../motion";
 export const Response = () => {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = f / fps;
+  const T = useSceneTime();
+  const t = T();
   const text = "Nogal. Latón. Para tu escritorio.";
   return (
     <Stage step={6} label="Streaming · SSE" light>
@@ -26,8 +26,8 @@ export const Response = () => {
           position: "absolute",
           left: 215,
           top: 280,
-          rotate: `${interpolate(t, [0, 3], [-9, 0], clamp)}deg`,
-          scale: interpolate(t, [0, 1], [0.7, 1], clamp),
+          rotate: `${interpolate(T(0.1), [0, 3], [-9, 0], clamp)}deg`,
+          scale: interpolate(T(0.1), [0, 1], [0.7, 1], clamp),
         }}
       >
         <Photo index={0} size={500} />
@@ -44,7 +44,7 @@ export const Response = () => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          scale: interpolate(t, [1.5, 1.9, 2.2], [0, 1.15, 1], clamp),
+          scale: interpolate(T(1.5), [1.5, 1.9, 2.2], [0, 1.15, 1], clamp),
         }}
       >
         <Check size={58} />
@@ -75,9 +75,9 @@ export const Response = () => {
       >
         {text.slice(
           0,
-          Math.round(interpolate(t, [1.4, 3.6], [0, text.length], clamp)),
+          Math.round(interpolate(T(1.4), [1.4, 3.6], [0, text.length], clamp)),
         )}
-        <span style={{ opacity: t < 3.6 ? 1 : 0 }}>▍</span>
+        <span style={{ opacity: T(1.4) < 3.6 ? 1 : 0 }}>▍</span>
       </Enter>
       <Enter
         at={2.5}
@@ -98,7 +98,7 @@ export const Response = () => {
           top: 785,
           display: "flex",
           gap: 8,
-          opacity: 1 - progress(t, 4.2, 5),
+          opacity: 1 - progress(T(4.2), 4.2, 5),
         }}
       >
         {Array.from({ length: 16 }, (_, i) => (
@@ -109,7 +109,11 @@ export const Response = () => {
               height: 8 + Math.abs(Math.sin(t * 4 - i * 0.6)) * 30,
               borderRadius: 5,
               background: "#6b843a",
-              opacity: progress(t, 1.5 + i * 0.07, 1.7 + i * 0.07),
+              opacity: progress(
+                T(1.5 + i * 0.07),
+                1.5 + i * 0.07,
+                1.7 + i * 0.07,
+              ),
             }}
           />
         ))}

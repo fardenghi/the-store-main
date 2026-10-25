@@ -1,6 +1,7 @@
 import React from "react";
 import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { C, Glyph, Photo, clamp, ease } from "./design";
+import { useSceneTime } from "./clock";
 
 export const progress = (t: number, from: number, to: number) =>
   interpolate(t, [from, to], [0, 1], { ...clamp, easing: ease });
@@ -189,9 +190,7 @@ export const Rail: React.FC<{
   until?: number;
   color?: string;
 }> = ({ x1, y1, x2, y2, at = 0, until = 100, color = C.lime }) => {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = f / fps;
+  const t = useSceneTime()(at);
   const p = progress(t, at, at + 1);
   return (
     <svg

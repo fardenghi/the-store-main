@@ -23,6 +23,41 @@ npm run dev -- --no-open --port=3100
 Abrir <http://localhost:3100/TheStore-Assistant> y presionar Play.
 Cada escena tiene su propia composición en la carpeta `Escenas` de Studio.
 
+## Presentación (deck)
+
+Las mismas escenas se usan como slides de la presentación, con paradas. Una
+parada no congela la imagen: lo que ya estaba en camino termina su recorrido y
+el movimiento de fondo sigue, pero lo que viene después espera a que el
+presentador avance. Por eso cada parada va justo antes de que empiece la fase
+siguiente de la escena (`src/clock.tsx`).
+
+```sh
+cd assistant-demo
+npm ci
+npm run deck
+```
+
+Abrir <http://localhost:3200> en Chrome. Al abrirse, la primera slide se ve
+quieta: Chrome no deja arrancar el reloj de las animaciones hasta que se toca
+una tecla, así que la primera tecla solo pone el deck en movimiento.
+
+| Tecla | Acción |
+| --- | --- |
+| → ↓ espacio Enter PageDown, click | Avanzar a la próxima parada o slide (si la animación todavía no llegó a la parada, salta a ella) |
+| ← ↑ Backspace PageUp, click derecho | Volver a la parada anterior |
+| `f` | Pantalla completa |
+| `h` | Mostrar u ocultar el número de slide y de paso |
+| Home | Volver al principio |
+
+Los clickers de presentación mandan PageDown y PageUp, así que funcionan sin
+configurar nada. La URL guarda la slide (`#/4`), para retomar el ensayo donde
+quedó.
+
+Las slides y sus paradas están en `src/deck/slides.tsx`. Las escenas toman el tiempo de `useSceneTime()`: `T(inicio)` para lo que arranca en un momento dado y `T()` para el movimiento de fondo; sin paradas (el video) es el tiempo real. Cada slide es una
+composición de Remotion, así que se edita y se previsualiza igual que el video
+(`npm run dev`). `npm run deck:build` genera una versión estática en
+`dist/deck/`.
+
 ## Trabajar en equipo
 
 Después de clonar el repositorio (o hacer `git pull`), seguí los pasos de arriba.

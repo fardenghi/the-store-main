@@ -1,13 +1,13 @@
-import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { interpolate } from "remotion";
+import { useSceneTime } from "../clock";
 import { C, Stage, Head, Enter, clamp } from "../design";
 import { Tile, Core, Rail, progress } from "../motion";
 export const Followup = () => {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = f / fps;
+  const T = useSceneTime();
+  const t = T();
   return (
     <Stage step={7} label="Memoria · Volver a buscar">
-      <div style={{ opacity: 1 - progress(t, 6.3, 7) }}>
+      <div style={{ opacity: 1 - progress(T(6.3), 6.3, 7) }}>
         <Head>“Nogal, más barata.”</Head>
         <div
           style={{
@@ -42,7 +42,7 @@ export const Followup = () => {
             letterSpacing: -4,
           }}
         >
-          ≤ ${Math.round(interpolate(t, [1.5, 2.8], [149, 148], clamp))}
+          ≤ ${Math.round(interpolate(T(1.5), [1.5, 2.8], [149, 148], clamp))}
         </Enter>
         <Enter
           at={1.5}
@@ -74,12 +74,12 @@ export const Followup = () => {
                 display: "flex",
                 alignItems: "center",
                 gap: 95,
-                color: t > 2.5 + i * 0.8 ? C.lime : C.line,
+                color: T(2.5 + i * 0.8) > 2.5 + i * 0.8 ? C.lime : C.line,
               }}
             >
               <span
                 style={{
-                  border: `1px solid ${t > 2.5 + i * 0.8 ? C.lime : C.line}`,
+                  border: `1px solid ${T(2.5 + i * 0.8) > 2.5 + i * 0.8 ? C.lime : C.line}`,
                   borderRadius: 18,
                   padding: "15px 35px",
                 }}

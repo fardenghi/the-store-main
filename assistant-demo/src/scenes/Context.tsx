@@ -1,11 +1,10 @@
-import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { interpolate } from "remotion";
+import { useSceneTime } from "../clock";
 import { C, Stage, Head, Enter, clamp } from "../design";
 import { Core, Tile, Rail, progress, Check } from "../motion";
 export const Context = () => {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = f / fps;
-  const arrival = progress(t, 5.4, 6.6);
+  const T = useSceneTime();
+  const arrival = progress(T(5.4), 5.4, 6.6);
   return (
     <Stage step={5} label="LLM 02 · Responder">
       <Head>Solo los matches.</Head>
@@ -68,7 +67,7 @@ export const Context = () => {
         active={arrival}
       />
       {Array.from({ length: 5 }, (_, i) => {
-        const p = progress(t, 1 + i * 0.42, 4.3 + i * 0.42);
+        const p = progress(T(1 + i * 0.42), 1 + i * 0.42, 4.3 + i * 0.42);
         const x = interpolate(p, [0, 1], [300, 1510], clamp);
         const y = interpolate(
           p,
@@ -120,7 +119,7 @@ export const Context = () => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          opacity: progress(t, 1, 2),
+          opacity: progress(T(1), 1, 2),
         }}
       >
         <Check />
@@ -143,7 +142,11 @@ export const Context = () => {
               height: 8,
               borderRadius: 4,
               background: C.lime,
-              opacity: progress(t, 5.3 + i * 0.24, 5.7 + i * 0.24),
+              opacity: progress(
+                T(5.3 + i * 0.24),
+                5.3 + i * 0.24,
+                5.7 + i * 0.24,
+              ),
             }}
           />
         ))}

@@ -1,4 +1,5 @@
-import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { interpolate } from "remotion";
+import { useSceneTime } from "../clock";
 import { C, Stage, Head, Enter, Tag, clamp } from "../design";
 import { Tile, VectorBars, progress } from "../motion";
 // Conceptual projection. The animation does not claim measured vector positions.
@@ -7,11 +8,10 @@ export const searchPoints = Array.from({ length: 80 }, (_, i) => ({
   y: i < 5 ? 585 + Math.sin(i * 2.399) * 105 : 365 + ((i * 113) % 480),
 }));
 export const Retrieval = () => {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = f / fps;
-  const organize = progress(t, 0.2, 2.2);
-  const select = progress(t, 4.1, 5.4);
+  const T = useSceneTime();
+  const t = T();
+  const organize = progress(T(0.2), 0.2, 2.2);
+  const select = progress(T(4.1), 4.1, 5.4);
   const target = { x: 750, y: 585 };
   return (
     <Stage step={4} label="Qdrant · Similitud">
@@ -36,7 +36,7 @@ export const Retrieval = () => {
         style={{ position: "absolute", inset: 0 }}
       >
         {[0, 1, 2].map((i) => {
-          const p = (Math.max(0, t - 2.4) * 0.44 + i / 3) % 1;
+          const p = (Math.max(0, T(2.4) - 2.4) * 0.44 + i / 3) % 1;
           return (
             <ellipse
               key={i}
@@ -47,7 +47,7 @@ export const Retrieval = () => {
               fill="none"
               stroke={C.lilac}
               strokeWidth={2}
-              opacity={t < 2.4 ? 0 : (1 - p) * 0.35 * (1 - select * 0.6)}
+              opacity={T(2.4) < 2.4 ? 0 : (1 - p) * 0.35 * (1 - select * 0.6)}
             />
           );
         })}
@@ -55,7 +55,7 @@ export const Retrieval = () => {
           style={{
             transformOrigin: "750px 585px",
             rotate: `${t * 35}deg`,
-            opacity: progress(t, 2.1, 3) * (1 - select * 0.9),
+            opacity: progress(T(2.1), 2.1, 3) * (1 - select * 0.9),
           }}
         >
           <path d="M750 585L1050 585A300 300 0 0 0 962 373Z" fill="#c9b7ef09" />
@@ -83,7 +83,7 @@ export const Retrieval = () => {
             <g
               key={i}
               opacity={
-                progress(t, i * 0.007, 0.8 + i * 0.007) *
+                progress(T(i * 0.007), i * 0.007, 0.8 + i * 0.007) *
                 (i < 5 ? 1 : 1 - select * 0.88)
               }
             >
@@ -108,14 +108,14 @@ export const Retrieval = () => {
           );
         })}
         <circle
-          cx={interpolate(progress(t, 1.5, 3), [0, 1], [270, 750], clamp)}
-          cy={interpolate(progress(t, 1.5, 3), [0, 1], [300, 585], clamp)}
+          cx={interpolate(progress(T(1.5), 1.5, 3), [0, 1], [270, 750], clamp)}
+          cy={interpolate(progress(T(1.5), 1.5, 3), [0, 1], [300, 585], clamp)}
           r={13}
           fill={C.lilac}
-          opacity={progress(t, 1.3, 1.8)}
+          opacity={progress(T(1.3), 1.3, 1.8)}
         />
         {searchPoints.slice(0, 5).map((p, i) => {
-          const q = progress(t, 5 + i * 0.3, 6.5 + i * 0.3);
+          const q = progress(T(5 + i * 0.3), 5 + i * 0.3, 6.5 + i * 0.3);
           return (
             <path
               key={i}
@@ -139,7 +139,7 @@ export const Retrieval = () => {
           display: "flex",
           alignItems: "center",
           gap: 22,
-          opacity: 1 - progress(t, 2.2, 3.2),
+          opacity: 1 - progress(T(2.2), 2.2, 3.2),
         }}
       >
         <span style={{ fontSize: 30, color: C.lime }}>desk lamp</span>
@@ -161,7 +161,7 @@ export const Retrieval = () => {
         <Tag>Top 5</Tag>
       </Enter>
       {searchPoints.slice(0, 5).map((p, i) => {
-        const q = progress(t, 5 + i * 0.3, 6.5 + i * 0.3);
+        const q = progress(T(5 + i * 0.3), 5 + i * 0.3, 6.5 + i * 0.3);
         const destY = 360 + i * 117;
         return (
           <div
@@ -170,7 +170,7 @@ export const Retrieval = () => {
               position: "absolute",
               left: interpolate(q, [0, 1], [p.x - 49, 1320], clamp),
               top: interpolate(q, [0, 1], [p.y - 49, destY - 49], clamp),
-              opacity: progress(t, 5 + i * 0.3, 5.4 + i * 0.3),
+              opacity: progress(T(5 + i * 0.3), 5 + i * 0.3, 5.4 + i * 0.3),
               scale: 0.25 + q * 0.75,
             }}
           >

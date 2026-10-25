@@ -1,11 +1,11 @@
-import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { interpolate } from "remotion";
+import { useSceneTime } from "../clock";
 import { C, Stage, Head, Enter, Tag, clamp } from "../design";
 import { Core, Rail, progress, VectorBars } from "../motion";
 export const Rewriting = () => {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = f / fps;
-  const out = progress(t, 4.8, 5.7);
+  const T = useSceneTime();
+  const t = T();
+  const out = progress(T(4.8), 4.8, 5.7);
   return (
     <Stage step={3} label="LLM 01 · Reescribir">
       <Head>Entender.</Head>
@@ -15,7 +15,7 @@ export const Rewriting = () => {
         <Tag color={C.muted}>Tu pedido</Tag>
       </Enter>
       {["Lámpara", "para mi", "escritorio"].map((word, i) => {
-        const p = progress(t, 1.8 + i * 0.24, 3.6 + i * 0.24);
+        const p = progress(T(1.8 + i * 0.24), 1.8 + i * 0.24, 3.6 + i * 0.24);
         return (
           <div
             key={word}
@@ -30,7 +30,7 @@ export const Rewriting = () => {
               fontSize: 40,
               opacity:
                 (1 - progress(p, 0.65, 1)) *
-                progress(t, 0.3 + i * 0.14, 0.8 + i * 0.14),
+                progress(T(0.3 + i * 0.14), 0.3 + i * 0.14, 0.8 + i * 0.14),
               scale: 1 - p * 0.65,
               rotate: `${p * 30}deg`,
             }}
@@ -53,7 +53,7 @@ export const Rewriting = () => {
               height: 18,
               borderRadius: 7,
               background: C.lilac,
-              opacity: progress(t, 2, 3) * (1 - progress(t, 5.5, 6.5)),
+              opacity: progress(T(2), 2, 3) * (1 - progress(T(5.5), 5.5, 6.5)),
             }}
           />
         );

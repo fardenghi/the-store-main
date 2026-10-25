@@ -1,4 +1,5 @@
 import React from "react";
+import { useSceneTime } from "./clock";
 import {
   AbsoluteFill,
   CanvasImage,
@@ -77,18 +78,12 @@ export const Enter: React.FC<{
   at?: number;
   style?: React.CSSProperties;
 }> = ({ children, at = 0, style }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const t = useSceneTime()(at);
   return (
     <div
       style={{
-        opacity: interpolate(
-          frame,
-          [at * fps, (at + 0.7) * fps],
-          [0, 1],
-          clamp,
-        ),
-        translate: `0 ${interpolate(frame, [at * fps, (at + 0.9) * fps], [30, 0], { ...clamp, easing: ease })}px`,
+        opacity: interpolate(t, [at, at + 0.7], [0, 1], clamp),
+        translate: `0 ${interpolate(t, [at, at + 0.9], [30, 0], { ...clamp, easing: ease })}px`,
         ...style,
       }}
     >

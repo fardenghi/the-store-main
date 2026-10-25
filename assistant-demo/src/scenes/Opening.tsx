@@ -1,10 +1,10 @@
-import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { interpolate } from "remotion";
+import { useSceneTime } from "../clock";
 import { C, Stage, Enter, clamp } from "../design";
 import { Tile, Core, progress } from "../motion";
 export const Opening = () => {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = f / fps;
+  const T = useSceneTime();
+  const t = T();
   return (
     <Stage step={1} label="Tu próximo match">
       <Enter
@@ -27,14 +27,14 @@ export const Opening = () => {
         style={{
           position: "absolute",
           inset: 0,
-          opacity: 1 - progress(t, 2.7, 3.6),
+          opacity: 1 - progress(T(2.7), 2.7, 3.6),
         }}
       >
         <Core x={1400} y={530} label="" size={165} />
       </div>
       {Array.from({ length: 5 }, (_, i) => {
         const a = (i * Math.PI * 2) / 5 + t * 0.32;
-        const shrink = progress(t, 1.8, 3.1);
+        const shrink = progress(T(1.8), 1.8, 3.1);
         const winner = i === 0;
         return (
           <div
@@ -44,7 +44,7 @@ export const Opening = () => {
               left: 1400 + Math.cos(a) * 290 * (1 - shrink) - 65,
               top: 530 + Math.sin(a) * 275 * (1 - shrink) - 65,
               opacity: winner
-                ? progress(t, 0.1, 0.5)
+                ? progress(T(0.1), 0.1, 0.5)
                 : 1 - progress(shrink, 0, 0.55),
               scale: winner
                 ? interpolate(shrink, [0, 1], [1, 3.1], clamp)
@@ -52,7 +52,7 @@ export const Opening = () => {
               rotate: `${(1 - shrink) * Math.sin(a) * 10}deg`,
             }}
           >
-            <Tile index={i} size={130} selected={winner && t > 3} />
+            <Tile index={i} size={130} selected={winner && T(3) > 3} />
           </div>
         );
       })}

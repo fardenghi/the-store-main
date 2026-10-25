@@ -1,11 +1,10 @@
-import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { interpolate } from "remotion";
+import { useSceneTime } from "../clock";
 import { C, Stage, Head, Enter, clamp } from "../design";
 import { Core, Rail, Tile, VectorBars, progress, Check } from "../motion";
 export const Indexing = () => {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = f / fps;
-  const count = Math.round(interpolate(t, [3.4, 9], [0, 80], clamp));
+  const T = useSceneTime();
+  const count = Math.round(interpolate(T(3.4), [3.4, 9], [0, 80], clamp));
   return (
     <Stage step={2} label="Arranque · Assistant">
       <Head>Catálogo → conocimiento.</Head>
@@ -22,7 +21,8 @@ export const Indexing = () => {
       </Enter>
       {Array.from({ length: 12 }, (_, i) => {
         const start = 1 + i * 0.43;
-        const p = interpolate(t, [start, start + 3.4], [0, 1], clamp);
+        const ts = T(start);
+        const p = interpolate(ts, [start, start + 3.4], [0, 1], clamp);
         const x = 250 + p * 1410;
         const morph = progress(p, 0.38, 0.57);
         return (
@@ -32,7 +32,7 @@ export const Indexing = () => {
               position: "absolute",
               left: x - 48,
               top: 482 + Math.sin(p * Math.PI) * Math.sin(i * 2) * 50,
-              opacity: t < start || p >= 1 ? 0 : 1,
+              opacity: ts < start || p >= 1 ? 0 : 1,
               scale: interpolate(p, [0, 0.1, 0.8, 1], [0.4, 1, 1, 0.3], clamp),
             }}
           >
