@@ -279,6 +279,7 @@ show_help() {
     echo "  status          Show cluster status"
     echo "  start           Start an existing cluster (e.g. after restarting Docker)"
     echo "                  without building or loading images"
+    echo "  stop            Stop the cluster without deleting it"
     echo "  reload-images [SERVICE...]"
     echo "                  Build and load Docker images (all, or only the given"
     echo "                  services) and restart their deployments"
@@ -376,6 +377,21 @@ cmd_start() {
     fi
 }
 
+# Apaga el cluster sin borrarlo: las imágenes, los manifiestos y los datos de
+# Qdrant quedan en el nodo y se recuperan con 'start'.
+cmd_stop() {
+    check_prerequisites
+
+    if ! kind get clusters | grep -q "^$CLUSTER_NAME$"; then
+        print_error "Cluster '$CLUSTER_NAME' does not exist."
+        exit 1
+    fi
+
+    print_status "Stopping cluster '$CLUSTER_NAME'..."
+    docker stop $(kind get nodes --name $CLUSTER_NAME) > /dev/null
+    print_success "Cluster '$CLUSTER_NAME' stopped. Start it again with './local.sh start'"
+}
+
 cmd_update_secrets() {
     check_prerequisites
 
@@ -461,7 +477,7 @@ main() {
 
     while [[ $# -gt 0 ]]; do
         case $1 in
-            help|create-cluster|delete-cluster|rebuild-cluster|status|start|reload-images|e2e-test|load-test|update-secrets) COMMAND="$1"; shift ;;
+            help|create-cluster|delete-cluster|rebuild-cluster|status|start|stop|reload-images|e2e-test|load-test|update-secrets) COMMAND="$1"; shift ;;
             catalog|cart|checkout|orders|ui|assistant)
                 if [ "$COMMAND" != "reload-images" ]; then
                     echo "Service names are only valid after 'reload-images': $1"; show_help; exit 1
@@ -482,6 +498,7 @@ main() {
         rebuild-cluster) cmd_rebuild_cluster;;
         status) cmd_status;;
         start) cmd_start;;
+        stop) cmd_stop;;
         reload-images) cmd_reload_images;;
         e2e-test) cmd_e2e_tests;;
         load-test) cmd_load_generator;;

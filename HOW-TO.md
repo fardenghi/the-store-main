@@ -271,7 +271,8 @@ Decisiones principales:
 | Tarea | Cómo |
 |---|---|
 | Cambiar o rotar las claves | Editar `.env` y `./local.sh update-secrets` (reaplica el Secret y reinicia el `assistant`) |
-| Volver a prender el cluster (después de reiniciar Docker o la máquina) | `./local.sh start`. No construye ni carga imágenes |
+| Apagar el cluster sin borrarlo | `./local.sh stop`. Las imágenes y los datos de Qdrant quedan guardados |
+| Volver a prender el cluster (después de `stop` o de reiniciar Docker o la máquina) | `./local.sh start`. No construye ni carga imágenes |
 | Recompilar después de cambiar código | `./local.sh reload-images` (todos) o `./local.sh reload-images ui assistant` (solo esos). Reinicia los Deployments solo |
 | Aplicar cambios del manifiesto | `kubectl apply -f dist/kubernetes.yaml -n the-store` |
 | Pasar al plan B (Nemotron) | Copiar las variables comentadas del ConfigMap `assistant` (o las de la sección "Razonamiento y plan B" del [README del `assistant`](src/assistant/README.md)), aplicar y `kubectl rollout restart deployment/assistant -n the-store` |
