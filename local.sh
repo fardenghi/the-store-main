@@ -277,7 +277,11 @@ show_help() {
     echo "  delete-cluster  Delete the cluster"
     echo "  rebuild-cluster Delete and recreate cluster"
     echo "  status          Show cluster status"
-    echo "  reload-images   Build and load Docker images"
+    echo "  start           Start an existing cluster (e.g. after restarting Docker)"
+    echo "                  without building or loading images"
+    echo "  reload-images [SERVICE...]"
+    echo "                  Build and load Docker images (all, or only the given"
+    echo "                  services) and restart their deployments"
     echo "  e2e-test        Run end-to-end tests"
     echo "  load-test       Run load generator tests"
     echo "  update-secrets  Re-apply the assistant API keys (from .env or the environment)"
@@ -310,10 +314,66 @@ cmd_delete_cluster() {
 
 cmd_reload_images() {
     check_prerequisites
-    print_status "Building and loading Docker images..."
+
+    if [ -n "$SELECTED_SERVICES" ]; then
+        SERVICES="$SELECTED_SERVICES"
+    fi
+
+    print_status "Building and loading Docker images for: $SERVICES"
     build_images
     load_images
     print_success "Images built and loaded successfully"
+
+    # Los Deployments usan el tag latest, así que sin reiniciar los pods
+    # seguirían corriendo la imagen anterior.
+    if kubectl get namespace $NAMESPACE &> /dev/null; then
+        local deployments=""
+        for service in $SERVICES; do
+            deployments="$deployments deployment/$(deployment_for $service)"
+        done
+        print_status "Restarting:$deployments"
+        kubectl rollout restart $deployments -n $NAMESPACE
+        for deployment in $deployments; do
+            kubectl rollout status $deployment -n $NAMESPACE --timeout=300s
+        done
+        print_success "Deployments restarted with the new images"
+    fi
+}
+
+# El Deployment de cart se llama carts; el resto coincide con el servicio.
+deployment_for() {
+    case $1 in
+        cart) echo "carts" ;;
+        *) echo "$1" ;;
+    esac
+}
+
+# Prende un cluster que ya existe (por ejemplo, después de reiniciar Docker)
+# sin volver a construir ni cargar imágenes.
+cmd_start() {
+    check_prerequisites
+
+    if ! kind get clusters | grep -q "^$CLUSTER_NAME$"; then
+        print_error "Cluster '$CLUSTER_NAME' does not exist. Please create it first with 'create-cluster' command."
+        exit 1
+    fi
+
+    print_status "Starting cluster '$CLUSTER_NAME'..."
+    docker start $(kind get nodes --name $CLUSTER_NAME) > /dev/null
+    kubectl config use-context kind-$CLUSTER_NAME > /dev/null
+
+    print_status "Waiting for the node to be ready..."
+    # El API server tarda unos segundos en responder después de prender el contenedor.
+    until kubectl get nodes &> /dev/null; do sleep 2; done
+    kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+    if kubectl get namespace $NAMESPACE &> /dev/null; then
+        print_status "Waiting for all deployments to be available..."
+        kubectl wait --namespace $NAMESPACE --for=condition=available deployments --timeout=300s --all
+        print_success "Cluster '$CLUSTER_NAME' is up. UI at: http://localhost"
+    else
+        print_warning "Namespace '$NAMESPACE' not found. Deploy the services with 'create-cluster'."
+    fi
 }
 
 cmd_update_secrets() {
@@ -397,10 +457,16 @@ main() {
     NAMESPACE="the-store"
     SKIP_TESTS=false
     SKIP_STATUS=false
+    SELECTED_SERVICES=""
 
     while [[ $# -gt 0 ]]; do
         case $1 in
-            help|create-cluster|delete-cluster|rebuild-cluster|status|reload-images|e2e-test|load-test|update-secrets) COMMAND="$1"; shift ;;
+            help|create-cluster|delete-cluster|rebuild-cluster|status|start|reload-images|e2e-test|load-test|update-secrets) COMMAND="$1"; shift ;;
+            catalog|cart|checkout|orders|ui|assistant)
+                if [ "$COMMAND" != "reload-images" ]; then
+                    echo "Service names are only valid after 'reload-images': $1"; show_help; exit 1
+                fi
+                SELECTED_SERVICES="$SELECTED_SERVICES $1"; shift ;;
             -c|--cluster) CLUSTER_NAME="$2"; shift 2 ;;
             -n|--namespace) NAMESPACE="$2"; shift 2 ;;
             --skip-tests) SKIP_TESTS=true; shift ;;
@@ -415,6 +481,7 @@ main() {
         delete-cluster) cmd_delete_cluster;;
         rebuild-cluster) cmd_rebuild_cluster;;
         status) cmd_status;;
+        start) cmd_start;;
         reload-images) cmd_reload_images;;
         e2e-test) cmd_e2e_tests;;
         load-test) cmd_load_generator;;

@@ -271,7 +271,8 @@ Decisiones principales:
 | Tarea | Cómo |
 |---|---|
 | Cambiar o rotar las claves | Editar `.env` y `./local.sh update-secrets` (reaplica el Secret y reinicia el `assistant`) |
-| Recompilar después de cambiar código | `./local.sh reload-images` y `kubectl rollout restart deployment -n the-store` |
+| Volver a prender el cluster (después de reiniciar Docker o la máquina) | `./local.sh start`. No construye ni carga imágenes |
+| Recompilar después de cambiar código | `./local.sh reload-images` (todos) o `./local.sh reload-images ui assistant` (solo esos). Reinicia los Deployments solo |
 | Aplicar cambios del manifiesto | `kubectl apply -f dist/kubernetes.yaml -n the-store` |
 | Pasar al plan B (Nemotron) | Copiar las variables comentadas del ConfigMap `assistant` (o las de la sección "Razonamiento y plan B" del [README del `assistant`](src/assistant/README.md)), aplicar y `kubectl rollout restart deployment/assistant -n the-store` |
 | Reindexar el catálogo | `kubectl rollout restart deployment/assistant -n the-store`. Para empezar de cero, borrar antes la colección (ver el README del `assistant`) |
