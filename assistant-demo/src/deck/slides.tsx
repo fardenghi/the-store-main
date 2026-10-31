@@ -1,5 +1,6 @@
 import React from "react";
 import { Hold, HoldsProvider } from "../clock";
+import { DeckFooterProvider } from "../design";
 import { Opening } from "../scenes/Opening";
 import { Indexing } from "../scenes/Indexing";
 import { Rewriting } from "../scenes/Rewriting";
@@ -7,6 +8,17 @@ import { Retrieval } from "../scenes/Retrieval";
 import { Context } from "../scenes/Context";
 import { Response } from "../scenes/Response";
 import { Followup } from "../scenes/Followup";
+import { Cover } from "./Cover";
+import { Problem } from "./Problem";
+import { LiveDemo } from "./LiveDemo";
+import {
+  DECISION_LENGTHS,
+  DecisionModel,
+  DecisionSearch,
+  DecisionService,
+} from "./Decisions";
+import { WhyDivider } from "./WhyDivider";
+import { Closing } from "./Closing";
 
 export const FPS = 30;
 export const WIDTH = 1920;
@@ -20,6 +32,9 @@ export const HEIGHT = 1080;
 export type Slide = {
   id: string;
   title: string;
+  // Pie de la slide: índice en SECTIONS (null: sin marcas) y texto.
+  section: number | null;
+  footer: string;
   component: React.FC;
   durationInFrames: number;
   stops: number[];
@@ -27,44 +42,104 @@ export type Slide = {
 
 const sec = (s: number) => Math.round(s * FPS);
 
+// Secciones del deck: una marca por cada una en el pie de todas las slides.
+export const SECTIONS = [
+  "El problema",
+  "La solución",
+  "Cómo funciona",
+  "Por qué así",
+];
+const HOW = 2;
+
+// La apertura del recorrido abre la sección "Cómo funciona".
+const HowItWorks: React.FC = () => (
+  <Opening title={["Cómo funciona", "el asistente."]} />
+);
+
+// En el deck las palabras del pedido quedan un segundo más para leerlas.
+const RewritingSlow: React.FC = () => <Rewriting wait={1} />;
+
+// En el deck, la escena de memoria muestra solo el recorrido, que queda quieto
+// al terminar (el cierre "Menos búsqueda. Más match." queda para el video).
+const FollowupFlow: React.FC = () => <Followup part="flow" />;
+
 export const slides: Slide[] = [
   {
-    id: "Apertura",
-    title: "Recorrido · Apertura",
-    component: Opening,
+    id: "Portada",
+    section: null,
+    footer: "Redes de Información · ITBA · 2C 2026",
+    title: "Portada",
+    component: Cover,
+    durationInFrames: sec(3),
+    stops: [3],
+  },
+  {
+    id: "Problema",
+    section: 0,
+    footer: "El problema",
+    title: "El problema",
+    component: Problem,
+    durationInFrames: sec(7),
+    stops: [3.4, 7],
+  },
+  {
+    id: "Demo",
+    section: 1,
+    footer: "La solución · Demo en vivo",
+    title: "La solución · Demo en vivo",
+    component: LiveDemo,
     durationInFrames: sec(4),
-    stops: [1.7, 4],
+    stops: [4],
+  },
+  {
+    id: "Apertura",
+    section: HOW,
+    footer: "Cómo funciona",
+    title: "Cómo funciona · Apertura",
+    component: HowItWorks,
+    durationInFrames: sec(4),
+    stops: [4],
   },
   {
     id: "Indexacion",
+    section: HOW,
+    footer: "Cómo funciona · Indexación",
     title: "Recorrido · Arranque e indexación",
     component: Indexing,
     durationInFrames: sec(11),
-    stops: [0.95, 11],
+    stops: [11],
   },
   {
     id: "Reescritura",
+    section: HOW,
+    footer: "Cómo funciona · Reescritura",
     title: "Recorrido · Primer llamado: reescritura",
-    component: Rewriting,
-    durationInFrames: sec(9),
-    stops: [1.25, 4.25, 9],
+    component: RewritingSlow,
+    durationInFrames: sec(10),
+    stops: [10],
   },
   {
     id: "Busqueda",
+    section: HOW,
+    footer: "Cómo funciona · Búsqueda vectorial",
     title: "Recorrido · Búsqueda vectorial",
     component: Retrieval,
     durationInFrames: sec(11),
-    stops: [4.05, 11],
+    stops: [11],
   },
   {
     id: "Contexto",
+    section: HOW,
+    footer: "Cómo funciona · Segundo llamado",
     title: "Recorrido · Segundo llamado: contexto",
     component: Context,
     durationInFrames: sec(9),
-    stops: [0.95, 9],
+    stops: [9],
   },
   {
     id: "Respuesta",
+    section: HOW,
+    footer: "Cómo funciona · Respuesta",
     title: "Recorrido · Respuesta",
     component: Response,
     durationInFrames: sec(6),
@@ -72,10 +147,57 @@ export const slides: Slide[] = [
   },
   {
     id: "Memoria",
+    section: HOW,
+    footer: "Cómo funciona · Memoria",
     title: "Recorrido · Seguimiento con memoria",
-    component: Followup,
-    durationInFrames: sec(9),
-    stops: [0.65, 6.25, 9],
+    component: FollowupFlow,
+    durationInFrames: sec(6.5),
+    stops: [6.5],
+  },
+  {
+    id: "PorQue-separador",
+    section: 3,
+    footer: "Por qué así",
+    title: "Por qué así · Separador",
+    component: WhyDivider,
+    durationInFrames: sec(3),
+    stops: [3],
+  },
+  {
+    id: "PorQue-servicio",
+    section: 3,
+    footer: "Por qué así",
+    title: "Por qué así · Un servicio más",
+    component: DecisionService,
+    durationInFrames: sec(DECISION_LENGTHS[0]),
+    stops: [DECISION_LENGTHS[0]],
+  },
+  {
+    id: "PorQue-modelo",
+    section: 3,
+    footer: "Por qué así",
+    title: "Por qué así · Modelo",
+    component: DecisionModel,
+    durationInFrames: sec(DECISION_LENGTHS[1]),
+    stops: [DECISION_LENGTHS[1]],
+  },
+  {
+    id: "PorQue-busqueda",
+    section: 3,
+    footer: "Por qué así",
+    title: "Por qué así · Primero entender",
+    component: DecisionSearch,
+    durationInFrames: sec(DECISION_LENGTHS[2]),
+    stops: [DECISION_LENGTHS[2]],
+  },
+  {
+    id: "Cierre",
+    section: null,
+    footer: "Redes de Información · ITBA · 2C 2026",
+    title: "Cierre · Gracias, preguntas",
+    component: Closing,
+    durationInFrames: sec(3.5),
+    stops: [3.5],
   },
 ];
 
@@ -90,16 +212,25 @@ export const PLAYER_SECONDS = 60 * 60;
 // `stops` solo lo usa el exportador del PPT (scripts/export-pptx.mjs).
 export type DeckProps = { holds: Hold[]; stops?: number[] };
 
-// La escena envuelta con las paradas que le pasa el deck por inputProps.
-const withHolds = (Scene: React.FC): React.FC<DeckProps> => {
+// La escena envuelta con las paradas que le pasa el deck por inputProps y con
+// el pie de su sección.
+const withHolds = (slide: Slide): React.FC<DeckProps> => {
+  const Scene = slide.component;
+  const footer = {
+    label: slide.footer,
+    section: slide.section,
+    total: SECTIONS.length,
+  };
   const Wrapped: React.FC<DeckProps> = ({ holds }) => (
-    <HoldsProvider holds={holds}>
-      <Scene />
-    </HoldsProvider>
+    <DeckFooterProvider value={footer}>
+      <HoldsProvider holds={holds}>
+        <Scene />
+      </HoldsProvider>
+    </DeckFooterProvider>
   );
   return Wrapped;
 };
 
 export const deckComponents = new Map(
-  slides.map((slide) => [slide.id, withHolds(slide.component)]),
+  slides.map((slide) => [slide.id, withHolds(slide)]),
 );

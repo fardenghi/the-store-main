@@ -104,6 +104,9 @@ const Deck: React.FC = () => {
 
   const now = () => (ref.current?.getCurrentFrame() ?? 0) / FPS;
 
+  // Un clic siempre avanza: a la parada siguiente si la slide tiene otra (solo
+  // "El problema"), o a la slide siguiente, aunque la animación no haya
+  // terminado.
   const next = useCallback(() => {
     if (!started) {
       // Primer gesto del usuario: play() dentro del evento reanuda el reloj.
@@ -111,18 +114,13 @@ const Deck: React.FC = () => {
       ref.current?.play();
       return;
     }
-    const target = reachesStop(pos);
-    const elapsed = now();
-    if (elapsed < target) {
-      // Todavía animando hacia la parada: saltar a ella.
-      ref.current?.seekTo(Math.round(target * FPS));
-      return;
-    }
     if (pos.stop < slide.stops.length - 1) {
+      // Si todavía no llegó a la parada, la espera cumplida es 0: lo que viene
+      // después arranca cuando el reloj pase por la parada.
       setPos({
         ...pos,
         stop: pos.stop + 1,
-        lengths: [...pos.lengths, elapsed - target],
+        lengths: [...pos.lengths, Math.max(0, now() - reachesStop(pos))],
       });
     } else if (pos.slide < slides.length - 1) {
       setPos(at(pos.slide + 1, 0, false));

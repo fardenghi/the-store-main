@@ -56,7 +56,8 @@ export const Tile: React.FC<{
   size?: number;
   selected?: boolean;
   style?: React.CSSProperties;
-}> = ({ index, size = 120, selected = false, style }) => (
+  id?: string;
+}> = ({ index, size = 120, selected = false, style, id }) => (
   <div
     style={{
       width: size,
@@ -73,7 +74,7 @@ export const Tile: React.FC<{
       ...style,
     }}
   >
-    <Photo index={index} size={size - 24} />
+    <Photo index={index} size={size - 24} id={id} />
   </div>
 );
 export const Core: React.FC<{

@@ -25,12 +25,14 @@ export const Context = () => {
       <div
         style={{
           position: "absolute",
-          left: 96,
-          top: 370,
-          width: 410,
+          // Ocupa lo mismo que la columna de las 5 fotos al arrancar (centro
+          // x = 300, de y = 324 a 756): 8 × 10 celdas de 33 px con 11 de
+          // separación (341 × 429 px).
+          left: 300 - 170,
+          top: 326,
           display: "grid",
-          gridTemplateColumns: "repeat(10, 30px)",
-          gap: 10,
+          gridTemplateColumns: "repeat(8, 33px)",
+          gap: 11,
           opacity: 0.6,
         }}
       >
@@ -38,7 +40,7 @@ export const Context = () => {
           <div
             key={i}
             style={{
-              height: 30,
+              height: 33,
               border: `1px solid ${C.line}`,
               borderRadius: 6,
               background: C.panel,
@@ -50,8 +52,10 @@ export const Context = () => {
         at={0.1}
         style={{
           position: "absolute",
-          left: 190,
-          top: 780,
+          left: 300 - 150,
+          width: 300,
+          textAlign: "center",
+          top: 790,
           fontSize: 31,
           color: C.muted,
         }}
@@ -124,11 +128,15 @@ export const Context = () => {
       >
         <Check />
       </div>
+      {/* Una marca por producto, que se enciende cuando su foto llega al
+          modelo: la foto i se desvanece en el nodo entre 1.98 + 0.42 i s
+          (50%) y 2.19 + 0.42 i s, y su marca se enciende en ese tramo. Centradas con el nodo (x = 1510): 5 × 34 px
+          con 10 de separación = 210 px. */}
       <Enter
-        at={6}
+        at={1.2}
         style={{
           position: "absolute",
-          left: 1400,
+          left: 1510 - 105,
           top: 840,
           display: "flex",
           gap: 10,
@@ -143,9 +151,9 @@ export const Context = () => {
               borderRadius: 4,
               background: C.lime,
               opacity: progress(
-                T(5.3 + i * 0.24),
-                5.3 + i * 0.24,
-                5.7 + i * 0.24,
+                T(1.95 + i * 0.42),
+                1.95 + i * 0.42,
+                2.2 + i * 0.42,
               ),
             }}
           />

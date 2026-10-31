@@ -1,4 +1,4 @@
-import React from "react";
+import React, { createContext, useContext } from "react";
 import { useSceneTime } from "./clock";
 import {
   AbsoluteFill,
@@ -57,12 +57,15 @@ export const products = [
     price: 79,
   },
 ];
-export const Photo: React.FC<{ index: number; size?: number }> = ({
+// `id` muestra un producto del catálogo que no está en `products` (su foto
+// tiene que estar en public/products).
+export const Photo: React.FC<{ index: number; size?: number; id?: string }> = ({
   index,
   size = 80,
+  id,
 }) => (
   <CanvasImage
-    src={staticFile(`products/${products[index % 5].id}.jpg`)}
+    src={staticFile(`products/${id ?? products[index % 5].id}.jpg`)}
     style={{
       width: size,
       height: size,
@@ -163,14 +166,47 @@ export const Note: React.FC<{ children: React.ReactNode; at?: number }> = ({
   </Enter>
 );
 
-// `step` es el paso del recorrido de un mensaje (1 a 7). Las slides que no son
-// parte del recorrido lo omiten, y el pie muestra solo `label`.
+// Pie que impone el deck (ver src/deck/slides.tsx): la sección y el detalle
+// en `label`, y una marca por sección del deck con la actual resaltada
+// (`section` null: sin marcas). Sin este contexto (el video), el pie es el de
+// la escena.
+export type DeckFooter = {
+  label: string;
+  section: number | null;
+  total: number;
+};
+const DeckFooterContext = createContext<DeckFooter | null>(null);
+export const DeckFooterProvider = DeckFooterContext.Provider;
+
+// `step` es el paso del recorrido de un mensaje (1 a 7), solo para el video.
+// Las slides que no son parte del recorrido lo omiten, y el pie muestra solo
+// `label` (a la derecha y atenuado, como el encabezado, si `labelRight`).
 export const Stage: React.FC<{
   children: React.ReactNode;
   step?: number;
   label: string;
   light?: boolean;
-}> = ({ children, step, label, light = false }) => {
+  labelRight?: boolean;
+}> = ({
+  children,
+  step: sceneStep,
+  label: sceneLabel,
+  light = false,
+  labelRight = false,
+}) => {
+  const deck = useContext(DeckFooterContext);
+  const label = deck ? deck.label : sceneLabel;
+  const step = deck ? undefined : sceneStep;
+  // Marcas: secciones del deck o pasos del recorrido del video.
+  const marks = deck
+    ? deck.section === null
+      ? null
+      : { total: deck.total, current: deck.section }
+    : step === undefined
+      ? null
+      : { total: 7, current: step - 1 };
+  const accent = light ? "#58762a" : C.lime;
+  const idle = light ? "#cdd0c3" : C.line;
   return (
     <AbsoluteFill
       style={{
@@ -223,48 +259,39 @@ export const Stage: React.FC<{
           right: 96,
           bottom: 56,
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent: labelRight ? "flex-end" : "space-between",
           alignItems: "center",
           borderTop: `1px solid ${light ? "#cdd0c3" : C.line}`,
           paddingTop: 23,
         }}
       >
         <div
-          style={{ fontSize: 20, letterSpacing: 2, textTransform: "uppercase" }}
+          style={{
+            fontSize: 20,
+            letterSpacing: 2,
+            textTransform: "uppercase",
+            color: labelRight ? (light ? "#6a7162" : C.muted) : undefined,
+          }}
         >
           {step !== undefined && (
-            <span
-              style={{ color: light ? "#58762a" : C.lime, marginRight: 22 }}
-            >
-              0{step}
-            </span>
+            <span style={{ color: accent, marginRight: 22 }}>0{step}</span>
           )}
           {label}
         </div>
-        <div
-          style={{
-            display: step === undefined ? "none" : "flex",
-            gap: 9,
-          }}
-        >
-          {Array.from({ length: 7 }, (_, i) => (
-            <div
-              key={i}
-              style={{
-                width: i === (step ?? 0) - 1 ? 56 : 18,
-                height: 4,
-                background:
-                  i === (step ?? 0) - 1
-                    ? light
-                      ? "#58762a"
-                      : C.lime
-                    : light
-                      ? "#cdd0c3"
-                      : C.line,
-              }}
-            />
-          ))}
-        </div>
+        {marks && (
+          <div style={{ display: "flex", gap: 9 }}>
+            {Array.from({ length: marks.total }, (_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: i === marks.current ? 56 : 18,
+                  height: 4,
+                  background: i === marks.current ? accent : idle,
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </AbsoluteFill>
   );

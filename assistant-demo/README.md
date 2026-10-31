@@ -43,7 +43,7 @@ una tecla, así que la primera tecla solo pone el deck en movimiento.
 
 | Tecla | Acción |
 | --- | --- |
-| → ↓ espacio Enter PageDown, click | Avanzar a la próxima parada o slide (si la animación todavía no llegó a la parada, salta a ella) |
+| → ↓ espacio Enter PageDown, click | Avanzar a la próxima parada (solo "El problema" tiene dos) o a la slide siguiente, aunque la animación no haya terminado |
 | ← ↑ Backspace PageUp, click derecho | Volver a la parada anterior |
 | `f` | Pantalla completa |
 | `h` | Mostrar u ocultar el número de slide y de paso |

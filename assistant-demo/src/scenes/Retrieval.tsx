@@ -1,34 +1,61 @@
 import { interpolate } from "remotion";
 import { useSceneTime } from "../clock";
-import { C, Stage, Head, Enter, Tag, clamp } from "../design";
-import { Tile, VectorBars, progress } from "../motion";
+import { C, Stage, Head, Enter, clamp } from "../design";
+import { Core, Rail, Tile, VectorBars, progress } from "../motion";
+// Layout: a la izquierda, la consulta pasa por Gemini (columna centrada en
+// GEMINI_X); en el medio, el mapa de Qdrant (de MAP_X a MAP_X + MAP_W, con la
+// consulta en TARGET); a la derecha, las fotos del top 5 desde PHOTOS_X.
+const GEMINI_X = 290;
+const MAP_X = 600;
+const MAP_W = 760;
+const TARGET = { x: 1100, y: 585 };
+const PHOTOS_X = 1560;
+
 // Conceptual projection. The animation does not claim measured vector positions.
 export const searchPoints = Array.from({ length: 80 }, (_, i) => ({
-  x: i < 5 ? 750 + Math.cos(i * 2.399) * 105 : 160 + ((i * 157) % 900),
-  y: i < 5 ? 585 + Math.sin(i * 2.399) * 105 : 365 + ((i * 113) % 480),
+  x:
+    i < 5
+      ? TARGET.x + Math.cos(i * 2.399) * 105
+      : MAP_X + (((i * 157) % 900) * MAP_W) / 900,
+  y: i < 5 ? TARGET.y + Math.sin(i * 2.399) * 105 : 365 + ((i * 113) % 480),
 }));
 export const Retrieval = () => {
   const T = useSceneTime();
   const t = T();
   const organize = progress(T(0.2), 0.2, 2.2);
   const select = progress(T(4.1), 4.1, 5.4);
-  const target = { x: 750, y: 585 };
+  const target = TARGET;
   return (
     <Stage step={4} label="Qdrant · Similitud">
       <Head>Encontrar.</Head>
       <Enter
-        at={0.2}
+        // Aparece cuando el punto de la consulta llega al mapa (1.5 → 3 s).
+        at={2.8}
         style={{
           position: "absolute",
-          left: 1250,
+          // Centrado con el mapa (x de la consulta).
+          left: TARGET.x - 400,
+          width: 800,
+          textAlign: "center",
+          whiteSpace: "nowrap",
           top: 178,
           fontSize: 94,
           letterSpacing: -5,
           color: C.muted,
         }}
       >
-        80 <span style={{ fontSize: 50 }}>→</span>{" "}
-        <span style={{ color: C.lime }}>5</span>
+        80 {/* Subida para quedar a media altura de los números. */}
+        <span
+          style={{
+            fontSize: 50,
+            position: "relative",
+            top: -17,
+            margin: "0 12px",
+          }}
+        >
+          →
+        </span>{" "}
+        <span style={{ color: C.lime }}>Top 5</span>
       </Enter>
       <svg
         width={1920}
@@ -42,8 +69,8 @@ export const Retrieval = () => {
               key={i}
               cx={target.x}
               cy={target.y}
-              rx={90 + p * 460}
-              ry={70 + p * 300}
+              rx={90 + p * 360}
+              ry={70 + p * 260}
               fill="none"
               stroke={C.lilac}
               strokeWidth={2}
@@ -53,14 +80,17 @@ export const Retrieval = () => {
         })}
         <g
           style={{
-            transformOrigin: "750px 585px",
+            transformOrigin: `${target.x}px ${target.y}px`,
             rotate: `${t * 35}deg`,
             opacity: progress(T(2.1), 2.1, 3) * (1 - select * 0.9),
           }}
         >
-          <path d="M750 585L1050 585A300 300 0 0 0 962 373Z" fill="#c9b7ef09" />
           <path
-            d="M750 585H1085"
+            d={`M${target.x} ${target.y}l300 0a300 300 0 0 0 -88 -212Z`}
+            fill="#c9b7ef09"
+          />
+          <path
+            d={`M${target.x} ${target.y}h335`}
             stroke={C.lilac}
             strokeWidth={1}
             strokeOpacity={0.4}
@@ -70,7 +100,7 @@ export const Retrieval = () => {
           const x = interpolate(
             organize,
             [0, 1],
-            [170 + (i % 10) * 92, p.x],
+            [MAP_X + 10 + (i % 10) * 80, p.x],
             clamp,
           );
           const y = interpolate(
@@ -108,8 +138,18 @@ export const Retrieval = () => {
           );
         })}
         <circle
-          cx={interpolate(progress(T(1.5), 1.5, 3), [0, 1], [270, 750], clamp)}
-          cy={interpolate(progress(T(1.5), 1.5, 3), [0, 1], [300, 585], clamp)}
+          cx={interpolate(
+            progress(T(1.5), 1.5, 3),
+            [0, 1],
+            [GEMINI_X + 120, target.x],
+            clamp,
+          )}
+          cy={interpolate(
+            progress(T(1.5), 1.5, 3),
+            [0, 1],
+            [target.y, target.y],
+            clamp,
+          )}
           r={13}
           fill={C.lilac}
           opacity={progress(T(1.3), 1.3, 1.8)}
@@ -119,7 +159,7 @@ export const Retrieval = () => {
           return (
             <path
               key={i}
-              d={`M${p.x} ${p.y}Q1080 ${p.y} 1320 ${330 + i * 117}`}
+              d={`M${p.x} ${p.y}Q${(p.x + PHOTOS_X) / 2} ${p.y} ${PHOTOS_X} ${360 + i * 117}`}
               fill="none"
               stroke={C.lime}
               strokeWidth={2}
@@ -131,34 +171,70 @@ export const Retrieval = () => {
           );
         })}
       </svg>
-      <div
+      {/* Columna de Gemini: la consulta reescrita se convierte en vector. */}
+      <Enter
+        at={0.1}
         style={{
           position: "absolute",
-          left: 96,
-          top: 285,
-          display: "flex",
-          alignItems: "center",
-          gap: 22,
-          opacity: 1 - progress(T(2.2), 2.2, 3.2),
+          left: GEMINI_X - 145,
+          width: 290,
+          top: 365,
+          boxSizing: "border-box",
+          padding: "18px 0",
+          textAlign: "center",
+          background: C.panel,
+          border: `1px solid ${C.lime}`,
+          borderRadius: 22,
+          fontSize: 38,
+          letterSpacing: -1.5,
+          color: C.lime,
         }}
       >
-        <span style={{ fontSize: 30, color: C.lime }}>desk lamp</span>
-        <VectorBars width={120} height={40} color={C.lilac} />
-      </div>
+        desk lamp
+      </Enter>
+      <Rail
+        x1={GEMINI_X}
+        y1={455}
+        x2={GEMINI_X}
+        y2={505}
+        at={0.3}
+        until={1.4}
+      />
+      <Enter at={0.3}>
+        <Core x={GEMINI_X} y={585} label="Gemini" size={140} />
+      </Enter>
+      <Enter
+        at={0.9}
+        style={{
+          position: "absolute",
+          left: GEMINI_X - 145,
+          width: 290,
+          top: 745,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 14,
+        }}
+      >
+        <VectorBars width={170} height={54} color={C.lilac} />
+        <span style={{ fontSize: 23, color: C.muted }}>
+          Embedding · 768 dim
+        </span>
+      </Enter>
       <Enter
         at={3.1}
         style={{
           position: "absolute",
-          left: 615,
+          // Centrado con el punto de la consulta.
+          left: target.x - 150,
+          width: 300,
+          textAlign: "center",
           top: 770,
           fontSize: 24,
           color: C.lilac,
         }}
       >
         ● Consulta
-      </Enter>
-      <Enter at={5.1} style={{ position: "absolute", left: 1320, top: 270 }}>
-        <Tag>Top 5</Tag>
       </Enter>
       {searchPoints.slice(0, 5).map((p, i) => {
         const q = progress(T(5 + i * 0.3), 5 + i * 0.3, 6.5 + i * 0.3);
@@ -168,7 +244,7 @@ export const Retrieval = () => {
             key={i}
             style={{
               position: "absolute",
-              left: interpolate(q, [0, 1], [p.x - 49, 1320], clamp),
+              left: interpolate(q, [0, 1], [p.x - 49, PHOTOS_X], clamp),
               top: interpolate(q, [0, 1], [p.y - 49, destY - 49], clamp),
               opacity: progress(T(5 + i * 0.3), 5 + i * 0.3, 5.4 + i * 0.3),
               scale: 0.25 + q * 0.75,
@@ -190,17 +266,6 @@ export const Retrieval = () => {
           </div>
         );
       })}
-      <div
-        style={{
-          position: "absolute",
-          left: 96,
-          top: 911,
-          color: C.muted,
-          fontSize: 19,
-        }}
-      >
-        Proyección y ranking ilustrativos
-      </div>
     </Stage>
   );
 };

@@ -1,21 +1,29 @@
 import { interpolate } from "remotion";
 import { useSceneTime } from "../clock";
 import { C, Stage, Head, Enter, Tag, clamp } from "../design";
-import { Core, Rail, progress, VectorBars } from "../motion";
-export const Rewriting = () => {
+import { Core, Rail, progress } from "../motion";
+// `wait` son segundos extra con las palabras del pedido quietas antes de que
+// viajen al modelo (el deck da tiempo a leerlas; el video, no). Todo lo que
+// viene después se corre lo mismo.
+export const Rewriting = ({ wait = 0 }: { wait?: number }) => {
   const T = useSceneTime();
   const t = T();
-  const out = progress(T(4.8), 4.8, 5.7);
+  const w = (s: number) => s + wait;
+  const out = progress(T(w(4.8)), w(4.8), w(5.7));
   return (
     <Stage step={3} label="LLM 01 · Reescribir">
       <Head>Entender.</Head>
-      <Rail x1={410} y1={530} x2={960} y2={530} at={1.3} until={4.5} />
-      <Rail x1={960} y1={530} x2={1510} y2={530} at={4.3} />
+      <Rail x1={410} y1={530} x2={960} y2={530} at={w(1.3)} until={w(4.5)} />
+      <Rail x1={960} y1={530} x2={1510} y2={530} at={w(4.3)} />
       <Enter at={0.2} style={{ position: "absolute", left: 96, top: 351 }}>
         <Tag color={C.muted}>Tu pedido</Tag>
       </Enter>
       {["Lámpara", "para mi", "escritorio"].map((word, i) => {
-        const p = progress(T(1.8 + i * 0.24), 1.8 + i * 0.24, 3.6 + i * 0.24);
+        const p = progress(
+          T(w(1.8 + i * 0.24)),
+          w(1.8 + i * 0.24),
+          w(3.6 + i * 0.24),
+        );
         return (
           <div
             key={word}
@@ -53,19 +61,24 @@ export const Rewriting = () => {
               height: 18,
               borderRadius: 7,
               background: C.lilac,
-              opacity: progress(T(2), 2, 3) * (1 - progress(T(5.5), 5.5, 6.5)),
+              opacity:
+                progress(T(w(2)), w(2), w(3)) *
+                (1 - progress(T(w(5.5)), w(5.5), w(6.5))),
             }}
           />
         );
       })}
       <Enter
-        at={2.1}
+        at={w(2.1)}
         style={{
           position: "absolute",
-          left: 835,
-          top: 825,
+          // Centrado con el nodo (x = 960), debajo de su etiqueta.
+          left: 960 - 200,
+          width: 400,
+          top: 740,
+          textAlign: "center",
           color: C.lilac,
-          fontSize: 25,
+          fontSize: 34,
         }}
       >
         + memoria
@@ -98,19 +111,6 @@ export const Rewriting = () => {
           desk lamp
         </div>
       </div>
-      <Enter at={6.5} style={{ position: "absolute", left: 1420, top: 740 }}>
-        <VectorBars width={200} height={80} />
-        <div
-          style={{
-            fontSize: 23,
-            color: C.muted,
-            marginTop: 18,
-            textAlign: "center",
-          }}
-        >
-          → Gemini
-        </div>
-      </Enter>
     </Stage>
   );
 };

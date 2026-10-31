@@ -2,7 +2,13 @@ import { interpolate } from "remotion";
 import { useSceneTime } from "../clock";
 import { C, Stage, Enter, clamp } from "../design";
 import { Tile, Core, progress } from "../motion";
-export const Opening = () => {
+// `title` reemplaza el título de dos líneas (la segunda en lima). El video usa
+// el de siempre; el deck, el de la sección.
+export const Opening = ({
+  title = ["Pedilo.", "Encontralo."],
+}: {
+  title?: [string, string];
+}) => {
   const T = useSceneTime();
   const t = T();
   return (
@@ -12,16 +18,17 @@ export const Opening = () => {
         style={{
           position: "absolute",
           left: 96,
-          top: 320,
+          // Centrado en vertical con la imagen (y = 530): dos líneas de ~145 px.
+          top: 530 - 145,
           fontSize: 148,
           lineHeight: 0.98,
           letterSpacing: -8,
           fontWeight: 500,
         }}
       >
-        Pedilo.
+        {title[0]}
         <br />
-        <span style={{ color: C.lime }}>Encontralo.</span>
+        <span style={{ color: C.lime }}>{title[1]}</span>
       </Enter>
       <div
         style={{
@@ -60,13 +67,15 @@ export const Opening = () => {
         at={2.9}
         style={{
           position: "absolute",
-          left: 1260,
+          left: 1400 - 300,
+          width: 600,
           top: 800,
+          textAlign: "center",
           color: C.lime,
           fontSize: 29,
         }}
       >
-        Tu match. ✦
+        Tu match ✦
       </Enter>
     </Stage>
   );
