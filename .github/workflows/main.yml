@@ -8,6 +8,7 @@ on:
       - 'src/**'
       - 'local.sh'
       - '.github/workflows/main.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
