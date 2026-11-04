@@ -1,31 +1,38 @@
 import React from "react";
-import { interpolate } from "remotion";
 import { useSceneTime } from "../clock";
-import { C, Enter, Head, Stage, Tag, clamp } from "../design";
-import { progress } from "../motion";
+import { C, Enter, Head, Stage, Tag } from "../design";
+import { Tile, progress } from "../motion";
 
-const QUERY = "somewhere cozy to curl up with a book";
 const LEFT = 96;
 const RIGHT = 1030;
 const TOP = 390;
+const PANEL = { w: 800, h: 330 };
+const TILE = 104;
+const GAP = 22;
+const COLS = 6;
 
-// Las dos limitaciones de The Store antes del asistente (sección 1 de la
-// pre-entrega). Primero la búsqueda; la parada en 3.4 s deja hablar de ella
-// antes de que entre el chat.
+// Las dos limitaciones de The Store antes del asistente. Primero la tienda sin
+// buscador (solo se puede recorrer el catálogo); la parada en 3.4 s deja hablar
+// de eso antes de que entre el chat, que era un LLM genérico sin datos de la
+// tienda: le preguntan por un producto del catálogo y ni sabe de qué le hablan. El
+// contexto (la conversación) se deja para la slide del buscador.
 export const Problem: React.FC = () => {
   const T = useSceneTime();
   const t = T();
-  const typed = Math.round(
-    interpolate(T(0.9), [0.9, 2.3], [0, QUERY.length], clamp),
-  );
   const chatTyping = T(4.2) > 4.2 && T(4.2) < 5;
+  // El catálogo se desplaza solo: el cliente recorre productos sin poder pedir.
+  const scroll = (t * 26) % (TILE + GAP);
   return (
     <Stage label="El problema">
-      <Head>La tienda no entiende lo que buscás.</Head>
+      <Head>
+        Tu cliente sabe lo que quiere.
+        <br />
+        <span style={{ color: C.lime }}>La tienda no lo deja pedirlo.</span>
+      </Head>
 
-      {/* Búsqueda */}
+      {/* Tienda sin buscador */}
       <Enter at={0.6} style={{ position: "absolute", left: LEFT, top: TOP }}>
-        <Tag color={C.muted}>Búsqueda del catálogo</Tag>
+        <Tag color={C.muted}>La tienda</Tag>
       </Enter>
       <Enter
         at={0.7}
@@ -33,87 +40,74 @@ export const Problem: React.FC = () => {
           position: "absolute",
           left: LEFT,
           top: TOP + 60,
-          width: 800,
+          width: PANEL.w,
+          height: PANEL.h,
           boxSizing: "border-box",
-          padding: "28px 34px",
           background: C.panel,
           border: `1px solid ${C.line}`,
           borderRadius: 24,
-          fontSize: 36,
-          letterSpacing: -0.5,
+          overflow: "hidden",
         }}
       >
-        “{QUERY.slice(0, typed)}
-        {typed === QUERY.length ? "”" : ""}
-        <span style={{ opacity: typed < QUERY.length && t % 1 < 0.6 ? 1 : 0 }}>
-          ▍
-        </span>
-      </Enter>
-      <Enter
-        at={2.4}
-        style={{
-          position: "absolute",
-          left: LEFT + 4,
-          top: TOP + 200,
-          fontSize: 24,
-          color: C.muted,
-          fontFamily: "Menlo, Consolas, monospace",
-        }}
-      >
-        GET /catalog/products?tags=
-        <span style={{ color: C.ink }}>somewhere+cozy+to+curl…</span>
-      </Enter>
-      <div
-        style={{
-          position: "absolute",
-          left: LEFT,
-          top: TOP + 265,
-          display: "flex",
-          gap: 14,
-        }}
-      >
-        {Array.from({ length: 4 }, (_, i) => (
-          <div
-            key={i}
-            style={{
-              width: 84,
-              height: 84,
-              borderRadius: 18,
-              border: `2px dashed ${C.line}`,
-              opacity:
-                progress(T(2.5 + i * 0.08), 2.5 + i * 0.08, 2.9 + i * 0.08) *
-                (1 - 0.6 * progress(T(3), 3, 3.6)),
-            }}
-          />
-        ))}
-        <Enter
-          at={3}
+        <div
           style={{
-            marginLeft: 26,
-            fontSize: 72,
-            letterSpacing: -3,
-            color: C.lilac,
-            lineHeight: "84px",
+            height: 92,
+            padding: "0 30px",
+            display: "flex",
+            alignItems: "center",
+            borderBottom: `1px solid ${C.line}`,
+            fontSize: 26,
           }}
         >
-          0 productos
-        </Enter>
-      </div>
+          <span style={{ fontWeight: 650, letterSpacing: -1 }}>the store</span>
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 92,
+            bottom: 0,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              left: 30,
+              top: GAP - scroll,
+              display: "grid",
+              gridTemplateColumns: `repeat(${COLS}, ${TILE}px)`,
+              gap: GAP,
+              opacity: progress(T(1), 1, 1.6),
+            }}
+          >
+            {Array.from({ length: COLS * 3 }, (_, i) => (
+              <Tile
+                key={i}
+                index={(i + Math.floor(i / COLS)) % 5}
+                size={TILE}
+              />
+            ))}
+          </div>
+        </div>
+      </Enter>
       <Enter
-        at={3.1}
+        at={2.2}
         style={{
           position: "absolute",
           left: LEFT,
-          top: TOP + 385,
-          fontSize: 28,
-          color: C.muted,
-          maxWidth: 800,
-          lineHeight: 1.4,
+          top: TOP + 420,
+          display: "flex",
+          alignItems: "center",
+          gap: 22,
+          fontSize: 58,
+          letterSpacing: -2.5,
+          color: C.lilac,
         }}
       >
-        Solo filtra por tags exactos.
-        <br />
-        Sin sinónimos ni tolerancia a errores de tipeo.
+        <span style={{ fontSize: 44 }}>✕</span>
+        No hay dónde buscar.
       </Enter>
 
       {/* Separador */}
@@ -130,7 +124,7 @@ export const Problem: React.FC = () => {
 
       {/* Chat */}
       <Enter at={3.6} style={{ position: "absolute", left: RIGHT, top: TOP }}>
-        <Tag color={C.muted}>Chat de la tienda</Tag>
+        <Tag color={C.muted}>El chat: un LLM genérico</Tag>
       </Enter>
       <Enter
         at={3.8}
@@ -145,7 +139,7 @@ export const Problem: React.FC = () => {
           fontSize: 32,
         }}
       >
-        too pricey, anything cheaper?
+        How much is the Walnut lamp?
       </Enter>
       <Enter
         at={4.2}
@@ -166,13 +160,12 @@ export const Problem: React.FC = () => {
             {".".repeat(1 + (Math.floor(t * 4) % 3))}
           </span>
         ) : (
-          "Cheaper than what?"
+          "What Walnut lamp?"
         )}
       </Enter>
       {[
-        "No conoce el catálogo",
-        "No recuerda la conversación",
-        "No compara ni actúa sobre la tienda",
+        "No conoce los productos ni sus precios",
+        "No puede actuar sobre la tienda",
       ].map((text, i) => (
         <Enter
           key={text}

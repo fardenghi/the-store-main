@@ -3,7 +3,7 @@ import { useSceneTime } from "../clock";
 import { C, Enter, Stage } from "../design";
 import { progress } from "../motion";
 
-// Separador de la sección "Por qué así": un camino que se abre en tres; dos
+// Separador de la sección "Apuesta segura": un camino que se abre en tres; dos
 // opciones se apagan y una queda elegida. Mismo formato de título que la
 // apertura de "Cómo funciona" (dos líneas, centrado con la ilustración).
 const O = { x: 1120, y: 530 };
@@ -19,7 +19,7 @@ export const WhyDivider: React.FC = () => {
   const draw = progress(T(0.5), 0.5, 1.6);
   const choose = progress(T(1.7), 1.7, 2.4);
   return (
-    <Stage label="Por qué así">
+    <Stage label="Apuesta segura">
       <Enter
         at={0.1}
         style={{
@@ -32,9 +32,9 @@ export const WhyDivider: React.FC = () => {
           fontWeight: 500,
         }}
       >
-        Por qué lo
+        Una apuesta
         <br />
-        <span style={{ color: C.lime }}>hicimos así.</span>
+        <span style={{ color: C.lime }}>segura.</span>
       </Enter>
       <svg
         width={1920}

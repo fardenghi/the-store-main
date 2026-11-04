@@ -8,8 +8,14 @@ import { Retrieval } from "../scenes/Retrieval";
 import { Context } from "../scenes/Context";
 import { Response } from "../scenes/Response";
 import { Followup } from "../scenes/Followup";
+import { AGENDA_LENGTH, Agenda } from "./Agenda";
 import { Cover } from "./Cover";
 import { Problem } from "./Problem";
+import {
+  ROW_START,
+  WHY_NOT_SEARCH_LENGTH,
+  WhyNotSearch,
+} from "./WhyNotSearch";
 import { LiveDemo } from "./LiveDemo";
 import {
   DECISION_LENGTHS,
@@ -19,6 +25,7 @@ import {
 } from "./Decisions";
 import { WhyDivider } from "./WhyDivider";
 import { Closing } from "./Closing";
+import { Pitch } from "./Pitch";
 
 export const FPS = 30;
 export const WIDTH = 1920;
@@ -47,7 +54,7 @@ export const SECTIONS = [
   "El problema",
   "La solución",
   "Cómo funciona",
-  "Por qué así",
+  "Apuesta segura",
 ];
 const HOW = 2;
 
@@ -74,6 +81,15 @@ export const slides: Slide[] = [
     stops: [3],
   },
   {
+    id: "Agenda",
+    section: null,
+    footer: "Agenda",
+    title: "Agenda",
+    component: Agenda,
+    durationInFrames: sec(AGENDA_LENGTH),
+    stops: [AGENDA_LENGTH],
+  },
+  {
     id: "Problema",
     section: 0,
     footer: "El problema",
@@ -81,6 +97,15 @@ export const slides: Slide[] = [
     component: Problem,
     durationInFrames: sec(7),
     stops: [3.4, 7],
+  },
+  {
+    id: "Buscador",
+    section: 0,
+    footer: "El problema · ¿Y un buscador?",
+    title: "El problema · ¿Y si ponemos un buscador?",
+    component: WhyNotSearch,
+    durationInFrames: sec(WHY_NOT_SEARCH_LENGTH),
+    stops: [ROW_START[1] - 0.1, WHY_NOT_SEARCH_LENGTH],
   },
   {
     id: "Demo",
@@ -157,8 +182,8 @@ export const slides: Slide[] = [
   {
     id: "PorQue-separador",
     section: 3,
-    footer: "Por qué así",
-    title: "Por qué así · Separador",
+    footer: "Apuesta segura",
+    title: "Apuesta segura · Separador",
     component: WhyDivider,
     durationInFrames: sec(3),
     stops: [3],
@@ -166,8 +191,8 @@ export const slides: Slide[] = [
   {
     id: "PorQue-servicio",
     section: 3,
-    footer: "Por qué así",
-    title: "Por qué así · Un servicio más",
+    footer: "Apuesta segura · Riesgo 1: que rompa la tienda",
+    title: "Apuesta segura · Un servicio más",
     component: DecisionService,
     durationInFrames: sec(DECISION_LENGTHS[0]),
     stops: [DECISION_LENGTHS[0]],
@@ -175,8 +200,8 @@ export const slides: Slide[] = [
   {
     id: "PorQue-modelo",
     section: 3,
-    footer: "Por qué así",
-    title: "Por qué así · Modelo",
+    footer: "Apuesta segura · Riesgo 2: que el modelo se equivoque",
+    title: "Apuesta segura · Modelo",
     component: DecisionModel,
     durationInFrames: sec(DECISION_LENGTHS[1]),
     stops: [DECISION_LENGTHS[1]],
@@ -184,11 +209,20 @@ export const slides: Slide[] = [
   {
     id: "PorQue-busqueda",
     section: 3,
-    footer: "Por qué así",
-    title: "Por qué así · Primero entender",
+    footer: "Apuesta segura · Riesgo 3: que no entienda",
+    title: "Apuesta segura · Primero entender",
     component: DecisionSearch,
     durationInFrames: sec(DECISION_LENGTHS[2]),
     stops: [DECISION_LENGTHS[2]],
+  },
+  {
+    id: "Producto",
+    section: null,
+    footer: "El producto",
+    title: "El producto en una frase",
+    component: Pitch,
+    durationInFrames: sec(2.5),
+    stops: [2.5],
   },
   {
     id: "Cierre",

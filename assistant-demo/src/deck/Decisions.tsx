@@ -4,7 +4,7 @@ import { useSceneTime } from "../clock";
 import { C, Glyph, Stage, clamp } from "../design";
 import { Core, Rail, Tile, Check, progress } from "../motion";
 
-// "Por qué así": tres decisiones, una por slide. Cada una tiene un título
+// "Apuesta segura": tres decisiones, una por slide (un riesgo cada una). Cada una tiene un título
 // corto y una ilustración. Fuentes: pre-entrega (dónde vive),
 // benchmark de modelos en src/assistant/README.md y el log de cada turno
 // (topk contra rawTopk).
@@ -341,9 +341,6 @@ const ModelPhase: React.FC = () => {
               }}
             >
               {b.name}
-              <span style={{ fontSize: 24, color: C.muted, marginLeft: 18 }}>
-                {b.ok} de {b.of} sesiones
-              </span>
             </div>
             <div
               style={{
@@ -609,17 +606,17 @@ const SearchPhase: React.FC = () => {
 };
 
 export const DecisionService: React.FC = () => (
-  <Stage label="Por qué así">
+  <Stage label="Apuesta segura">
     <ServicePhase />
   </Stage>
 );
 export const DecisionModel: React.FC = () => (
-  <Stage label="Por qué así">
+  <Stage label="Apuesta segura">
     <ModelPhase />
   </Stage>
 );
 export const DecisionSearch: React.FC = () => (
-  <Stage label="Por qué así">
+  <Stage label="Apuesta segura">
     <SearchPhase />
   </Stage>
 );
