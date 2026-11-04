@@ -11,7 +11,7 @@ import { Core, Rail, Tile, Check, progress } from "../motion";
 // Cada decisión es su propia slide: todas arrancan en 0 y `to` es su
 // duración (la parada del deck, al final).
 const PHASES = [
-  { from: 0, to: 6.4 },
+  { from: 0, to: 3.8 },
   { from: 0, to: 3.2 },
   { from: 0, to: 5.7 },
 ];
@@ -50,8 +50,7 @@ const Title: React.FC<{ k: number; children: React.ReactNode }> = ({
 
 // 1. Un servicio más: la arquitectura como un árbol acostado. La ui se abre a
 // los servicios; assistant, en el centro, entra como uno más y se abre a
-// Qdrant y al modelo: el Ollama local de la pre-entrega se tacha y lo
-// reemplaza el proveedor externo (autorizado por la cátedra).
+// Qdrant y al proveedor externo de los modelos.
 const UI = { x: 330, y: 560, w: 170, h: 72 };
 const COL = 900;
 const services = [
@@ -74,8 +73,7 @@ const Branch: React.FC<{
   y2: number;
   p: number;
   color?: string;
-  dashed?: boolean;
-}> = ({ x1, y1, x2, y2, p, color = C.line, dashed = false }) => {
+}> = ({ x1, y1, x2, y2, p, color = C.line }) => {
   const xm = (x1 + x2) / 2;
   return (
     <path
@@ -84,9 +82,8 @@ const Branch: React.FC<{
       stroke={color}
       strokeWidth={2}
       pathLength={1}
-      strokeDasharray={dashed ? "0.02 0.015" : 1}
-      strokeDashoffset={dashed ? 0 : 1 - p}
-      opacity={dashed ? p : 1}
+      strokeDasharray={1}
+      strokeDashoffset={1 - p}
     />
   );
 };
@@ -135,10 +132,7 @@ const ServicePhase: React.FC = () => {
   const svcAt = (i: number) => 0.4 + i * 0.12;
   const assist = progress(T(1.2), 1.2, 2);
   const qdrant = progress(T(2), 2, 2.6);
-  const ollama = progress(T(2.6), 2.6, 3);
-  // Ollama queda a la vista ~1.8 s antes de tacharse.
-  const ollamaOut = progress(T(5.1), 5.1, 5.6);
-  const cloud = progress(T(5.3), 5.3, 5.9);
+  const cloud = progress(T(2.6), 2.6, 3.2);
   const uiRight = UI.x + UI.w / 2;
   const assistRight = COL + ASSIST.w / 2;
   return (
@@ -176,15 +170,6 @@ const ServicePhase: React.FC = () => {
           y2={QDRANT.y}
           p={qdrant}
           color={C.lime}
-        />
-        <Branch
-          x1={assistRight}
-          y1={ASSIST.y}
-          x2={KIDS - 200}
-          y2={MODEL.y}
-          p={ollama * (1 - cloud)}
-          color={C.muted}
-          dashed
         />
         <Branch
           x1={assistRight}
@@ -244,35 +229,7 @@ const ServicePhase: React.FC = () => {
         <span style={{ fontSize: 30 }}>qdrant</span>
       </Pill>
 
-      {/* Modelo: Ollama local (tachado, sale) → proveedor externo. */}
-      <Pill
-        x={KIDS - 70}
-        y={MODEL.y}
-        w={260}
-        h={MODEL.h}
-        opacity={ollama * (1 - ollamaOut)}
-        style={{
-          flexDirection: "column",
-          gap: 4,
-          background: "transparent",
-          border: `2px dashed ${C.muted}`,
-          translate: `${-60 * ollamaOut}px 0`,
-        }}
-      >
-        <span style={{ ...mono, fontSize: 30 }}>ollama</span>
-        <span style={{ fontSize: 21, color: C.muted }}>local</span>
-        <div
-          style={{
-            position: "absolute",
-            left: 18,
-            top: "50%",
-            height: 3,
-            width: `${(260 - 36) * progress(T(4.5), 4.5, 5)}px`,
-            background: C.lilac,
-            rotate: "-12deg",
-          }}
-        />
-      </Pill>
+      {/* Modelos: proveedor externo. */}
       <Pill
         x={KIDS}
         y={MODEL.y}

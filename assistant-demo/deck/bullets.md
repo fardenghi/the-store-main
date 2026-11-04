@@ -140,8 +140,7 @@ respalda.
 ## 12. Un servicio más
 
 **Se ve:** la `ui` se abre a los servicios; `assistant` aparece en el centro y
-se conecta a `qdrant`. Debajo, "ollama · local" se tacha y lo reemplaza
-"NVIDIA · Gemini · externo · HTTPS".
+se conecta a `qdrant` y, debajo, a "NVIDIA · Gemini · externo · HTTPS".
 
 **Contar:** toda la lógica de GenAI vive en un microservicio nuevo (Java 21,
 Spring AI), el único que habla con Qdrant y con los modelos; la `ui` sigue
