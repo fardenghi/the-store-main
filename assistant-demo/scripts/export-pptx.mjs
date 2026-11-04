@@ -1,7 +1,7 @@
 // Genera el PPT entregable a partir del deck: una slide por parada, con la
 // imagen de la parada ya asentada (lo que ve el público mientras se habla).
-// Sin notas del orador: el discurso no va en el entregable. Cierra con la slide
-// de recursos (video y repositorio).
+// Sin notas del orador. Cierra con la slide de recursos (video y
+// repositorio).
 //
 //   npm run pptx                                  # sin link al video
 //   VIDEO_URL=https://... npm run pptx            # con link al video

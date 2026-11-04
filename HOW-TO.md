@@ -29,7 +29,7 @@ la conversación, compara productos y agrega al carrito.
 | `carts`, `orders`, `checkout` | —                                                                                                                                                | Sin cambios  |
 
 
-Modelos (en la nube; ver [sección 8](#8-diferencias-con-la-pre-entrega)):
+Modelos (en la nube; ver [sección 7](#7-diferencias-con-la-pre-entrega)):
 
 
 | Rol                                           | Proveedor                          | Modelo                  |

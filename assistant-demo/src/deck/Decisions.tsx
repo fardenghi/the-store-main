@@ -5,9 +5,8 @@ import { C, Glyph, Stage, clamp } from "../design";
 import { Core, Rail, Tile, Check, progress } from "../motion";
 
 // "Apuesta segura": tres decisiones, una por slide (un riesgo cada una). Cada una tiene un título
-// corto y una ilustración. Fuentes: pre-entrega (dónde vive),
-// benchmark de modelos en src/assistant/README.md y el log de cada turno
-// (topk contra rawTopk).
+// corto y una ilustración. Fuentes: benchmark de modelos en
+// src/assistant/README.md y el log de cada turno (topk contra rawTopk).
 // Cada decisión es su propia slide: todas arrancan en 0 y `to` es su
 // duración (la parada del deck, al final).
 const PHASES = [
@@ -362,7 +361,7 @@ const ModelPhase: React.FC = () => {
 // (src/assistant/README.md). "too pricey, anything cheaper?" crudo trae 1 de 5
 // productos correctos (alfombras y macetas); reescrito como "sofa" con
 // maxPrice 988 trae 5 de 5. Las fotos son asientos reales del catálogo por
-// debajo de $988. (Total de las 10 consultas, para el discurso: 42/50 crudo
+// debajo de $988. (Total de las 10 consultas: 42/50 crudo
 // contra 45/50 reescrito, promedio de 3 corridas: 45, 43 y 47.)
 const SEATS = [
   "fad3214a-b0f1-53fc-9d14-c5963ad4eda2", // Sloane Tufted Leather Loveseat, $869
