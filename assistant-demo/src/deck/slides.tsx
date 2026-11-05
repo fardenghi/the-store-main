@@ -16,6 +16,8 @@ import {
   WHY_NOT_SEARCH_LENGTH,
   WhyNotSearch,
 } from "./WhyNotSearch";
+import { ARCHITECTURE_LENGTH, Architecture } from "./Architecture";
+import { CONCEPTS_LENGTH, CONCEPTS_STOP, Concepts } from "./Concepts";
 import { LiveDemo } from "./LiveDemo";
 import {
   DECISION_LENGTHS,
@@ -106,6 +108,24 @@ export const slides: Slide[] = [
     component: WhyNotSearch,
     durationInFrames: sec(WHY_NOT_SEARCH_LENGTH),
     stops: [ROW_START[1] - 0.1, WHY_NOT_SEARCH_LENGTH],
+  },
+  {
+    id: "Arquitectura",
+    section: 1,
+    footer: "La solución · Arquitectura",
+    title: "La solución · Arquitectura completa",
+    component: Architecture,
+    durationInFrames: sec(ARCHITECTURE_LENGTH),
+    stops: [ARCHITECTURE_LENGTH],
+  },
+  {
+    id: "Piezas",
+    section: 1,
+    footer: "La solución · Modelo y base vectorial",
+    title: "La solución · Qué es un LLM y una base vectorial",
+    component: Concepts,
+    durationInFrames: sec(CONCEPTS_LENGTH),
+    stops: [CONCEPTS_STOP, CONCEPTS_LENGTH],
   },
   {
     id: "Demo",
