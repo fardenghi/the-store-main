@@ -3,7 +3,7 @@ import { useSceneTime } from "../clock";
 import { C, Enter, Stage } from "../design";
 import { Core, Tile, progress } from "../motion";
 
-// Cierre: "Gracias. ¿Preguntas?" con la misma animación que la portada (los
+// Cierre: "Muchas gracias. ¿Preguntas?" con la misma animación que la portada (los
 // productos orbitando el asistente) y sus focos de luz, para cerrar igual que
 // se abrió.
 export const Closing: React.FC = () => {
@@ -36,13 +36,13 @@ export const Closing: React.FC = () => {
           position: "absolute",
           left: 96,
           top: 530 - 145,
-          fontSize: 148,
+          fontSize: 120,
           lineHeight: 0.98,
-          letterSpacing: -8,
+          letterSpacing: -6,
           fontWeight: 500,
         }}
       >
-        Gracias.
+        Muchas gracias.
         <br />
         <span style={{ color: C.lime }}>¿Preguntas?</span>
       </Enter>

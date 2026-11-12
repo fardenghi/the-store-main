@@ -1,30 +1,23 @@
 import React from "react";
 import { useSceneTime } from "../clock";
-import { C, Enter, Glyph, Head, Stage } from "../design";
-import { Check, progress } from "../motion";
-import { SECTIONS } from "./slides";
+import { C, Enter, Head, Stage } from "../design";
+import { progress } from "../motion";
 
-// Índice del pitch: las cuatro secciones del deck (las mismas marcas del pie),
-// una tarjeta por sección con un ícono que anticipa su contenido. Un riel las
-// une y una luz lo recorre en loop, para que la slide no quede quieta mientras
-// se habla.
-// Títulos partidos en dos líneas para que las cuatro tarjetas queden parejas.
-const TITLES = [
-  ["El", "problema"],
-  ["La", "solución"],
-  ["Cómo", "funciona"],
-  ["Apuesta", "segura"],
-];
-const SUBTITLES = [
-  "Lo que hoy pierde la tienda",
-  "El asistente, en vivo",
-  "Un mensaje, punta a punta",
-  "Tres riesgos, ya medidos",
+// Dos bloques para la reentrega, con un riel animado que los conecta.
+const ITEMS = [
+  {
+    title: ["El", "problema"],
+    subtitle: "Lo que hoy pierde la tienda",
+  },
+  {
+    title: ["Repaso de la arquitectura", "de la solución"],
+    subtitle: "Sus componentes y cómo funciona el asistente",
+  },
 ];
 const LEFT = 96;
 const WIDTH = 1728;
 const GAP = 28;
-const CARD_W = (WIDTH - GAP * 3) / 4;
+const CARD_W = (WIDTH - GAP * (ITEMS.length - 1)) / ITEMS.length;
 const RAIL_Y = 410;
 const CARD_TOP = 460;
 const CARD_H = 400;
@@ -49,69 +42,33 @@ const Icon: React.FC<{ index: number; t: number }> = ({ index, t }) => {
       </div>
     );
   }
-  if (index === 1) {
-    // Burbuja de chat con los tres puntos de "escribiendo".
-    return (
-      <div
-        style={{
-          width: 120,
-          height: 84,
-          boxSizing: "border-box",
-          borderRadius: "30px 30px 30px 8px",
-          border: `2px solid ${C.lime}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-        }}
-      >
-        {[0, 1, 2].map((d) => (
-          <span
-            key={d}
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: "50%",
-              background: C.lime,
-              opacity: 0.35 + 0.65 * Math.max(0, Math.sin(t * 5 - d * 0.9)),
-            }}
-          />
-        ))}
-      </div>
-    );
-  }
-  if (index === 2) {
-    return (
-      <div
-        style={{
-          width: 84,
-          height: 84,
-          boxSizing: "border-box",
-          borderRadius: "50%",
-          border: `2px solid ${C.lime}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Glyph kind="vector" size={64} />
-      </div>
-    );
-  }
   return (
+    // Burbuja de chat con los tres puntos de "escribiendo".
     <div
       style={{
-        width: 84,
+        width: 120,
         height: 84,
-        borderRadius: "50%",
-        background: C.lime,
+        boxSizing: "border-box",
+        borderRadius: "30px 30px 30px 8px",
+        border: `2px solid ${C.lime}`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        boxShadow: "0 0 30px #d4f77d55",
+        gap: 12,
       }}
     >
-      <Check size={50} />
+      {[0, 1, 2].map((d) => (
+        <span
+          key={d}
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: C.lime,
+            opacity: 0.35 + 0.65 * Math.max(0, Math.sin(t * 5 - d * 0.9)),
+          }}
+        />
+      ))}
     </div>
   );
 };
@@ -150,18 +107,16 @@ export const Agenda: React.FC = () => {
             style={{ filter: "drop-shadow(0 0 12px #d4f77d)" }}
           />
         )}
-        {SECTIONS.map((_, i) => {
+        {ITEMS.map((_, i) => {
           const x = LEFT + i * (CARD_W + GAP) + 40;
           const on = progress(T(0.4 + i * 0.3), 0.4 + i * 0.3, 0.8 + i * 0.3);
-          return (
-            <circle key={i} cx={x} cy={RAIL_Y} r={9 * on} fill={C.lime} />
-          );
+          return <circle key={i} cx={x} cy={RAIL_Y} r={9 * on} fill={C.lime} />;
         })}
       </svg>
 
-      {SECTIONS.map((name, i) => (
+      {ITEMS.map((item, i) => (
         <Enter
-          key={name}
+          key={item.title.join(" ")}
           at={0.5 + i * 0.3}
           style={{
             position: "absolute",
@@ -207,9 +162,9 @@ export const Agenda: React.FC = () => {
               fontWeight: 500,
             }}
           >
-            {TITLES[i][0]}
+            {item.title[0]}
             <br />
-            {TITLES[i][1]}
+            {item.title[1]}
           </div>
           <div
             style={{
@@ -219,11 +174,11 @@ export const Agenda: React.FC = () => {
               color: C.muted,
             }}
           >
-            {SUBTITLES[i]}
+            {item.subtitle}
           </div>
-          {/* Las mismas marcas del pie: así se reconoce la sección después. */}
+          {/* Una marca por cada bloque de la agenda. */}
           <div style={{ display: "flex", gap: 8, marginTop: 30 }}>
-            {SECTIONS.map((__, j) => (
+            {ITEMS.map((__, j) => (
               <div
                 key={j}
                 style={{

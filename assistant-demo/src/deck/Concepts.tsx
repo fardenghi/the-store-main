@@ -4,13 +4,9 @@ import { useSceneTime } from "../clock";
 import { C, Glyph, Stage, clamp } from "../design";
 import { Check, progress } from "../motion";
 
-// Las dos piezas nuevas, a grandes rasgos. A la izquierda, qué es un modelo
-// de lenguaje: con el contexto predice el próximo token, y repite. A la
-// derecha, qué es una base vectorial: cada producto pasa por el modelo de
-// embeddings y queda como un punto; buscar es encontrar los puntos más
-// cercanos a la consulta. La parada deja hablar de las dos antes de que entre
-// la comparación con las bases que ya usa la tienda (MySQL en catalog y
-// DynamoDB en carts, en su versión original).
+// Por qué estas piezas encajan con el asistente: interpretar pedidos y
+// recuperar productos por significado. La parada permite explicar el ejemplo
+// antes de mostrar los beneficios de la búsqueda vectorial.
 export const CONCEPTS_STOP = 3.6;
 export const CONCEPTS_LENGTH = 6;
 
@@ -126,18 +122,10 @@ const Arrow: React.FC<{ x: number; y: number; w: number; p: number }> = ({
 // ---- Izquierda: el modelo de lenguaje --------------------------------------
 
 const VIS_Y = 420;
-const CANDIDATES = [
-  { token: "lamps", p: 0.72 },
-  { token: "options", p: 0.19 },
-  { token: "chairs", p: 0.04 },
-];
-
 const Model: React.FC = () => {
   const T = useSceneTime();
   const show = useShow();
   const t = T();
-  const bars = progress(T(1.3), 1.3, 2.1);
-  const pick = progress(T(2.1), 2.1, 2.5);
   return (
     <>
       <Caps
@@ -146,7 +134,7 @@ const Model: React.FC = () => {
         Modelo de lenguaje · LLM
       </Caps>
       <Heading left={LEFT} style={show(0.25)}>
-        Predice el texto <span style={{ color: C.lime }}>que sigue.</span>
+        Del pedido a la <span style={{ color: C.lime }}>recomendación.</span>
       </Heading>
 
       {/* Contexto: lo que recibe el modelo. */}
@@ -169,7 +157,7 @@ const Model: React.FC = () => {
         }}
       >
         <Caps color={C.muted} style={{ fontSize: 16 }}>
-          Contexto
+          Pedido del cliente
         </Caps>
         <div
           style={{
@@ -181,13 +169,11 @@ const Model: React.FC = () => {
             fontSize: 20,
           }}
         >
-          lamps under $100?
+          Una lámpara para leer
         </div>
-        <div style={{ fontSize: 18, color: C.muted }}>
-          + productos del catálogo
-        </div>
+        <div style={{ fontSize: 18, color: C.muted }}>por menos de US$100</div>
         <div style={{ fontSize: 22, color: C.ink }}>
-          Here are three
+          + conversación y catálogo
           <span style={{ color: C.lime, opacity: t % 1 < 0.6 ? 1 : 0 }}>
             {" "}
             ▍
@@ -235,9 +221,8 @@ const Model: React.FC = () => {
             color: C.muted,
           }}
         >
-          miles de millones
-          <br />
-          de parámetros
+          Interpreta el pedido
+          <br />y redacta la respuesta
         </div>
       </div>
       <Arrow
@@ -247,64 +232,28 @@ const Model: React.FC = () => {
         p={progress(T(1.2), 1.2, 1.5)}
       />
 
-      {/* Próximo token: probabilidades. */}
+      {/* Dos aportes al flujo: orientar la búsqueda y redactar con contexto. */}
       <div
         style={{
           position: "absolute",
           left: LEFT + 566,
-          top: VIS_Y + 22,
+          top: VIS_Y + 12,
           width: LEFT_W - 566,
           ...show(1.2),
         }}
       >
         <Caps color={C.muted} style={{ fontSize: 16 }}>
-          Próximo token
+          Para buscar
         </Caps>
-        {CANDIDATES.map((c, i) => {
-          const best = i === 0;
-          return (
-            <div key={c.token} style={{ marginTop: 20 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontFamily: mono,
-                  fontSize: 20,
-                  color: best
-                    ? interpolate(pick, [0, 1], [0, 1]) > 0.5
-                      ? C.lime
-                      : C.ink
-                    : C.muted,
-                }}
-              >
-                <span>{c.token}</span>
-                <span>{Math.round(c.p * 100 * bars)}%</span>
-              </div>
-              <div
-                style={{
-                  marginTop: 8,
-                  height: 12,
-                  borderRadius: 6,
-                  background: C.panel,
-                  border: `1px solid ${C.line}`,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    width: `${c.p * 100 * bars}%`,
-                    height: "100%",
-                    background: best ? C.lime : C.muted,
-                    opacity: best ? 0.6 + 0.4 * pick : 0.6,
-                    boxShadow: best
-                      ? `0 0 ${20 * pick}px #d4f77d80`
-                      : undefined,
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
+        <div style={{ marginTop: 12, fontSize: 24, color: C.lime }}>
+          Lámparas · hasta US$100
+        </div>
+        <Caps color={C.muted} style={{ marginTop: 30, fontSize: 16 }}>
+          Para responder
+        </Caps>
+        <div style={{ marginTop: 12, fontSize: 22, lineHeight: 1.35 }}>
+          Recomendación basada en los productos recuperados
+        </div>
       </div>
 
       <div
@@ -319,15 +268,15 @@ const Model: React.FC = () => {
         }}
       >
         <Bullet style={show(2.3)}>
-          Aprendió el lenguaje leyendo muchísimo texto.
+          Interpreta necesidades expresadas en lenguaje cotidiano.
         </Bullet>
         <Bullet style={show(2.45)}>
-          Genera token por token (pedazos de palabra) hasta armar la respuesta.
+          Usa la conversación para resolver pedidos de seguimiento.
         </Bullet>
         <Bullet style={show(2.6)}>
           <span>
-            No conoce nuestro catálogo:{" "}
-            <span style={{ color: C.ink }}>se lo damos en el contexto.</span>
+            Para recomendar productos reales:{" "}
+            <span style={{ color: C.ink }}>recibe los datos del catálogo.</span>
           </span>
         </Bullet>
       </div>
@@ -374,13 +323,13 @@ const CLUSTERS: { label: string; at: Pt; points: Pt[] }[] = [
     ],
   },
 ];
-// La lámpara nueva cae en su grupo; la consulta queda entre lámparas y
-// sillones, y sus vecinos más cercanos son de los dos grupos.
+// La consulta sobre luz para leer queda cerca de las lámparas del catálogo.
+// El espacio es una ilustración en 2D de los vectores de alta dimensión.
 const NEW_POINT: Pt = [124, 140];
-const QUERY: Pt = [235, 104];
+const QUERY: Pt = [180, 125];
 const NEIGHBORS: Pt[] = [
-  [295, 95],
-  [315, 132],
+  [135, 65],
+  [100, 118],
   [145, 100],
 ];
 const abs = ([x, y]: Pt): Pt => [SCATTER.x + x, SCATTER.y + y];
@@ -405,7 +354,7 @@ const VectorDb: React.FC = () => {
         Base de datos vectorial · Qdrant
       </Caps>
       <Heading left={RIGHT} style={show(0.45)}>
-        Busca por <span style={{ color: C.lime }}>cercanía.</span>
+        Encuentra por <span style={{ color: C.lime }}>significado.</span>
       </Heading>
 
       {/* Del texto del producto a un vector. */}
@@ -466,7 +415,9 @@ const VectorDb: React.FC = () => {
             opacity: progress(T(1.2), 1.2, 1.6),
           }}
         >
-          768 números = su significado
+          Vector de alta dimensión
+          <br />
+          Representa rasgos del significado
         </div>
       </div>
 
@@ -568,7 +519,7 @@ const VectorDb: React.FC = () => {
         style={{
           position: "absolute",
           left: q[0] - 120,
-          top: q[1] - 46,
+          top: q[1] + 28,
           width: 240,
           textAlign: "center",
           fontSize: 17,
@@ -576,31 +527,25 @@ const VectorDb: React.FC = () => {
           opacity: query,
         }}
       >
-        “cozy to read”
+        “luz para leer”
       </div>
     </>
   );
 };
 
-// ---- Comparación: por qué no otra base -------------------------------------
+// ---- Beneficios para nuestra búsqueda de productos -------------------------
 
 const OPTIONS = [
   {
-    kind: "Relacional",
-    example: "MySQL",
-    reason: "Compara valores exactos: “cozy” no aparece en ningún nombre.",
-    ok: false,
+    kind: "Semántica",
+    example: "Embeddings",
+    reason: "Textos de significado similar tienden a tener vectores cercanos.",
+    ok: true,
   },
   {
-    kind: "Clave-valor",
-    example: "DynamoDB",
-    reason: "Encuentra por clave; para el más parecido, hay que recorrer todo.",
-    ok: false,
-  },
-  {
-    kind: "Vectorial",
-    example: "Qdrant",
-    reason: "Índice de vecinos cercanos, con filtros por tag y precio.",
+    kind: "Relevancia",
+    example: "Similitud vectorial",
+    reason: "Vincula el pedido con productos, aunque usen otras palabras.",
     ok: true,
   },
 ];
@@ -621,7 +566,7 @@ const WhyVector: React.FC = () => {
           ...show(start),
         }}
       >
-        ¿Por qué no otra base para el catálogo?
+        ¿Qué aporta a nuestro asistente?
       </Caps>
       {OPTIONS.map((o, i) => {
         const at = start + 0.3 + i * 0.4;
@@ -692,7 +637,7 @@ export const Concepts: React.FC = () => {
   const show = useShow();
   const T = useSceneTime();
   return (
-    <Stage label="La solución · Modelo y base vectorial">
+    <Stage label="La solución · Por qué estas tecnologías">
       <div
         style={{
           position: "absolute",
@@ -705,7 +650,7 @@ export const Concepts: React.FC = () => {
           ...show(0),
         }}
       >
-        Las dos piezas <span style={{ color: C.lime }}>nuevas.</span>
+        Dos piezas que <span style={{ color: C.lime }}>encajan.</span>
       </div>
       <div
         style={{

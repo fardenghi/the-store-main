@@ -11,6 +11,7 @@ import { Followup } from "../scenes/Followup";
 import { AGENDA_LENGTH, Agenda } from "./Agenda";
 import { Cover } from "./Cover";
 import { Problem } from "./Problem";
+import { Solution } from "./Solution";
 import {
   ROW_START,
   WHY_NOT_SEARCH_LENGTH,
@@ -110,6 +111,15 @@ export const slides: Slide[] = [
     stops: [ROW_START[1] - 0.1, WHY_NOT_SEARCH_LENGTH],
   },
   {
+    id: "Solucion",
+    section: 1,
+    footer: "La solución",
+    title: "La solución · Un nuevo asistente en la tienda",
+    component: Solution,
+    durationInFrames: sec(3),
+    stops: [3],
+  },
+  {
     id: "Arquitectura",
     section: 1,
     footer: "La solución · Arquitectura",
@@ -121,11 +131,20 @@ export const slides: Slide[] = [
   {
     id: "Piezas",
     section: 1,
-    footer: "La solución · Modelo y base vectorial",
-    title: "La solución · Qué es un LLM y una base vectorial",
+    footer: "La solución · Por qué estas tecnologías",
+    title: "La solución · Por qué un LLM y una base vectorial",
     component: Concepts,
     durationInFrames: sec(CONCEPTS_LENGTH),
     stops: [CONCEPTS_STOP, CONCEPTS_LENGTH],
+  },
+  {
+    id: "Cierre",
+    section: null,
+    footer: "Redes de Información · ITBA · 2C 2026",
+    title: "Cierre · Muchas gracias, preguntas",
+    component: Closing,
+    durationInFrames: sec(3.5),
+    stops: [3.5],
   },
   {
     id: "Demo",
@@ -243,15 +262,6 @@ export const slides: Slide[] = [
     component: Pitch,
     durationInFrames: sec(2.5),
     stops: [2.5],
-  },
-  {
-    id: "Cierre",
-    section: null,
-    footer: "Redes de Información · ITBA · 2C 2026",
-    title: "Cierre · Gracias, preguntas",
-    component: Closing,
-    durationInFrames: sec(3.5),
-    stops: [3.5],
   },
 ];
 
