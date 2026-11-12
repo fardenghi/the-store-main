@@ -5,10 +5,12 @@ import { C, Glyph, Stage, clamp } from "../design";
 import { Check, progress } from "../motion";
 
 // Por qué estas piezas encajan con el asistente: interpretar pedidos y
-// recuperar productos por significado. La parada permite explicar el ejemplo
-// antes de mostrar los beneficios de la búsqueda vectorial.
-export const CONCEPTS_STOP = 3.6;
-export const CONCEPTS_LENGTH = 6;
+// recuperar productos por significado. Primero el LLM; la parada deja
+// explicarlo antes de que entre Qdrant junto con lo que aporta.
+export const CONCEPTS_STOP = 3;
+// Corrimiento de la mitad de Qdrant: arranca justo después de la parada.
+const V = CONCEPTS_STOP - 0.2;
+export const CONCEPTS_LENGTH = V + 4.8;
 
 const mono = "Menlo, Consolas, monospace";
 const LEFT = 96;
@@ -169,11 +171,11 @@ const Model: React.FC = () => {
             fontSize: 20,
           }}
         >
-          Una lámpara para leer
+          Lámpara para leer
         </div>
-        <div style={{ fontSize: 18, color: C.muted }}>por menos de US$100</div>
+        <div style={{ fontSize: 18, color: C.muted }}>hasta US$100</div>
         <div style={{ fontSize: 22, color: C.ink }}>
-          + conversación y catálogo
+          + catálogo
           <span style={{ color: C.lime, opacity: t % 1 < 0.6 ? 1 : 0 }}>
             {" "}
             ▍
@@ -221,8 +223,7 @@ const Model: React.FC = () => {
             color: C.muted,
           }}
         >
-          Interpreta el pedido
-          <br />y redacta la respuesta
+          Interpreta y responde
         </div>
       </div>
       <Arrow
@@ -245,14 +246,21 @@ const Model: React.FC = () => {
         <Caps color={C.muted} style={{ fontSize: 16 }}>
           Para buscar
         </Caps>
-        <div style={{ marginTop: 12, fontSize: 24, color: C.lime }}>
-          Lámparas · hasta US$100
+        <div
+          style={{
+            marginTop: 12,
+            fontSize: 22,
+            color: C.lime,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Lámparas ≤ US$100
         </div>
         <Caps color={C.muted} style={{ marginTop: 30, fontSize: 16 }}>
           Para responder
         </Caps>
         <div style={{ marginTop: 12, fontSize: 22, lineHeight: 1.35 }}>
-          Recomendación basada en los productos recuperados
+          Con productos reales
         </div>
       </div>
 
@@ -267,16 +275,11 @@ const Model: React.FC = () => {
           gap: 16,
         }}
       >
-        <Bullet style={show(2.3)}>
-          Interpreta necesidades expresadas en lenguaje cotidiano.
-        </Bullet>
+        <Bullet style={show(2.3)}>Entiende lenguaje cotidiano.</Bullet>
         <Bullet style={show(2.45)}>
-          Usa la conversación para resolver pedidos de seguimiento.
-        </Bullet>
-        <Bullet style={show(2.6)}>
           <span>
-            Para recomendar productos reales:{" "}
-            <span style={{ color: C.ink }}>recibe los datos del catálogo.</span>
+            Recomienda con{" "}
+            <span style={{ color: C.ink }}>datos del catálogo.</span>
           </span>
         </Bullet>
       </div>
@@ -338,8 +341,8 @@ const VectorDb: React.FC = () => {
   const T = useSceneTime();
   const show = useShow();
   const t = T();
-  const fly = progress(T(1.8), 1.8, 2.5);
-  const query = progress(T(2.5), 2.5, 2.9);
+  const fly = progress(T(V + 1.8), V + 1.8, V + 2.5);
+  const query = progress(T(V + 2.5), V + 2.5, V + 2.9);
   const from: Pt = [1330, PIPE_Y + 168];
   const to = abs(NEW_POINT);
   const flyX = interpolate(fly, [0, 1], [from[0], to[0]]);
@@ -349,11 +352,16 @@ const VectorDb: React.FC = () => {
   return (
     <>
       <Caps
-        style={{ position: "absolute", left: RIGHT, top: 280, ...show(0.4) }}
+        style={{
+          position: "absolute",
+          left: RIGHT,
+          top: 280,
+          ...show(V + 0.4),
+        }}
       >
         Base de datos vectorial · Qdrant
       </Caps>
-      <Heading left={RIGHT} style={show(0.45)}>
+      <Heading left={RIGHT} style={show(V + 0.45)}>
         Encuentra por <span style={{ color: C.lime }}>significado.</span>
       </Heading>
 
@@ -364,7 +372,7 @@ const VectorDb: React.FC = () => {
           left: RIGHT,
           top: PIPE_Y,
           width: 330,
-          ...show(0.8),
+          ...show(V + 0.8),
         }}
       >
         <div
@@ -386,7 +394,7 @@ const VectorDb: React.FC = () => {
             margin: "14px 0 14px 18px",
             fontSize: 17,
             color: C.muted,
-            opacity: progress(T(1), 1, 1.4),
+            opacity: progress(T(V + 1), V + 1, V + 1.4),
           }}
         >
           <span style={{ color: C.lime, fontSize: 22 }}>↓</span>
@@ -401,7 +409,7 @@ const VectorDb: React.FC = () => {
             fontFamily: mono,
             fontSize: 18,
             color: C.lime,
-            opacity: progress(T(1.1), 1.1, 1.5),
+            opacity: progress(T(V + 1.1), V + 1.1, V + 1.5),
           }}
         >
           [0.12, −0.83, 0.41, …]
@@ -412,12 +420,10 @@ const VectorDb: React.FC = () => {
             marginLeft: 18,
             fontSize: 17,
             color: C.muted,
-            opacity: progress(T(1.2), 1.2, 1.6),
+            opacity: progress(T(V + 1.2), V + 1.2, V + 1.6),
           }}
         >
-          Vector de alta dimensión
-          <br />
-          Representa rasgos del significado
+          Vector = significado
         </div>
       </div>
 
@@ -433,7 +439,7 @@ const VectorDb: React.FC = () => {
           borderRadius: 24,
           background: C.panel,
           border: `1px solid ${C.line}`,
-          ...show(1.2),
+          ...show(V + 1.2),
         }}
       >
         {CLUSTERS.map((c) => (
@@ -458,7 +464,7 @@ const VectorDb: React.FC = () => {
         height={1080}
         style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
       >
-        <g opacity={progress(T(1.3), 1.3, 1.8)}>
+        <g opacity={progress(T(V + 1.3), V + 1.3, V + 1.8)}>
           {CLUSTERS.flatMap((c) => c.points).map((p) => {
             const [x, y] = abs(p);
             return (
@@ -477,11 +483,8 @@ const VectorDb: React.FC = () => {
         <g opacity={query}>
           {NEIGHBORS.map((n, i) => {
             const [x, y] = abs(n);
-            const p = progress(
-              T(2.7 + i * 0.12),
-              2.7 + i * 0.12,
-              3.1 + i * 0.12,
-            );
+            const at = V + 2.7 + i * 0.12;
+            const p = progress(T(at), at, at + 0.4);
             return (
               <g key={`${x}-${y}`}>
                 <line
@@ -539,13 +542,13 @@ const OPTIONS = [
   {
     kind: "Semántica",
     example: "Embeddings",
-    reason: "Textos de significado similar tienden a tener vectores cercanos.",
+    reason: "Significados parecidos, vectores cercanos.",
     ok: true,
   },
   {
     kind: "Relevancia",
     example: "Similitud vectorial",
-    reason: "Vincula el pedido con productos, aunque usen otras palabras.",
+    reason: "Encuentra productos aunque cambien las palabras.",
     ok: true,
   },
 ];
@@ -554,7 +557,8 @@ const CMP_Y = 684;
 const WhyVector: React.FC = () => {
   const T = useSceneTime();
   const show = useShow();
-  const start = CONCEPTS_STOP + 0.1;
+  // Sin parada propia: entra apenas aparece la consulta en el espacio.
+  const start = V + 3;
   return (
     <>
       <Caps
@@ -566,7 +570,7 @@ const WhyVector: React.FC = () => {
           ...show(start),
         }}
       >
-        ¿Qué aporta a nuestro asistente?
+        ¿Qué aporta?
       </Caps>
       {OPTIONS.map((o, i) => {
         const at = start + 0.3 + i * 0.4;
